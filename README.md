@@ -154,7 +154,7 @@ Per pubblicare una versione dopo aver committato il codice:
 .\scripts\release.cmd -Version 1.3.0
 ```
 
-Lo script aggiorna `<Version>` in `src/Nebula/Nebula.csproj`, crea commit e tag, e li invia a GitHub. Il primo setup del repository e i dettagli del workflow sono in [docs/aggiornamenti.md](docs/aggiornamenti.md).
+Lo script aggiorna `<Version>` in `src/Nebula/Nebula.csproj`, crea commit e tag, e li invia a GitHub. Il repository deve essere **pubblico**, perché l'aggiornatore scarica gli asset senza credenziali. Il primo setup del repository e i dettagli del workflow sono in [docs/aggiornamenti.md](docs/aggiornamenti.md).
 
 ## Verifiche di questa release
 

@@ -19,6 +19,11 @@ if ($changes.Length -gt 0) {
     throw "Ci sono modifiche non committate. Fai prima il commit del codice, poi esegui questo script per la release."
 }
 
+$remote = ((& git remote get-url origin 2>$null) -join "`n").Trim()
+if (-not $NoPush -and $remote.Length -eq 0) {
+    throw "Nessun remote 'origin'. Aggiungi il repository GitHub prima della release: git remote add origin https://github.com/OWNER/REPO.git"
+}
+
 $projectPath = Join-Path $root "src\Nebula\Nebula.csproj"
 $project = [System.IO.File]::ReadAllText($projectPath)
 $versionMatch = [regex]::Match($project, '<Version>\s*([0-9]+\.[0-9]+\.[0-9]+)\s*</Version>')
@@ -57,11 +62,6 @@ Write-Host "Creato commit e tag $tag." -ForegroundColor Green
 if ($NoPush) {
     Write-Host "Nessun push richiesto (-NoPush). Quando vuoi pubblicare: git push origin HEAD; git push origin $tag" -ForegroundColor Yellow
     return
-}
-
-$remote = (& git remote get-url origin 2>$null)
-if ([string]::IsNullOrWhiteSpace($remote)) {
-    throw "Nessun remote 'origin'. Aggiungi il repository GitHub e poi esegui: git push origin HEAD; git push origin $tag"
 }
 
 & git push origin HEAD

@@ -69,8 +69,8 @@ public sealed class UpdateCoordinator : IDisposable
 
     /// <summary>
     /// Checks the configured manifest. With <paramref name="automatic"/> true the
-    /// package is downloaded and installed only when the user enabled AutoUpdate.
-    /// Manual checks never install a package on their own.
+    /// update window is offered when AutoUpdate is enabled; the package is
+    /// downloaded only after the user confirms. Manual checks never install on their own.
     /// </summary>
     public async Task<bool> CheckNowAsync(bool automatic, CancellationToken cancellationToken = default)
     {

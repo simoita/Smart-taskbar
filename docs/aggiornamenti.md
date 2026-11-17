@@ -124,6 +124,7 @@ Lo ZIP deve contenere i file della build direttamente nella radice e almeno `Neb
 ## Sicurezza e limiti
 
 - Lo SHA-256 verifica l'integrità del pacchetto, non autentica crittograficamente l'autore. Proteggi il repository e l'account GitHub; per una distribuzione pubblica valuta la firma del codice.
+- Il repository e le Release devono essere **pubblici** (o gli asset scaricabili senza login): l'aggiornatore non invia credenziali GitHub. Su un repository privato il download del pacchetto riceve un errore di autenticazione.
 - Non cancellare una Release ancora puntata da `latest`: pubblica una versione successiva per correggere un problema.
 - Se rinomini il repository, le installazioni vecchie continuano a puntare al vecchio URL; pubblica una build con il nuovo `UpdateRepository` o indica il nuovo URL nelle impostazioni.
 - La build è framework-dependent: sul PC serve il **.NET 8 Desktop Runtime**.
