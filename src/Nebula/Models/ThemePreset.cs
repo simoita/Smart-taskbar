@@ -66,7 +66,16 @@ public sealed record ThemePreset(
             "#FFF1F2", "#D3A0AB", "#E11D48", "#F59E0B", "pill", 1.1),
         new("sage", "Sage", "Salvia chiara, natura calma", true,
             "#F7FBF3", "#E3EFD9", "#FFFFFF", "#4D7C0F", "#0D9488",
-            "#1A2E05", "#6B7D5A", "#65A30D", "#14B8A6", "dot", 1.0)
+            "#1A2E05", "#6B7D5A", "#65A30D", "#14B8A6", "dot", 1.0),
+        new("prism", "Prism", "Vetro iridescente, luce spettrale", true,
+            "#F8FAFF", "#E7ECFF", "#FFFFFF", "#6366F1", "#EC4899",
+            "#171A2B", "#5F6480", "#6366F1", "#EC4899", "dot", 1.2),
+        new("obsidian", "Obsidian", "Nero profondo, oro discreto", false,
+            "#1A1A1A", "#050505", "#D4AF37", "#EAB308", "#F59E0B",
+            "#FFFDF5", "#B8AE92", "#EAB308", "#F59E0B", "line", 0.5),
+        new("cyber", "Cyber", "Blu notte, rosa elettrico", false,
+            "#0B1230", "#05030F", "#22D3EE", "#F472B6", "#22D3EE",
+            "#F5F3FF", "#9AA7C7", "#F472B6", "#22D3EE", "glow", 0.65)
     };
 
     public static ThemePreset Find(string? id) =>

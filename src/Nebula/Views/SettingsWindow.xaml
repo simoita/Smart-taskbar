@@ -260,7 +260,7 @@
                                         <Border Style="{StaticResource Card}" Margin="0,0,0,22">
                                             <StackPanel>
                                                 <TextBlock Text="PRESET SUPERFICI" Style="{StaticResource T.Section}" />
-                                                <TextBlock Text="Vetro, Minimal, Neon, Soft e Mono applicati dal vivo a widget, controlli rapidi e ricerca. Le schede mantengono il proprio stile."
+                                                <TextBlock Text="Vetro, Minimal, Neon, Soft, Mono e Liquid applicati dal vivo a widget, controlli rapidi e ricerca. Le schede mantengono il proprio stile."
                                                            Style="{StaticResource T.Caption}" Margin="0,0,0,12" TextWrapping="Wrap" />
                                                 <StackPanel Orientation="Horizontal">
                                                     <Button Content="Vetro" Style="{StaticResource GhostButton}"
@@ -283,6 +283,10 @@
                                                             Tag="mono" Padding="16,8" Margin="8,0,0,0"
                                                             Click="OnSurfaceStyleClick"
                                                             AutomationProperties.Name="Preset superfici Mono" />
+                                                    <Button Content="Liquid" Style="{StaticResource GhostButton}"
+                                                            Tag="liquid" Padding="16,8" Margin="8,0,0,0"
+                                                            Click="OnSurfaceStyleClick"
+                                                            AutomationProperties.Name="Preset superfici Liquid" />
                                                     <TextBlock VerticalAlignment="Center" Margin="14,0,0,0"
                                                                FontSize="10.5" Foreground="{DynamicResource C.TextMuted}"
                                                                Text="{Binding ActiveSurfaceStyleName, StringFormat='Attivo: {0}'}" />
@@ -517,7 +521,7 @@
                                                                   IsChecked="{Binding Settings.ShowGrain, Mode=TwoWay}" />
                                                     </Grid>
                                                 </Border>
-                                                <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
+                                                <Border Style="{StaticResource Row}">
                                                     <Grid>
                                                         <StackPanel MaxWidth="500" HorizontalAlignment="Left">
                                                             <TextBlock Text="Linea luminosa" FontSize="13"
@@ -528,6 +532,20 @@
                                                         <CheckBox Style="{StaticResource Switch}"
                                                                   HorizontalAlignment="Right" VerticalAlignment="Center"
                                                                   IsChecked="{Binding Settings.ShowShimmer, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+                                                <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Riflesso liquido" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Una luce soffusa segue il puntatore lungo il vetro della barra."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}"
+                                                                  HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                  AutomationProperties.Name="Riflesso liquido"
+                                                                  IsChecked="{Binding Settings.LiquidSheen, Mode=TwoWay}" />
                                                     </Grid>
                                                 </Border>
                                             </StackPanel>
@@ -613,6 +631,103 @@
                                                         <CheckBox Style="{StaticResource Switch}"
                                                                   HorizontalAlignment="Right" VerticalAlignment="Center"
                                                                   IsChecked="{Binding Settings.HideInFullscreen, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}" Margin="0,0,0,20">
+                                            <StackPanel>
+                                                <TextBlock Text="DYNAMIC ISLAND" Style="{StaticResource T.Section}" />
+                                                <TextBlock Text="Una capsula flottante in alto al centro: compatta a riposo, si espande con una molla fluida su hover o clic e mostra orologio, CPU/RAM, batteria, media e volume. Fuori dalla capsula i clic passano al desktop."
+                                                           Style="{StaticResource T.Caption}" Margin="0,0,0,10" TextWrapping="Wrap" />
+
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Mostra Dynamic Island" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="La capsula resta sopra le finestre e non aggiunge un processo separato."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}"
+                                                                  HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                  AutomationProperties.Name="Mostra Dynamic Island"
+                                                                  IsChecked="{Binding Settings.ShowIsland, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <TextBlock Text="Stile dell'isola" FontSize="13"
+                                                                   Foreground="{DynamicResource C.Text}"
+                                                                   VerticalAlignment="Center" />
+                                                        <ComboBox Width="226" Height="32" HorizontalAlignment="Right"
+                                                                  ItemsSource="{Binding IslandStyleOptions}"
+                                                                  SelectedValuePath="Id"
+                                                                  SelectedValue="{Binding Settings.IslandStyle, Mode=TwoWay}"
+                                                                  AutomationProperties.Name="Stile Dynamic Island">
+                                                            <ComboBox.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                                </DataTemplate>
+                                                            </ComboBox.ItemTemplate>
+                                                        </ComboBox>
+                                                    </Grid>
+                                                </Border>
+
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="Scala dell'isola" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <Slider Style="{StaticResource SlimSlider}" Minimum="0.8"
+                                                                    Maximum="1.3" Value="{Binding Settings.IslandScale, Mode=TwoWay}"
+                                                                    AutomationProperties.Name="Scala Dynamic Island"
+                                                                    Margin="0,8,120,0" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                                                   Text="{Binding Settings.IslandScale, StringFormat='{}{0:0.00}×'}"
+                                                                   FontSize="12" Foreground="{DynamicResource C.TextMuted}" />
+                                                    </Grid>
+                                                </Border>
+
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="Distanza dal bordo superiore" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <Slider Style="{StaticResource SlimSlider}" Minimum="0"
+                                                                    Maximum="36" Value="{Binding Settings.IslandTopMargin, Mode=TwoWay}"
+                                                                    AutomationProperties.Name="Margine superiore Dynamic Island"
+                                                                    Margin="0,8,120,0" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                                                   Text="{Binding Settings.IslandTopMargin, StringFormat='{}{0:0} px'}"
+                                                                   FontSize="12" Foreground="{DynamicResource C.TextMuted}" />
+                                                    </Grid>
+                                                </Border>
+
+                                                <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Controlli media e volume" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Mostra i tasti del player e dell'audio nella capsula espansa."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}"
+                                                                  HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                  AutomationProperties.Name="Controlli media e volume nell'isola"
+                                                                  IsChecked="{Binding Settings.IslandShowControls, Mode=TwoWay}" />
                                                     </Grid>
                                                 </Border>
                                             </StackPanel>

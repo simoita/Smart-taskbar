@@ -26,6 +26,11 @@ public sealed class AppSettings : ObservableObject
     private bool _showStats = true;
     private bool _showBattery = true;
     private bool _showSearch = true;
+    private bool _showIsland;
+    private string _islandStyle = "capsule";
+    private double _islandScale = 1.0;
+    private double _islandTopMargin = 8;
+    private bool _islandShowControls = true;
     private bool _searchIncludeWindows = true;
     private double _searchCardWidth = 720;
     private bool _showWidgets = true;
@@ -35,6 +40,7 @@ public sealed class AppSettings : ObservableObject
     private bool _showGlow = true;
     private bool _showGrain = true;
     private bool _showShimmer = true;
+    private bool _liquidSheen = true;
     private bool _animationsEnabled = true;
     private double _animationSpeed = 1.0;
     private bool _hoverMagnify = true;
@@ -212,6 +218,39 @@ public sealed class AppSettings : ObservableObject
         set => SetProperty(ref _showSearch, value);
     }
 
+    /// <summary>Floating top-center capsule with clock, system state and quick controls.</summary>
+    public bool ShowIsland
+    {
+        get => _showIsland;
+        set => SetProperty(ref _showIsland, value);
+    }
+
+    /// <summary>capsule, pill or minimal.</summary>
+    public string IslandStyle
+    {
+        get => _islandStyle;
+        set => SetProperty(ref _islandStyle, value);
+    }
+
+    public double IslandScale
+    {
+        get => _islandScale;
+        set => SetProperty(ref _islandScale, value);
+    }
+
+    public double IslandTopMargin
+    {
+        get => _islandTopMargin;
+        set => SetProperty(ref _islandTopMargin, value);
+    }
+
+    /// <summary>Shows media and volume controls in the expanded island.</summary>
+    public bool IslandShowControls
+    {
+        get => _islandShowControls;
+        set => SetProperty(ref _islandShowControls, value);
+    }
+
     public bool ShowWidgets
     {
         get => _showWidgets;
@@ -265,6 +304,13 @@ public sealed class AppSettings : ObservableObject
     {
         get => _showShimmer;
         set => SetProperty(ref _showShimmer, value);
+    }
+
+    /// <summary>A soft specular highlight follows the pointer along the bar.</summary>
+    public bool LiquidSheen
+    {
+        get => _liquidSheen;
+        set => SetProperty(ref _liquidSheen, value);
     }
 
     public bool AnimationsEnabled

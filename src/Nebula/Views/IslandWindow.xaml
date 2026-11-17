@@ -1,0 +1,237 @@
+<Window x:Class="Nebula.Views.IslandWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Nebula Island" Width="480" Height="260"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" ShowActivated="False" Topmost="True"
+        ResizeMode="NoResize" WindowStartupLocation="Manual"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        FontFamily="Segoe UI Variable Text, Segoe UI">
+
+    <Grid x:Name="Root" Background="Transparent" Opacity="0">
+        <Grid.RenderTransform>
+            <TranslateTransform x:Name="IslandSlide" Y="-8" />
+        </Grid.RenderTransform>
+
+        <Border x:Name="Capsule" Width="220" Height="40"
+                HorizontalAlignment="Center" VerticalAlignment="Top"
+                CornerRadius="20" ClipToBounds="True"
+                Background="{DynamicResource C.TooltipBg}"
+                BorderBrush="{DynamicResource C.DockStroke}" BorderThickness="1"
+                MouseEnter="OnCapsuleEnter" MouseLeave="OnCapsuleLeave"
+                MouseLeftButtonUp="OnCapsuleClick">
+
+            <Grid>
+                <Border x:Name="IslandGlow" CornerRadius="20" IsHitTestVisible="False" Opacity="0.34">
+                    <Border.Background>
+                        <RadialGradientBrush Center="0.16,0" GradientOrigin="0.16,0"
+                                             RadiusX="0.55" RadiusY="1.3">
+                            <GradientStop Color="{DynamicResource C.AccentColor}" Offset="0" />
+                            <GradientStop Color="#008B5CF6" Offset="1" />
+                        </RadialGradientBrush>
+                    </Border.Background>
+                </Border>
+
+                <Border x:Name="IslandGlow2" CornerRadius="20" IsHitTestVisible="False" Opacity="0.22">
+                    <Border.Background>
+                        <RadialGradientBrush Center="0.86,0.2" GradientOrigin="0.86,0.2"
+                                             RadiusX="0.5" RadiusY="1.2">
+                            <GradientStop Color="{DynamicResource C.Accent2Color}" Offset="0" />
+                            <GradientStop Color="#0022D3EE" Offset="1" />
+                        </RadialGradientBrush>
+                    </Border.Background>
+                </Border>
+
+                <Border Height="1" VerticalAlignment="Top" Margin="18,0"
+                        Background="#40FFFFFF" IsHitTestVisible="False" />
+
+                <Grid Margin="15,0">
+                    <!-- COMPACT -->
+                    <Grid x:Name="CompactView" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Width="8" Height="8" CornerRadius="4"
+                                Background="{DynamicResource C.Accent}"
+                                VerticalAlignment="Center" />
+
+                        <TextBlock Grid.Column="1" Text="{Binding TimeText}"
+                                   Margin="9,0,0,0" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource C.Text}"
+                                   VerticalAlignment="Center"
+                                   Typography.NumeralAlignment="Tabular" />
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Monitor.CpuText}" FontSize="9.5"
+                                       Foreground="{DynamicResource C.TextMuted}"
+                                       VerticalAlignment="Center" />
+                            <Border Width="1" Height="10" Margin="8,0"
+                                    Background="{DynamicResource C.StrokeSoft}"
+                                    VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Monitor.BatteryText}" FontSize="9.5"
+                                       Foreground="{DynamicResource C.TextMuted}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- EXPANDED -->
+                    <Grid x:Name="ExpandedView" Opacity="0" Visibility="Collapsed"
+                          Margin="2,10,2,10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding TimeText}" FontSize="23"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource C.Text}"
+                                           Typography.NumeralAlignment="Tabular" />
+                                <TextBlock Text="{Binding DateText}" FontSize="10.5"
+                                           Margin="10,7,0,0"
+                                           Foreground="{DynamicResource C.TextMuted}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <Border HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Background="{DynamicResource C.Hover}" CornerRadius="9"
+                                    Padding="8,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="5" Height="5" Fill="{DynamicResource C.Success}"
+                                             VerticalAlignment="Center" />
+                                    <TextBlock Text="LIVE" FontSize="8.5" FontWeight="SemiBold"
+                                               Margin="5,0,0,0"
+                                               Foreground="{DynamicResource C.TextMuted}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <Grid Grid.Row="1" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Margin="0,0,10,0">
+                                <Grid>
+                                    <TextBlock Text="CPU" FontSize="8.5" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource C.TextMuted}" />
+                                    <TextBlock Text="{Binding Monitor.CpuText}" FontSize="10.5"
+                                               HorizontalAlignment="Right"
+                                               Foreground="{DynamicResource C.Text}" />
+                                </Grid>
+                                <ProgressBar Style="{StaticResource MiniBar}" Maximum="100"
+                                             Value="{Binding Monitor.Cpu, Mode=OneWay}"
+                                             Margin="0,4,0,0" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                <Grid>
+                                    <TextBlock Text="RAM" FontSize="8.5" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource C.TextMuted}" />
+                                    <TextBlock Text="{Binding Monitor.RamText}" FontSize="10.5"
+                                               HorizontalAlignment="Right"
+                                               Foreground="{DynamicResource C.Text}" />
+                                </Grid>
+                                <ProgressBar Style="{StaticResource MiniBar}" Maximum="100"
+                                             Value="{Binding Monitor.Ram, Mode=OneWay}"
+                                             Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Grid.Row="2" Margin="0,12,0,0"
+                              Visibility="{Binding Settings.IslandShowControls, Converter={StaticResource BoolVis}}">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                                        ToolTip="Precedente" AutomationProperties.Name="Media precedente"
+                                        Click="OnPreviousMedia">
+                                    <TextBlock Text="&#xE892;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                                </Button>
+                                <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                                        Margin="2,0" ToolTip="Play / Pausa"
+                                        AutomationProperties.Name="Media play pausa"
+                                        Click="OnPlayPauseMedia">
+                                    <TextBlock Text="&#xE768;" FontFamily="Segoe Fluent Icons" FontSize="12" />
+                                </Button>
+                                <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                                        ToolTip="Successiva" AutomationProperties.Name="Media successiva"
+                                        Click="OnNextMedia">
+                                    <TextBlock Text="&#xE893;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                                </Button>
+                                <TextBlock Text="Media" FontSize="9.5" Margin="8,0,0,0"
+                                           Foreground="{DynamicResource C.TextFaint}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                                        ToolTip="Muto" AutomationProperties.Name="Muto"
+                                        Click="OnMuteClick">
+                                    <TextBlock Text="&#xE74F;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                                </Button>
+                                <Button Style="{StaticResource IconButton}" Width="26" Height="28"
+                                        ToolTip="Volume giù" AutomationProperties.Name="Volume giù"
+                                        Click="OnVolumeDown">
+                                    <TextBlock Text="&#xE738;" FontFamily="Segoe Fluent Icons" FontSize="9" />
+                                </Button>
+                                <TextBlock x:Name="VolumeText" Text="—" FontSize="10.5"
+                                           MinWidth="34" TextAlignment="Center"
+                                           Foreground="{DynamicResource C.Text}"
+                                           VerticalAlignment="Center"
+                                           Typography.NumeralAlignment="Tabular" />
+                                <Button Style="{StaticResource IconButton}" Width="26" Height="28"
+                                        ToolTip="Volume su" AutomationProperties.Name="Volume su"
+                                        Click="OnVolumeUp">
+                                    <TextBlock Text="&#xE710;" FontFamily="Segoe Fluent Icons" FontSize="9" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Grid.Row="3" Margin="0,10,0,0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
+                                <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                                        ToolTip="Cerca app e finestre"
+                                        AutomationProperties.Name="Isola: cerca"
+                                        Click="OnOpenSearch">
+                                    <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                                </Button>
+                                <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                                        Margin="2,0" ToolTip="Pannello widget"
+                                        AutomationProperties.Name="Isola: widget"
+                                        Click="OnOpenWidgets">
+                                    <TextBlock Text="&#xE71D;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                                </Button>
+                                <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                                        ToolTip="Controlli rapidi"
+                                        AutomationProperties.Name="Isola: controlli"
+                                        Click="OnOpenControls">
+                                    <TextBlock Text="&#xE9E9;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                                </Button>
+                                <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                                        Margin="2,0" ToolTip="Nebula Studio"
+                                        AutomationProperties.Name="Isola: impostazioni"
+                                        Click="OnOpenSettings">
+                                    <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                                </Button>
+                            </StackPanel>
+
+                            <TextBlock x:Name="IslandStatus" HorizontalAlignment="Right"
+                                       VerticalAlignment="Center" FontSize="9"
+                                       Foreground="{DynamicResource C.TextFaint}"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="190" />
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

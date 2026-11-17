@@ -121,6 +121,14 @@
                                     <DataTrigger Binding="{Binding StyleKey}" Value="glass">
                                         <Setter TargetName="SelectionBg" Property="Opacity" Value="1" />
                                     </DataTrigger>
+                                    <DataTrigger Binding="{Binding StyleKey}" Value="liquid">
+                                        <Setter TargetName="TabRoot" Property="CornerRadius" Value="18" />
+                                        <Setter TargetName="TabRoot" Property="Margin" Value="3,0" />
+                                        <Setter TargetName="HoverBg" Property="CornerRadius" Value="18" />
+                                        <Setter TargetName="SelectionBg" Property="CornerRadius" Value="18" />
+                                        <Setter TargetName="SelectionBg" Property="Background" Value="{DynamicResource C.Selected}" />
+                                        <Setter TargetName="TabTitle" Property="FontWeight" Value="SemiBold" />
+                                    </DataTrigger>
                                 </DataTemplate.Triggers>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

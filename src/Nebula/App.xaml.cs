@@ -1,9 +1,11 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
 using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
+using Nebula.Interop;
 using Nebula.Models;
 using Nebula.Services;
 using Nebula.Utilities;
@@ -22,6 +24,7 @@ public partial class App : Application
     private TrayService? _tray;
     private HotkeyManager? _hotkeys;
     private DockWindow? _dockWindow;
+    private IslandWindow? _island;
     private SettingsWindow? _settingsWindow;
     private LauncherWindow? _launcher;
     private WidgetsWindow? _widgets;
@@ -140,6 +143,9 @@ public partial class App : Application
             _dockWindow.Show();
         _dockWindow.ApplySettings();
 
+        if (Settings.ShowIsland)
+            ShowIsland();
+
         // Hiding the native bar is only half the guarantee. If the AppBar did
         // not reserve the work area, put the native bar back instead of leaving
         // a bar that maximized windows can cover.
@@ -181,7 +187,8 @@ public partial class App : Application
 
         StartPipeServer();
 
-        bool startSilent = args.Any(a => string.Equals(a, "--startup", StringComparison.OrdinalIgnoreCase));
+        bool captureDemo = args.Any(a => string.Equals(a, "--capture-demo", StringComparison.OrdinalIgnoreCase));
+        bool startSilent = args.Any(a => string.Equals(a, "--startup", StringComparison.OrdinalIgnoreCase)) || captureDemo;
         bool wantSettings = args.Any(a => string.Equals(a, "--settings", StringComparison.OrdinalIgnoreCase));
 
         if (!startSilent && (_store.IsFirstRun || wantSettings))
@@ -193,12 +200,185 @@ public partial class App : Application
         if (args.Any(a => string.Equals(a, "--widgets", StringComparison.OrdinalIgnoreCase)))
             Dispatcher.InvokeAsync(ShowWidgets);
 
-        if (_store.IsFirstRun)
+        if (_store.IsFirstRun && !captureDemo)
             _tray.ShowBalloon("Nebula è attiva",
                 "La tua dock è pronta. Apri le impostazioni per scegliere stile, vetro e widget.");
 
         if (!_hotkeys.LauncherRegistered)
             Log.Write("Global launcher hotkey unavailable (already in use).");
+
+        if (captureDemo)
+            _ = RunCaptureDemoAsync();
+    }
+
+    /// <summary>
+    /// Reproducible real-session capture: opens two real Notepad windows, groups
+    /// them into a real tab bar, expands the Dynamic Island and writes the screen
+    /// rectangles the external capture script needs. It is a diagnostic mode,
+    /// just like --selftest, and always restores the native taskbar on exit.
+    /// </summary>
+    private async Task RunCaptureDemoAsync()
+    {
+        string outputDir = Environment.GetEnvironmentVariable("NEBULA_CAPTURE_DIR") ??
+                           Path.Combine(Environment.CurrentDirectory, "artifacts", "real-session",
+                               DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+        Directory.CreateDirectory(outputDir);
+        var notepads = new List<Process>();
+
+        try
+        {
+            Settings.ShowIsland = true;
+            Settings.IslandStyle = "capsule";
+            Settings.IslandScale = 1.0;
+            Settings.IslandTopMargin = 8;
+            Settings.SurfaceStyle = "liquid";
+            Settings.TabsStyle = "liquid";
+            Settings.AnimationsEnabled = true;
+            Settings.EnableTabs = true;
+            Settings.ReplaceWindowsTaskbar = true;
+            Settings.ReserveTaskbarSpace = true;
+            Settings.TaskbarFullWidth = true;
+            Settings.DockOnTop = false;
+            Settings.AutoHideDock = false;
+            Settings.HideInFullscreen = false;
+            _store.SaveNow();
+            ShowIsland();
+            await Task.Delay(900);
+
+            for (int i = 0; i < 2; i++)
+            {
+                Process? process = Process.Start(new ProcessStartInfo("notepad.exe")
+                {
+                    UseShellExecute = true
+                });
+                if (process is null)
+                    throw new InvalidOperationException("Impossibile avviare Blocco note per la demo.");
+
+                notepads.Add(process);
+                await WaitForDemoWindowAsync(process, 8000);
+                NativeMethods.SetWindowText(process.MainWindowHandle, "Nebula Demo " + (char)('A' + i));
+                await Task.Delay(300);
+            }
+
+            IntPtr[] handles = notepads
+                .Select(p => p.MainWindowHandle)
+                .Where(h => h != IntPtr.Zero)
+                .ToArray();
+
+            if (handles.Length < 2 || _tabs is null)
+                throw new InvalidOperationException("Le finestre demo non sono disponibili.");
+
+            if (!_tabs.CreateGroup(handles, out string? error))
+                throw new InvalidOperationException("Gruppo demo non creato: " + error);
+
+            WindowAccess.ShowAndActivate(handles[0]);
+            await Task.Delay(800);
+            _island?.ExpandAnimated();
+            await Task.Delay(700);
+
+            WriteCaptureManifest(outputDir);
+
+            string donePath = Path.Combine(outputDir, "capture-done.txt");
+            for (int i = 0; i < 180 && !File.Exists(donePath); i++)
+                await Task.Delay(500);
+
+            File.AppendAllText(Path.Combine(outputDir, "demo.txt"),
+                "STYLE=" + Settings.SurfaceStyle + Environment.NewLine +
+                "TABS_STYLE=" + Settings.TabsStyle + Environment.NewLine +
+                "ISLAND_STYLE=" + Settings.IslandStyle + Environment.NewLine +
+                "TAB_GROUPS=" + _tabs.Groups.Count + Environment.NewLine +
+                "ISLAND_EXPANDED=" + (_island?.IsExpanded == true) + Environment.NewLine);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Capture demo failed: " + ex);
+            try
+            {
+                File.WriteAllText(Path.Combine(outputDir, "capture-error.txt"), ex.ToString());
+            }
+            catch
+            {
+                // Diagnostics only.
+            }
+        }
+        finally
+        {
+            try { _tabs?.CloseAll(); } catch { }
+
+            foreach (Process process in notepads)
+            {
+                try
+                {
+                    if (!process.HasExited)
+                        process.CloseMainWindow();
+                }
+                catch { }
+            }
+
+            await Task.Delay(300);
+            foreach (Process process in notepads)
+            {
+                try
+                {
+                    if (!process.HasExited)
+                        process.Kill();
+                }
+                catch { }
+                process.Dispose();
+            }
+
+            ExitApp();
+        }
+    }
+
+    private static async Task WaitForDemoWindowAsync(Process process, int timeoutMs)
+    {
+        int waited = 0;
+        while (waited < timeoutMs)
+        {
+            process.Refresh();
+            if (process.MainWindowHandle != IntPtr.Zero)
+                return;
+            await Task.Delay(150);
+            waited += 150;
+        }
+
+        throw new InvalidOperationException("La finestra demo non è comparsa in tempo.");
+    }
+
+    private void WriteCaptureManifest(string outputDir)
+    {
+        var lines = new List<string>();
+
+        if (_island is { IsVisible: true })
+            AddRect(lines, "ISLAND", _island.CapsuleScreenRect);
+
+        if (_dockWindow is { IsVisible: true })
+            AddRect(lines, "DOCK", ScreenRect(_dockWindow, _dockWindow.ShellBoundsDip));
+
+        int tabIndex = 0;
+        foreach (TabBarWindow bar in Application.Current.Windows.OfType<TabBarWindow>().Where(b => b.IsVisible))
+            AddRect(lines, "TAB" + tabIndex++, ScreenRect(bar, new Rect(0, 0, bar.ActualWidth, bar.ActualHeight)));
+
+        lines.Add("STYLE=" + Settings.SurfaceStyle);
+        lines.Add("TABS_STYLE=" + Settings.TabsStyle);
+        lines.Add("ISLAND_STYLE=" + Settings.IslandStyle);
+        lines.Add("TAB_GROUPS=" + (_tabs?.Groups.Count ?? 0));
+        lines.Add("ISLAND_EXPANDED=" + (_island?.IsExpanded == true));
+
+        File.WriteAllLines(Path.Combine(outputDir, "capture-manifest.txt"), lines);
+    }
+
+    private static void AddRect(List<string> lines, string key, Rect rect)
+    {
+        lines.Add($"{key}={rect.Left:0},{rect.Top:0},{rect.Right:0},{rect.Bottom:0}");
+    }
+
+    private static Rect ScreenRect(Window window, Rect dipRect)
+    {
+        Point topLeft = window.PointToScreen(new Point(dipRect.Left, dipRect.Top));
+        Point bottomRight = window.PointToScreen(new Point(dipRect.Right, dipRect.Bottom));
+        return new Rect(topLeft, bottomRight);
     }
 
     private void NormalizePins()
@@ -293,6 +473,13 @@ public partial class App : Application
                 }
                 break;
 
+            case nameof(AppSettings.ShowIsland):
+                if (Settings.ShowIsland)
+                    ShowIsland();
+                else
+                    CloseIsland();
+                break;
+
             case nameof(AppSettings.ShowWidgets):
             case nameof(AppSettings.ShowQuickControls):
                 _widgets?.ApplyAvailability();
@@ -338,6 +525,33 @@ public partial class App : Application
             HideDockAndPanels();
 
         _dockWindow?.ApplySettings();
+
+        if (Settings.ShowIsland)
+            ShowIsland();
+        else
+            CloseIsland();
+    }
+
+    public void ShowIsland()
+    {
+        if (!Settings.ShowIsland)
+            return;
+
+        if (_island is null)
+        {
+            _island = new IslandWindow(Dock);
+            _island.Closed += (_, _) => _island = null;
+        }
+
+        if (!_island.IsVisible)
+            _island.Show();
+        _island.ApplySettings();
+    }
+
+    public void CloseIsland()
+    {
+        _island?.Close();
+        _island = null;
     }
 
     public void ShowSettings()
@@ -694,6 +908,8 @@ public partial class App : Application
         _launcher?.Close();
         _settingsWindow?.Close();
         _updatePrompt?.Close();
+        _island?.Close();
+        _island = null;
         _dockWindow?.Close();
 
         _hotkeys?.Dispose();
@@ -715,6 +931,8 @@ public partial class App : Application
         SystemIcons?.CleanupOnExit();
         Updates?.Dispose();
         _mediaControls?.Dispose();
+        _island?.Close();
+        _island = null;
         _tabs?.Dispose();
         _store?.Dispose();
         _trackerTimer?.Stop();

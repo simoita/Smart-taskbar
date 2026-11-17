@@ -13,9 +13,9 @@ Risultato registrato:
 
 ```text
 === Studio (SettingsWindow + all pages) ===
-settings_bindings: 74
-settings_editors_twoway: 59
-event_attributes: 43
+settings_bindings: 75
+settings_editors_twoway: 60
+event_attributes: 44
 unique_handlers: 30
 missing_handlers: 0
 settings_with_editors_on_multiple_pages: 0
@@ -60,9 +60,9 @@ Nessuna impostazione con editor compare su due pagine. Il file completo con righ
 
 ### Stile
 - Card dei temi: imposta `ThemeId`, aggiorna `ThemeEngine`, anteprima live e salvataggio.
-- Cinque pulsanti superficie: impostano `SurfaceStyle`, indipendente da `TabsStyle`.
+- Sei pulsanti superficie: impostano `SurfaceStyle`, indipendente da `TabsStyle`; **Liquid** usa un gradiente vetro-brillante.
 - Vetro, raggio, altezza dock, dimensione icone, spaziatura: binding `Settings.*` usati da `ThemeEngine`, `DockViewModel` e `DockWindow`.
-- Glow, grana, linea luminosa: binding usati direttamente dai layer della dock.
+- Glow, grana, linea luminosa e riflesso liquido: binding usati direttamente dai layer della dock; il riflesso segue il puntatore con un transform, senza animazioni continue.
 - Accenti: `AccentHex`, `SetAccent`/`ApplyAccentInput`, aggiornamento del tema.
 - Icona di un collegamento: `SetShortcutIcon` scrive `IconLocation` nel `.lnk` tramite WScript.Shell.
 

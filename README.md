@@ -8,14 +8,17 @@ L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminan
 
 **Novità 1.3:** taskbar sostitutiva **a tutta larghezza** con app a sinistra, widget al centro e controlli a destra; prenotazione reale dello spazio tramite **AppBar di Windows** (le finestre massimizzate si fermano alla barra); taskbar nativa nascosta anche sui monitor secondari e richiusa all'istante se Explorer la mostra; **widget riordinabili dentro la barra** (orologio, CPU/RAM, batteria, rete, media, ricerca, schede e altro); Studio adattivo che non esce più dallo schermo; righe impostazioni senza sovrapposizioni. Dettagli in [docs/taskbar-windows.md](docs/taskbar-windows.md).
 
+**Novità 1.5:** nuovo preset **Liquid Glass** per widget, controlli rapidi e ricerca, nuovo stile **Liquid** per le schede e **riflesso liquido** sulla barra: una luce soffusa segue il puntatore lungo il vetro. Arrivano anche tre temi — **Prism**, **Obsidian** e **Cyber** — per un totale di 19. Dettagli in [docs/superfici.md](docs/superfici.md) e [docs/schede.md](docs/schede.md).
+
 **Novità 1.4:** verifica **eseguibile** della sostituzione con `Nebula.exe --selftest` (AppBar reale, area di lavoro, taskbar nascosta su tutti i monitor, ordine widget dopo salvataggio/riavvio, layout a 1280×720 e 1920×1080) e ripristino d'emergenza `--restore-taskbar`; l'AppBar viene verificata sull'area di lavoro vera, non solo sulla risposta di `ABM_SETPOS`; dopo un riavvio reale di Explorer la registrazione viene rifatta automaticamente; se il watchdog manca o la verifica fallisce, Nebula **non nasconde** la taskbar nativa. Dettagli in [docs/taskbar-windows.md](docs/taskbar-windows.md) e [docs/ripristino-taskbar.md](docs/ripristino-taskbar.md).
 
 ## Funzioni
 
 - Dock personalizzabile: in alto o in basso, margine regolabile, auto-hide, dimensione e schermo di destinazione.
 - **Taskbar a tutta larghezza**: app a sinistra, widget al centro, azioni a destra; spazio riservato con l'API AppBar di Windows e ripristino watchdog.
-- **16 temi completi** (Nebula, Aurora, Neon Grid, Ember, Porcelain, Mint Glass, Sakura, Graphite, Solar, Ocean, Candy, Forest, Lavender, Midnight, Sunset, Sage) con accento personalizzato applicato dal vivo a dock, studio, widget e launcher.
-- **5 preset superficie — Vetro / Minimal / Neon / Soft / Mono** applicati dal vivo a widget, controlli rapidi e ricerca, indipendenti dallo stile delle schede.
+- **19 temi completi** (Nebula, Aurora, Neon Grid, Ember, Porcelain, Mint Glass, Sakura, Graphite, Solar, Ocean, Candy, Forest, Lavender, Midnight, Sunset, Sage, Prism, Obsidian, Cyber) con accento personalizzato applicato dal vivo a dock, studio, widget e launcher.
+- **6 preset superficie — Vetro / Minimal / Neon / Soft / Mono / Liquid** applicati dal vivo a widget, controlli rapidi e ricerca, indipendenti dallo stile delle schede.
+- **Riflesso liquido**: una luce soffusa segue il puntatore lungo il vetro della barra; si attiva da **Studio → Stile → Dettagli**.
 - **Tre zone dock indipendenti** (app, sistema, azioni): visibilità, ordine, scala, spaziatura e separatori si impostano separatamente.
 - **11 widget** selezionabili dal catalogo e inseribili nel pannello: orologio, data, calendario, sistema, batteria, rete, uptime, disco, media, ricerca e controlli.
 - **13 widget nella taskbar**, aggiungibili e riordinabili singolarmente: orologio, CPU, RAM, CPU+RAM, batteria, rete, media, ricerca, schede, pannello widget, controlli, impostazioni e separatore.
@@ -83,13 +86,14 @@ Le icone compaiono solo per le superfici attive. In **Studio → Widget / Ricerc
 
 ### Preset superficie
 
-In **Studio → Stile → PRESET SUPERFICI** si scelgono **Vetro**, **Minimal**, **Neon**, **Soft** o **Mono**. Il preset viene applicato dal vivo alle superfici già aperte, non solo alla riapertura:
+In **Studio → Stile → PRESET SUPERFICI** si scelgono **Vetro**, **Minimal**, **Neon**, **Soft**, **Mono** o **Liquid**. Il preset viene applicato dal vivo alle superfici già aperte, non solo alla riapertura:
 
 - **Vetro:** card e controlli arrotondati, bordo vetro, slider da 4 px con pomello da 17 px, tipografia variable.
 - **Minimal:** raggi più contenuti, bordo piatto, slider da 3 px con pomello da 13 px, testo Segoe UI.
 - **Neon:** raggi intermedi, bordo con gradiente d'accento, slider da 5 px con pomello da 18 px, titoli in grassetto.
 - **Soft:** raggi ampi, superfici più piene, ombre attenuate e tipografia morbida.
 - **Mono:** raggi ridotti, contrasto alto, niente gradiente d'accento e controlli lineari.
+- **Liquid:** lavaggio vetro-brillante con bordo ad accento, raggi ampi, slider da 5 px con pomello da 18 px e riflesso luminoso.
 
 Il preset cambia sfondi, bordi, raggi, padding, spessori, dimensioni dei controlli, font e peso dei titoli tramite risorse `S.*` condivise; le schede non vengono ridisegnate. Anche l'interruttore **Animazioni fluide** vale per queste superfici: disattivato ferma immediatamente le transizioni di ingresso, riattivato le ripristina. La ricerca ha un pulsante ingranaggio per aprire lo Studio senza chiuderla: le modifiche si vedono mentre la ricerca resta aperta e, chiudendo lo Studio, la ricerca torna in primo piano.
 
@@ -133,7 +137,7 @@ Dalla dock usa l'icona **schede** o il menu contestuale **Raggruppa finestre in 
 - × sulla scheda chiude la finestra; menu destro → **Stacca scheda** la rimuove dal gruppo e le restituisce la geometria originale.
 - × a destra della barra chiude il gruppo e ripristina tutte le finestre.
 
-Nello studio, pagina **Schede**: attiva/disattiva, stile **Vetro / Minimal / Neon / Soft / Mono**, altezza 34–64 px, posizione sopra/sotto, animazioni collegate a **Animazioni fluide**. Tutto viene applicato dal vivo e salvato.
+Nello studio, pagina **Schede**: attiva/disattiva, stile **Vetro / Minimal / Neon / Soft / Mono / Liquid**, altezza 34–64 px, posizione sopra/sotto, animazioni collegate a **Animazioni fluide**. Tutto viene applicato dal vivo e salvato.
 
 Le finestre protette, elevate o UWP vengono rifiutate con un messaggio esplicito. I dettagli, le misure e i limiti sono in [docs/schede.md](docs/schede.md).
 
@@ -180,14 +184,14 @@ Il repository include `.github/workflows/release.yml`: al push di un tag `vMAJOR
 Per pubblicare una versione dopo aver committato il codice:
 
 ```powershell
-.\scripts\release.cmd -Version 1.4.0
+.\scripts\release.cmd -Version 1.5.0
 ```
 
 Lo script aggiorna `<Version>` in `src/Nebula/Nebula.csproj`, crea commit e tag, e li invia a GitHub. Il repository deve essere **pubblico**, perché l'aggiornatore scarica gli asset senza credenziali. Il primo setup del repository e i dettagli del workflow sono in [docs/aggiornamenti.md](docs/aggiornamenti.md).
 
 ## Verifiche di questa release
 
-> Le verifiche seguenti si riferiscono alla release 1.2. La revisione 1.3 è stata verificata con build Release e publish; la revisione 1.4 ha aggiunto il selftest AppBar, il ripristino d'emergenza, l'audit dei controlli e il layout misurato a 1280×720 e 1920×1080. Il giro UI completo su taskbar sostitutiva, AppBar e widget è descritto qui sotto ed è stato rieseguito sulla macchina di destinazione.
+> Le verifiche seguenti si riferiscono alla release 1.2. La revisione 1.3 è stata verificata con build Release e publish; la revisione 1.4 ha aggiunto il selftest AppBar, il ripristino d'emergenza, l'audit dei controlli e il layout misurato a 1280×720 e 1920×1080. La revisione 1.5 aggiunge i preset Liquid, il riflesso sulla barra e tre temi, verificati con build Release e selftest completo. Il giro UI completo su taskbar sostitutiva, AppBar e widget è descritto qui sotto ed è stato rieseguito sulla macchina di destinazione.
 
 Eseguite sulla build pubblicata in `dist/`:
 

@@ -130,6 +130,7 @@ public partial class DockWindow : Window
         ApplyZoneLayout();
         Reposition();
         UpdateBackdrop();
+        CenterLiquidSheen(false);
         Dispatcher.InvokeAsync(UpdateAppBar, DispatcherPriority.Loaded);
 
         if (!_vm.Settings.AnimationsEnabled)
@@ -694,6 +695,41 @@ public partial class DockWindow : Window
                 App.Instance?.ToggleMediaPlayback();
                 break;
         }
+    }
+
+    private void OnShellMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_vm.Settings.LiquidSheen || Shell.ActualWidth <= 0)
+            return;
+
+        double x = e.GetPosition(Shell).X - LiquidSheen.Width / 2;
+        SheenShift.X = Math.Clamp(x, 0, Math.Max(0, Shell.ActualWidth - LiquidSheen.Width));
+    }
+
+    private void OnShellMouseLeave(object sender, MouseEventArgs e)
+    {
+        CenterLiquidSheen(_vm.Settings.AnimationsEnabled);
+    }
+
+    private void CenterLiquidSheen(bool animated)
+    {
+        if (Shell.ActualWidth <= 0)
+            return;
+
+        double target = Math.Max(0, (Shell.ActualWidth - LiquidSheen.Width) / 2);
+        if (!animated)
+        {
+            SheenShift.BeginAnimation(TranslateTransform.XProperty, null);
+            SheenShift.X = target;
+            return;
+        }
+
+        SheenShift.BeginAnimation(TranslateTransform.XProperty,
+            new DoubleAnimation(target, TimeSpan.FromSeconds(
+                0.35 / Math.Clamp(_vm.Settings.AnimationSpeed, 0.5, 2)))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            });
     }
 
     private void OnDockItemEnter(object sender, MouseEventArgs e)

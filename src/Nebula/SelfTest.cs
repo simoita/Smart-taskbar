@@ -61,6 +61,7 @@ public partial class App
 
         SettingsStore? store = null;
         DockWindow? dock = null;
+        IslandWindow? island = null;
         SettingsWindow? studio = null;
         NativeTaskbarController? native = null;
         string? fatal = null;
@@ -108,6 +109,22 @@ public partial class App
                 throw new InvalidOperationException("Preflight failed: " + preflightReason);
 
             var theme = new ThemeEngine(settings);
+
+            // The Liquid preset must resolve to the shared S.* resources, not
+            // only be accepted by the settings validator.
+            string originalSurface = settings.SurfaceStyle;
+            settings.SurfaceStyle = "liquid";
+            theme.Reload();
+            object radiusValue = Application.Current.Resources["S.CardRadius"];
+            object brushValue = Application.Current.Resources["S.CardBg"];
+            bool liquidRadius = radiusValue is CornerRadius liquidCorner &&
+                                Math.Abs(liquidCorner.TopLeft - 24) < 0.01;
+            bool liquidBrush = brushValue is LinearGradientBrush;
+            Add(checks, "theme.liquid_surface", liquidRadius && liquidBrush && ThemePreset.All.Count >= 19,
+                $"themes={ThemePreset.All.Count}; radius={radiusValue}; brush={brushValue?.GetType().Name}");
+            settings.SurfaceStyle = originalSurface;
+            theme.Reload();
+
             var tracker = new WindowTracker();
             var monitor = new SystemMonitor();
             var dockVm = new DockViewModel(settings, theme, tracker, monitor);
@@ -236,7 +253,67 @@ public partial class App
                     $"viewModel={mutated}; reloaded={persisted}; visual={visualMutated}");
             }
 
-            // 8. Studio layout at common sizes, plus screenshots of every page.
+            // 8. Dynamic Island: persisted options, applied style resources,
+            // compact/expanded geometry and click-through outside the capsule.
+            settings.IslandStyle = "pill";
+            settings.IslandScale = 1.1;
+            settings.IslandTopMargin = 12;
+            settings.ShowIsland = true;
+            store.SaveNow();
+            using (var islandStore = new SettingsStore())
+            {
+                AppSettings saved = islandStore.Settings;
+                Add(checks, "island.settings_roundtrip",
+                    saved.ShowIsland && saved.IslandStyle == "pill" &&
+                    Math.Abs(saved.IslandScale - 1.1) < 0.001 &&
+                    Math.Abs(saved.IslandTopMargin - 12) < 0.001,
+                    $"show={saved.ShowIsland}; style={saved.IslandStyle}; scale={saved.IslandScale}; margin={saved.IslandTopMargin}");
+            }
+
+            island = new IslandWindow(dockVm) { ShowActivated = false };
+            island.Show();
+            await WaitUntilAsync(() => island.IsLoaded, 4000);
+            await Task.Delay(350);
+            island.ApplySettings();
+            island.UpdateLayout();
+
+            double compactWidth = island.CapsuleWidth;
+            bool islandStyleApplied = island.AppliedStyleKey == "pill" &&
+                                      island.CapsuleBackground is not null &&
+                                      island.CapsuleCornerRadius > 0 &&
+                                      Math.Abs(island.CompactWidth - 242) < 1.0 &&
+                                      Math.Abs(island.ExpandedWidth - 440) < 1.0;
+            Capture(island.Capsule, Path.Combine(outputDir, "island-compact.png"));
+
+            island.ExpandForTest();
+            await Task.Delay(250);
+            island.UpdateLayout();
+            Rect islandRect = island.CapsuleScreenRect;
+            bool islandExpanded = island.IsExpanded &&
+                                  island.CapsuleWidth > compactWidth + 10 &&
+                                  island.CapsuleHeight > island.CompactHeight + 10;
+            Capture(island.Capsule, Path.Combine(outputDir, "island-expanded.png"));
+
+            bool inside = island.IsPointInteractive(new Point(
+                islandRect.Left + islandRect.Width / 2,
+                islandRect.Top + islandRect.Height / 2));
+            bool outside = island.IsPointInteractive(new Point(
+                islandRect.Right + 40, islandRect.Bottom + 40));
+
+            Add(checks, "island.style_resources", islandStyleApplied,
+                $"style={island.AppliedStyleKey}; background={island.CapsuleBackground?.GetType().Name}; " +
+                $"radius={island.CapsuleCornerRadius:0.#}; compact={island.CompactWidth:0.#}x{island.CompactHeight:0.#}; " +
+                $"expanded={island.ExpandedWidth:0.#}x{island.ExpandedHeight:0.#}");
+            Add(checks, "island.expand", islandExpanded,
+                $"compactWidth={compactWidth:0.#}; capsule={island.CapsuleWidth:0.#}x{island.CapsuleHeight:0.#}; " +
+                $"expanded={island.IsExpanded}");
+            Add(checks, "island.hit_test_transparent_outside", inside && !outside,
+                $"inside={inside}; outside={outside}; rect={islandRect}");
+
+            island.Close();
+            island = null;
+
+            // 9. Studio layout at common sizes, plus screenshots of every page.
             var tabs = new TabGroupService(settings);
             var icons = new SystemIconService();
             var updates = new UpdateCoordinator(settings);
@@ -258,6 +335,7 @@ public partial class App
         finally
         {
             failSafe.Stop();
+            try { island?.Close(); } catch { }
             try { studio?.Close(); } catch { }
             try { dock?.Close(); } catch { }
             try { native?.Restore(); } catch { }
@@ -397,8 +475,24 @@ public partial class App
             int height = (int)Math.Ceiling(element.ActualHeight);
             if (width < 2 || height < 2)
                 return;
+            // RenderTargetBitmap.Render(visual) includes the visual's offset
+            // inside its parent. A VisualBrush draws the element from its own
+            // top-left corner, so centred elements (the Dynamic Island) are not
+            // clipped in their screenshot.
+            var visual = new DrawingVisual();
+            using (DrawingContext context = visual.RenderOpen())
+            {
+                var brush = new VisualBrush(element)
+                {
+                    Stretch = Stretch.None,
+                    AlignmentX = AlignmentX.Left,
+                    AlignmentY = AlignmentY.Top
+                };
+                context.DrawRectangle(brush, null, new Rect(0, 0, width, height));
+            }
+
             var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(element);
+            bitmap.Render(visual);
             var encoder = new PngBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(bitmap));
             using FileStream stream = File.Create(path);

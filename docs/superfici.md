@@ -18,7 +18,7 @@ Le icone della dock compaiono solo se la superficie è attiva. Il menu contestua
 
 ## Preset superficie
 
-In **Studio → Stile → PRESET SUPERFICI** ci sono cinque pulsanti: **Vetro**, **Minimal**, **Neon**, **Soft** e **Mono**. Il preset scelto viene salvato in `SurfaceStyle` e applicato dal vivo alle tre superfici, anche se sono già aperte. Le schede non vengono ridisegnate da questi pulsanti; lo stile delle schede resta indipendente.
+In **Studio → Stile → PRESET SUPERFICI** ci sono sei pulsanti: **Vetro**, **Minimal**, **Neon**, **Soft**, **Mono** e **Liquid**. Il preset scelto viene salvato in `SurfaceStyle` e applicato dal vivo alle tre superfici, anche se sono già aperte. Le schede non vengono ridisegnate da questi pulsanti; lo stile delle schede resta indipendente.
 
 | Preset | Card / interna | Risultato / controllo | Slider | Tipografia |
 | --- | --- | --- | --- | --- |
@@ -27,6 +27,7 @@ In **Studio → Stile → PRESET SUPERFICI** ci sono cinque pulsanti: **Vetro**,
 | Neon | 16 / 10 px | 9 / 8 px | 5 px, pomello 18 px | variable, titoli bold |
 | Soft | 26 / 18 px | 22 / 12 px | 5 px, pomello 19 px | variable, titoli semibold |
 | Mono | 6 / 4 px | 16 / 3 px | 3 px, pomello 14 px | Segoe UI, titoli semibold |
+| Liquid | 24 / 18 px | 14 / 12 px | 5 px, pomello 18 px | variable, titoli semibold |
 
 Il preset cambia anche sfondo, bordo, padding, spessore del bordo e peso del titolo. Widget, controlli rapidi e ricerca usano le stesse risorse dinamiche `S.*`: non serve riaprirli. La tabella qui sopra descrive i valori impostati da `ThemeEngine.ApplySurfaceResources`; le famiglie e le dimensioni dei font sono risorse dinamiche, non valori duplicati nelle singole viste.
 

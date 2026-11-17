@@ -173,6 +173,13 @@ public partial class TabBarWindow : Window
                 Bar.BorderThickness = new Thickness(1);
                 break;
 
+            case "liquid":
+                Bar.CornerRadius = new CornerRadius(18);
+                Bar.Background = FindBrush("C.DockGlass", Brushes.Black);
+                Bar.BorderBrush = FindBrush("C.DockStroke", Brushes.White);
+                Bar.BorderThickness = new Thickness(1.2);
+                break;
+
             case "mono":
                 Bar.CornerRadius = new CornerRadius(4);
                 Bar.Background = FindBrush("C.Bg", Brushes.Black);

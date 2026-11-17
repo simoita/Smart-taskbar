@@ -34,7 +34,7 @@ La tab bar è una finestra `WS_EX_NOACTIVATE`: cliccare una scheda non ruba il f
 Nello studio, pagina **Schede**:
 
 - **Attiva le schede**: abilita o disabilita la funzione. Disattivandola, tutti i gruppi vengono chiusi e le finestre ripristinate.
-- **Stile**: **Vetro**, **Minimal**, **Neon**, **Soft**, **Mono**; cambia angoli, riempimento, bordo e accento della barra.
+- **Stile**: **Vetro**, **Minimal**, **Neon**, **Soft**, **Mono**, **Liquid**; cambia angoli, riempimento, bordo e accento della barra.
 - **Altezza della barra**: da 34 a 64 px.
 - **Posizione**: sopra o sotto la finestra attiva.
 - **Animazioni**: apertura, cambio scheda e chiusura seguono **Animazioni fluide** e **Velocità** della pagina Animazioni. Con le animazioni disattivate la barra compare e scompare senza dissolvenza.

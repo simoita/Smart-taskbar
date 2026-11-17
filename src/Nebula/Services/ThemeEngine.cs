@@ -250,7 +250,7 @@ public sealed class ThemeEngine
         Color cardColor, Color strokeColor, Color strokeSoft)
     {
         string style = _settings.SurfaceStyle;
-        if (style is not ("glass" or "minimal" or "neon" or "soft" or "mono"))
+        if (style is not ("glass" or "minimal" or "neon" or "soft" or "mono" or "liquid"))
             style = _settings.TabsStyle;
 
         Brush cardBg;
@@ -335,6 +335,37 @@ public sealed class ThemeEngine
                 borderThickness = new Thickness(1);
                 trackHeight = 5;
                 knobSize = 19;
+                textFont = "Segoe UI Variable Text, Segoe UI";
+                displayFont = "Segoe UI Variable Display, Segoe UI";
+                titleWeight = FontWeights.SemiBold;
+                break;
+
+            case "liquid":
+                // Specular glass: a soft bright-to-accent wash with a luminous
+                // border, generous radii and a stronger top sheen.
+                cardBg = p.IsLight
+                    ? new LinearGradientBrush(
+                        Color.FromArgb(238, 255, 255, 255),
+                        ColorUtil.WithAlpha(ColorUtil.Mix(Colors.White, AccentA, 0.16), 238),
+                        new Point(0, 0), new Point(1, 1))
+                    : new LinearGradientBrush(
+                        ColorUtil.WithAlpha(ColorUtil.Mix(bgColor, Colors.White, 0.10), 246),
+                        ColorUtil.WithAlpha(ColorUtil.Mix(bgColor, AccentA, 0.18), 246),
+                        new Point(0, 0), new Point(1, 1));
+                cardBorder = AccentGradient;
+                innerBg = Solid(ColorUtil.WithAlpha(AccentA, (byte)(p.IsLight ? 16 : 26)));
+                innerBorder = Solid(ColorUtil.WithAlpha(Colors.White, p.IsLight ? (byte)150 : (byte)44));
+                dim = Solid(Color.FromArgb(168, 7, 8, 16));
+                sheen = Solid(Color.FromArgb(p.IsLight ? (byte)210 : (byte)34, 255, 255, 255));
+                cardRadius = new CornerRadius(24);
+                innerRadius = new CornerRadius(18);
+                resultRadius = new CornerRadius(14);
+                controlRadius = new CornerRadius(12);
+                cardPadding = new Thickness(20);
+                resultPadding = new Thickness(11, 8, 11, 8);
+                borderThickness = new Thickness(1.5);
+                trackHeight = 5;
+                knobSize = 18;
                 textFont = "Segoe UI Variable Text, Segoe UI";
                 displayFont = "Segoe UI Variable Display, Segoe UI";
                 titleWeight = FontWeights.SemiBold;

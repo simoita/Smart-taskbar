@@ -230,7 +230,8 @@ public sealed class SettingsViewModel : ObservableObject
         new("minimal", "Minimal"),
         new("neon", "Neon"),
         new("soft", "Soft"),
-        new("mono", "Mono")
+        new("mono", "Mono"),
+        new("liquid", "Liquid")
     };
     public IReadOnlyList<TabStyleOptionViewModel> SurfaceStyleOptions { get; } = new List<TabStyleOptionViewModel>
     {
@@ -238,12 +239,19 @@ public sealed class SettingsViewModel : ObservableObject
         new("minimal", "Minimal"),
         new("neon", "Neon"),
         new("soft", "Soft"),
-        new("mono", "Mono")
+        new("mono", "Mono"),
+        new("liquid", "Liquid")
     };
     public IReadOnlyList<TabPositionOptionViewModel> TabPositionOptions { get; } = new List<TabPositionOptionViewModel>
     {
         new("top", "Sopra la finestra"),
         new("bottom", "Sotto la finestra")
+    };
+    public IReadOnlyList<TabStyleOptionViewModel> IslandStyleOptions { get; } = new List<TabStyleOptionViewModel>
+    {
+        new("capsule", "Capsula"),
+        new("pill", "Pillola"),
+        new("minimal", "Minimal")
     };
     public IReadOnlyList<ZoneOrderOptionViewModel> ZoneOrderOptions { get; } = new List<ZoneOrderOptionViewModel>
     {

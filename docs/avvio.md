@@ -45,7 +45,7 @@ I **Controlli rapidi** si aprono dall'icona dedicata nella dock o da **Studio �
 
 Widget e controlli condividono la stessa finestra: non vengono creati processi o finestre WPF aggiuntive.
 
-In **Studio → Stile → PRESET SUPERFICI** puoi passare dal vivo tra **Vetro**, **Minimal**, **Neon**, **Soft** e **Mono**. Il preset vale per widget, controlli rapidi e ricerca, anche quando sono già aperti; le schede mantengono il proprio stile. Ogni preset cambia card, raggi, bordi, padding, slider, tipografia e peso dei titoli. L'interruttore **Animazioni fluide** controlla anche le transizioni di ingresso di queste superfici.
+In **Studio → Stile → PRESET SUPERFICI** puoi passare dal vivo tra **Vetro**, **Minimal**, **Neon**, **Soft**, **Mono** e **Liquid**. Il preset vale per widget, controlli rapidi e ricerca, anche quando sono già aperti; le schede mantengono il proprio stile. Ogni preset cambia card, raggi, bordi, padding, slider, tipografia e peso dei titoli. L'interruttore **Animazioni fluide** controlla anche le transizioni di ingresso di queste superfici.
 
 ## Zone della dock
 

@@ -85,13 +85,17 @@ public sealed class SettingsStore : IDisposable
         s.ItemSpacing = Math.Clamp(s.ItemSpacing, -4, 12);
         s.EdgeMargin = Math.Clamp(s.EdgeMargin, 0, 48);
         s.AnimationSpeed = Math.Clamp(s.AnimationSpeed, 0.5, 2.0);
+        s.IslandScale = Math.Clamp(s.IslandScale, 0.8, 1.3);
+        s.IslandTopMargin = Math.Clamp(s.IslandTopMargin, 0, 36);
+        if (s.IslandStyle is not ("capsule" or "pill" or "minimal"))
+            s.IslandStyle = "capsule";
         s.SearchCardWidth = Math.Clamp(s.SearchCardWidth, 560, 900);
         s.TabsBarHeight = Math.Clamp(s.TabsBarHeight, 34, 64);
-        if (s.TabsStyle is not ("glass" or "minimal" or "neon" or "soft" or "mono"))
+        if (s.TabsStyle is not ("glass" or "minimal" or "neon" or "soft" or "mono" or "liquid"))
             s.TabsStyle = "glass";
         if (string.IsNullOrWhiteSpace(s.SurfaceStyle))
             s.SurfaceStyle = s.TabsStyle;
-        if (s.SurfaceStyle is not ("glass" or "minimal" or "neon" or "soft" or "mono"))
+        if (s.SurfaceStyle is not ("glass" or "minimal" or "neon" or "soft" or "mono" or "liquid"))
             s.SurfaceStyle = "glass";
         if (s.TabsBarPosition is not ("top" or "bottom"))
             s.TabsBarPosition = "top";

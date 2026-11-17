@@ -15,9 +15,10 @@
         <Border x:Name="Shell" CornerRadius="{Binding ShellRadius}" Background="#E60B0716"
                 BorderBrush="{Binding StrokeBrush}" BorderThickness="1"
                 MinHeight="{Binding Settings.DockHeight}"
+                MouseMove="OnShellMouseMove" MouseLeave="OnShellMouseLeave"
                 MouseRightButtonUp="OnDockBackgroundRightClick">
 
-            <Grid>
+            <Grid ClipToBounds="True">
                 <Border CornerRadius="{Binding ShellRadius}" Background="{Binding Backdrop}"
                         Visibility="{Binding BackdropVisibility}" Opacity="0.55" />
 
@@ -58,6 +59,21 @@
                         Background="{DynamicResource C.AccentGrad}" Opacity="0.28"
                         IsHitTestVisible="False"
                         Visibility="{Binding Settings.ShowShimmer, Converter={StaticResource BoolVis}}" />
+
+                <Border x:Name="LiquidSheen" Width="280" HorizontalAlignment="Left"
+                        IsHitTestVisible="False" Opacity="0.16"
+                        Visibility="{Binding Settings.LiquidSheen, Converter={StaticResource BoolVis}}">
+                    <Border.Background>
+                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5"
+                                             RadiusX="0.5" RadiusY="1.35">
+                            <GradientStop Color="#66FFFFFF" Offset="0" />
+                            <GradientStop Color="#00FFFFFF" Offset="1" />
+                        </RadialGradientBrush>
+                    </Border.Background>
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="SheenShift" />
+                    </Border.RenderTransform>
+                </Border>
 
                 <Grid x:Name="ZoneHost" VerticalAlignment="Center" Margin="10,0">
                     <StackPanel x:Name="AppsZone" Orientation="Horizontal" VerticalAlignment="Center">
