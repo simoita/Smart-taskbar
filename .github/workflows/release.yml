@@ -1,0 +1,142 @@
+name: Release Nebula
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versione da pubblicare, senza la v (es. 1.3.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nebula-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Resolve version and tag
+        id: version
+        shell: pwsh
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          PUSHED_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $raw = $env:REQUESTED_VERSION.Trim()
+          } else {
+            $raw = $env:PUSHED_TAG.Trim()
+          }
+
+          if ($raw -notmatch '^v?(\d+\.\d+\.\d+)$') {
+            throw "Versione non valida: '$raw'. Usa un tag vMAJOR.MINOR.PATCH."
+          }
+
+          $version = $Matches[1]
+          $tag = "v$version"
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "version=$version" -Encoding utf8
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "tag=$tag" -Encoding utf8
+
+      - name: Verify project version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $projectVersion = (& dotnet msbuild src/Nebula/Nebula.csproj -nologo -getProperty:Version).Trim()
+          if ($projectVersion -ne "${{ steps.version.outputs.version }}") {
+            throw "Nebula.csproj contiene la versione '$projectVersion', ma la release è '${{ steps.version.outputs.version }}'. Aggiorna <Version> e ripeti il commit/tag."
+          }
+
+      - name: Publish Windows build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ steps.version.outputs.version }}"
+          $repository = "${{ github.repository }}"
+          dotnet publish src/Nebula/Nebula.csproj -c Release -o publish `
+            -p:Version=$version `
+            -p:UpdateRepository=$repository `
+            -p:ContinuousIntegrationBuild=true
+          if ($LASTEXITCODE -ne 0) { throw "dotnet publish non è riuscito." }
+          if (!(Test-Path "publish/Nebula.exe")) { throw "Nebula.exe non trovato nel publish." }
+          if (!(Test-Path "publish/Nebula.Watchdog.exe")) { throw "Nebula.Watchdog.exe non trovato nel publish." }
+
+      - name: Build ZIP, checksum and update manifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ steps.version.outputs.version }}"
+          $tag = "${{ steps.version.outputs.tag }}"
+          New-Item -ItemType Directory -Force -Path "release" | Out-Null
+          Compress-Archive -Path "publish\*" -DestinationPath "release\Nebula-win-x64.zip" -CompressionLevel Optimal
+          $hash = (Get-FileHash "release\Nebula-win-x64.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $downloadUrl = "https://github.com/${{ github.repository }}/releases/download/$tag/Nebula-win-x64.zip"
+
+          # The release commit only bumps <Version>; use the code commit before it
+          # so the popup shows a useful description.
+          $notes = (& git log -1 --skip=1 --pretty=format:%s).Trim()
+          if ([string]::IsNullOrWhiteSpace($notes)) {
+            $notes = "Miglioramenti e correzioni di Nebula $version."
+          }
+
+          $manifest = [ordered]@{
+            version = $version
+            downloadUrl = $downloadUrl
+            sha256 = $hash
+            notes = $notes
+          } | ConvertTo-Json -Depth 3
+
+          $utf8 = [System.Text.UTF8Encoding]::new($false)
+          [System.IO.File]::WriteAllText((Join-Path $PWD "release\update.json"), $manifest, $utf8)
+
+          $releaseNotes = @(
+            "## Nebula $version",
+            "",
+            $notes,
+            "",
+            "### Installazione",
+            "Scarica ``Nebula-win-x64.zip``, estrai tutti i file e avvia ``Nebula.exe``.",
+            "",
+            "Le versioni precedenti ricevono il popup di aggiornamento e possono installare questa versione con **Aggiorna e riavvia**.",
+            "",
+            "### Integrità",
+            "SHA-256 del pacchetto: ``$hash``"
+          ) -join "`n"
+          [System.IO.File]::WriteAllText((Join-Path $PWD "release\RELEASE_NOTES.md"), $releaseNotes, $utf8)
+
+          Write-Output "version=$version"
+          Write-Output "sha256=$hash"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Nebula ${{ steps.version.outputs.version }}
+          body_path: release/RELEASE_NOTES.md
+          files: |
+            release/Nebula-win-x64.zip
+            release/update.json
+          make_latest: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

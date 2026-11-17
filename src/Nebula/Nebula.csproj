@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Nebula</RootNamespace>
+    <AssemblyName>Nebula</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\nebula.ico</ApplicationIcon>
+    <Product>Nebula Taskbar Studio</Product>
+    <AssemblyTitle>Nebula</AssemblyTitle>
+    <Version>1.2.2</Version>
+    <DebugType>embedded</DebugType>
+    <SatelliteResourceLanguages>it;en</SatelliteResourceLanguages>
+    <!-- Injected by the GitHub release workflow; empty in a normal local build. -->
+    <UpdateRepository Condition="'$(UpdateRepository)' == ''"></UpdateRepository>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>Nebula.UpdateRepository</_Parameter1>
+      <_Parameter2>$(UpdateRepository)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Builds and restores the watchdog; it is not referenced as an assembly. -->
+    <ProjectReference Include="..\Nebula.Watchdog\Nebula.Watchdog.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+  </ItemGroup>
+
+  <!-- Keep the crash watchdog next to the app in build and publish output. -->
+  <Target Name="BuildTaskbarWatchdog" AfterTargets="Build">
+    <ItemGroup>
+      <WatchdogFiles Include="..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.exe" />
+      <WatchdogFiles Include="..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.dll" />
+      <WatchdogFiles Include="..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.deps.json" />
+      <WatchdogFiles Include="..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.runtimeconfig.json" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(WatchdogFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true"
+          Condition="Exists('..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.exe')" />
+  </Target>
+
+  <Target Name="CopyTaskbarWatchdogToPublish" AfterTargets="Publish" DependsOnTargets="BuildTaskbarWatchdog">
+    <Copy SourceFiles="@(WatchdogFiles)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true"
+          Condition="Exists('..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.exe')" />
+  </Target>
+
+</Project>

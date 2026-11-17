@@ -1,0 +1,11 @@
+.dotnet/
+bin/
+obj/
+dist/
+artifacts/
+*.user
+*.suo
+
+# Temporary render probes from local diagnostics.
+tools/RenderAudit/
+tools/RenderProbe/

@@ -1,0 +1,133 @@
+<Window x:Class="Nebula.Views.LauncherWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Nebula Search" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize" WindowStartupLocation="Manual"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        FontFamily="{DynamicResource S.FontFamily}"
+        Deactivated="OnDeactivated" PreviewKeyDown="OnPreviewKeyDown">
+
+    <Grid>
+        <Border x:Name="Dim" Background="{DynamicResource S.Dim}" Opacity="0" MouseLeftButtonDown="OnDimClick" />
+
+        <Border x:Name="Card" Width="720" HorizontalAlignment="Center" VerticalAlignment="Center"
+                CornerRadius="{DynamicResource S.CardRadius}" Background="{DynamicResource S.CardBg}"
+                BorderBrush="{DynamicResource S.CardBorder}"
+                BorderThickness="{DynamicResource S.BorderThickness}"
+                Padding="{DynamicResource S.CardPadding}"
+                Opacity="0" RenderTransformOrigin="0.5,0.5">
+            <Border.RenderTransform>
+                <ScaleTransform x:Name="CardScale" ScaleX="0.97" ScaleY="0.97" />
+            </Border.RenderTransform>
+
+            <StackPanel>
+                <Grid Margin="4,2,4,14">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="34" Height="34" CornerRadius="{DynamicResource S.InnerRadius}"
+                                Background="{DynamicResource C.AccentGrad}">
+                            <UniformGrid Rows="2" Columns="2" Width="14" Height="14">
+                                <Ellipse Width="4" Height="4" Fill="{DynamicResource C.OnAccent}" Margin="1.2" />
+                                <Ellipse Width="4" Height="4" Fill="{DynamicResource C.OnAccent}" Margin="1.2" />
+                                <Ellipse Width="4" Height="4" Fill="{DynamicResource C.OnAccent}" Margin="1.2" />
+                                <Ellipse Width="4" Height="4" Fill="{DynamicResource C.OnAccent}" Margin="1.2" />
+                            </UniformGrid>
+                        </Border>
+                        <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="Nebula" FontWeight="{DynamicResource S.TitleWeight}" FontSize="14"
+                                       Foreground="{DynamicResource C.Text}" />
+                            <TextBlock x:Name="CaptionText" Text="Cerca app, finestre e azioni" FontSize="10.5"
+                                       Foreground="{DynamicResource C.TextMuted}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                                Click="OnOpenStudio" ToolTip="Apri Studio"
+                                AutomationProperties.Name="Apri Studio dalla ricerca">
+                            <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="12" />
+                        </Button>
+                        <Border Background="{DynamicResource C.Hover}" CornerRadius="{DynamicResource S.ControlRadius}"
+                                Padding="7,3" Margin="6,0,0,0">
+                            <TextBlock Text="ESC" FontSize="9.5" Foreground="{DynamicResource C.TextMuted}" />
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <Border CornerRadius="{DynamicResource S.InnerRadius}" Background="{DynamicResource S.InnerBg}"
+                        BorderBrush="{DynamicResource S.InnerBorder}"
+                        BorderThickness="{DynamicResource S.BorderThickness}" Padding="13,2">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="&#xE721;" FontFamily="Segoe Fluent Icons" FontSize="18"
+                                   Foreground="{DynamicResource C.TextMuted}" VerticalAlignment="Center"
+                                   Margin="2,0,10,0" />
+                        <Grid Grid.Column="1">
+                            <TextBox x:Name="SearchBox" Style="{StaticResource Input}" Background="Transparent"
+                                     BorderThickness="0" Padding="0,10" FontSize="17"
+                                     AutomationProperties.Name="Ricerca"
+                                     TextChanged="OnSearchTextChanged" />
+                            <TextBlock x:Name="Placeholder" Text="Cerca un'app, una finestra o un'azione…"
+                                       FontSize="17" Foreground="{DynamicResource C.TextFaint}"
+                                       VerticalAlignment="Center" Margin="2,0,0,0" IsHitTestVisible="False" />
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <ListBox x:Name="ResultList" Background="Transparent" BorderThickness="0"
+                         Margin="0,10,0,0" MaxHeight="330" Focusable="False"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ItemContainerStyle="{StaticResource ResultItem}"
+                         MouseDoubleClick="OnResultDoubleClick">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="30" Height="30" CornerRadius="{DynamicResource S.InnerRadius}"
+                                        Background="{DynamicResource C.Hover}">
+                                    <Grid>
+                                        <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons"
+                                                   FontSize="14" Foreground="{DynamicResource C.TextMuted}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Image Source="{Binding Icon}" Width="22" Height="22"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                    </Grid>
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}" FontSize="13.5"
+                                               Foreground="{DynamicResource C.Text}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Subtitle}" FontSize="9.5"
+                                               Foreground="{DynamicResource C.TextFaint}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding Subtitle, Converter={StaticResource EmptyStringCollapsed}}" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" Text="Invio" FontSize="9.5"
+                                           Foreground="{DynamicResource C.TextFaint}" VerticalAlignment="Center"
+                                           Margin="8,0,4,0" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <TextBlock x:Name="EmptyText" Text="Nessun risultato. Prova con un altro nome."
+                           Foreground="{DynamicResource C.TextMuted}" FontSize="12.5"
+                           HorizontalAlignment="Center" Margin="0,26" Visibility="Collapsed" />
+
+                <Grid Margin="6,12,6,0">
+                    <TextBlock Text="↑ ↓  naviga      Invio  apri      Esc  chiudi" FontSize="10.5"
+                               Foreground="{DynamicResource C.TextFaint}" />
+                    <TextBlock x:Name="CountText" FontSize="10.5" HorizontalAlignment="Right"
+                               Foreground="{DynamicResource C.TextFaint}" />
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

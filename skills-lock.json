@@ -1,0 +1,165 @@
+{
+  "version": 2,
+  "skills": {
+    "code-review": {
+      "source": "mattpocock/skills",
+      "commit": "5863806dd4e15c63174bee4e7515a4256792ecfa",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/code-review/SKILL.md",
+      "computedHash": "ce86b40a3d1648a0018b712f0c70704e6c2316b2a9b9e915ab116916a31273dc",
+      "installMode": "copy"
+    },
+    "csharp-expert": {
+      "source": "dotnet/skills",
+      "commit": "2877c712edc20643b72f64e2983b168e6661d607",
+      "sourceType": "github",
+      "skillPath": "plugins/dotnet/skills/csharp-expert/SKILL.md",
+      "computedHash": "81c33ee4d5d24c6a32c312deb434027e488512ba93162d9278c69f7b863c5a4d",
+      "installMode": "copy"
+    },
+    "csharp-xunit": {
+      "source": "github/awesome-copilot",
+      "commit": "dc0083dbe22133bfa7ce3500dee85e187e0cd47a",
+      "sourceType": "github",
+      "skillPath": "skills/csharp-xunit/SKILL.md",
+      "computedHash": "0b2a4fec896ffd99ee11fc47417705ad23e59575c1f67aa411abf3614743611e",
+      "installMode": "copy"
+    },
+    "cswin32-com": {
+      "source": "dotnet/msbuild",
+      "commit": "36212bbe82870bcb230a5b7a5f4366491ec776c4",
+      "sourceType": "github",
+      "skillPath": ".github/skills/cswin32-com/SKILL.md",
+      "computedHash": "6c427ed30983c9523fe99c5d414abaf11f9a654d20e2890cdd8d7ead44818efe",
+      "installMode": "copy"
+    },
+    "cswin32-interop": {
+      "source": "dotnet/msbuild",
+      "commit": "36212bbe82870bcb230a5b7a5f4366491ec776c4",
+      "sourceType": "github",
+      "skillPath": ".github/skills/cswin32-interop/SKILL.md",
+      "computedHash": "4a850fd0431e18654516eae38f869535c31d8303528b39281da022196ca5f7f7",
+      "installMode": "copy"
+    },
+    "documentation-and-adrs": {
+      "source": "addyosmani/agent-skills",
+      "commit": "39b723ceebf81474d0557c1fecd01eddab585563",
+      "sourceType": "github",
+      "skillPath": "skills/documentation-and-adrs/SKILL.md",
+      "computedHash": "deb39d7c8157563bc14a48f0d22003c82f4d8370b69c96efde476fe12318d188",
+      "installMode": "copy"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "commit": "50894c1d98bc45ca1ab127213e59d6525065b5e7",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "7bc223e2aafbdbf6e50ea243ba6ef67fe432bb069ab439fea0390795dac0bf7f",
+      "installMode": "copy"
+    },
+    "git-commit": {
+      "source": "github/awesome-copilot",
+      "commit": "dc0083dbe22133bfa7ce3500dee85e187e0cd47a",
+      "sourceType": "github",
+      "skillPath": "skills/git-commit/SKILL.md",
+      "computedHash": "90716f49501831c6c0679509b295495021eae83923d6a39035ce7c2d9cd2e8f2",
+      "installMode": "copy"
+    },
+    "performance-optimization": {
+      "source": "addyosmani/agent-skills",
+      "commit": "39b723ceebf81474d0557c1fecd01eddab585563",
+      "sourceType": "github",
+      "skillPath": "skills/performance-optimization/SKILL.md",
+      "computedHash": "cfa0c39804554198a33e3beb2b0f920a1b468bb2e066822e1d08f4abeda3db33",
+      "installMode": "copy"
+    },
+    "planning-and-task-breakdown": {
+      "source": "addyosmani/agent-skills",
+      "commit": "39b723ceebf81474d0557c1fecd01eddab585563",
+      "sourceType": "github",
+      "skillPath": "skills/planning-and-task-breakdown/SKILL.md",
+      "computedHash": "e4ef8d478d672103693af0cab5a97a1914f776099ef0756c2a093d9ae061f024",
+      "installMode": "copy"
+    },
+    "scaffold-dotnet-test-project": {
+      "source": "dotnet/skills",
+      "commit": "2877c712edc20643b72f64e2983b168e6661d607",
+      "sourceType": "github",
+      "skillPath": "plugins/dotnet-test/skills/scaffold-dotnet-test-project/SKILL.md",
+      "computedHash": "b35ba5d27b0be587da942cbe87efb4441164dff4c5afe3b1b158bea937d9f331",
+      "installMode": "copy"
+    },
+    "security-and-hardening": {
+      "source": "addyosmani/agent-skills",
+      "commit": "39b723ceebf81474d0557c1fecd01eddab585563",
+      "sourceType": "github",
+      "skillPath": "skills/security-and-hardening/SKILL.md",
+      "computedHash": "9bfc78e1ee2e23f3d226f610d8ed8e0cf6fb4f7e90a44db0a41b636735a24767",
+      "installMode": "copy"
+    },
+    "tdd": {
+      "source": "mattpocock/skills",
+      "commit": "5863806dd4e15c63174bee4e7515a4256792ecfa",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/tdd/SKILL.md",
+      "computedHash": "e3e0f78ff1c2d52ffefa0378baa1e80e129d359288cf9a56f4e59afcd2aac86c",
+      "installMode": "copy"
+    },
+    "winapp-find-api": {
+      "source": "microsoft/winappCli",
+      "commit": "92290ff6d82070944876c17fb4543d0a80f276ab",
+      "sourceType": "github",
+      "skillPath": "plugins/winapp/skills/winapp-find-api/SKILL.md",
+      "computedHash": "4058092ad910e615b82f3c7c338db19c766b31a4a0a5446e4ab4ed87e6e736f5",
+      "installMode": "copy"
+    },
+    "winapp-identity": {
+      "source": "microsoft/winappCli",
+      "commit": "92290ff6d82070944876c17fb4543d0a80f276ab",
+      "sourceType": "github",
+      "skillPath": "plugins/winapp/skills/winapp-identity/SKILL.md",
+      "computedHash": "42db76abd535d1d7a3abdee4991160a14a13fd5aa90b72a1475064d2b0f9db2c",
+      "installMode": "copy"
+    },
+    "winapp-package": {
+      "source": "microsoft/winappCli",
+      "commit": "92290ff6d82070944876c17fb4543d0a80f276ab",
+      "sourceType": "github",
+      "skillPath": "plugins/winapp/skills/winapp-package/SKILL.md",
+      "computedHash": "8ca9b176ab644795155cef96ebca829162bbfbe4d6148c320279e1365fa08612",
+      "installMode": "copy"
+    },
+    "winapp-troubleshoot": {
+      "source": "microsoft/winappCli",
+      "commit": "92290ff6d82070944876c17fb4543d0a80f276ab",
+      "sourceType": "github",
+      "skillPath": "plugins/winapp/skills/winapp-troubleshoot/SKILL.md",
+      "computedHash": "84480aa21ae72a47be0d5e870ec6767e9a56a5442e607de0c4656dd514987133",
+      "installMode": "copy"
+    },
+    "winapp-ui-automation": {
+      "source": "microsoft/winappCli",
+      "commit": "92290ff6d82070944876c17fb4543d0a80f276ab",
+      "sourceType": "github",
+      "skillPath": "plugins/winapp/skills/winapp-ui-automation/SKILL.md",
+      "computedHash": "c97611853151379a77c2dbea397c8807f768bc84881b025d8d22104db5f84678",
+      "installMode": "copy"
+    },
+    "winui-app": {
+      "source": "openai/skills",
+      "commit": "49f948faa9258a0c61caceaf225e179651397431",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/winui-app/SKILL.md",
+      "computedHash": "9432aff0900c439e989f1d33e09f484a705a7843efde52963238ef85113fedfe",
+      "installMode": "copy"
+    },
+    "wpf-best-practices": {
+      "source": "jcurbelo/skills",
+      "commit": "6313e174f1eaef3e34ba0e466a47b12b688950d1",
+      "sourceType": "github",
+      "skillPath": "wpf-best-practices/SKILL.md",
+      "computedHash": "41327fb27da24625e1d407b759cdbc4778d1417629f70c7b98807c97fadac81a",
+      "installMode": "copy"
+    }
+  }
+}
