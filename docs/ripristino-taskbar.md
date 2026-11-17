@@ -8,13 +8,15 @@ Quando Nebula nasconde la taskbar nativa:
 
 1. scrive `%APPDATA%\Nebula\taskbar.pending` con un GUID di sessione e lo stato originale della taskbar;
 2. avvia `Nebula.Watchdog.exe` accanto a `Nebula.exe`;
-3. il watchdog attende la fine del processo Nebula.
+3. imposta la taskbar nativa in auto-hide, nasconde `Shell_TrayWnd` e tutte le `Shell_SecondaryTrayWnd` e installa un hook `EVENT_OBJECT_SHOW` che la richiude subito se Explorer la mostra;
+4. registra la barra come AppBar di Windows, così l'area di lavoro tiene conto dello spazio occupato;
+5. il watchdog attende la fine del processo Nebula.
 
 Quando viene creato un gruppo di schede, Nebula scrive anche `%APPDATA%\Nebula\tabs.pending` con handle e `WINDOWPLACEMENT` originali di ogni finestra. Il file viene aggiornato quando cambia la composizione del gruppo e rimosso dopo il ripristino.
 
 Alla fine del processo:
 
-- **uscita normale:** Nebula ha già ripristinato lo stato originale e rimosso il file pendente; il watchdog non trova nulla da fare e termina;
+- **uscita normale:** Nebula ha già mostrato la taskbar visibile e rimosso il file pendente; il watchdog non trova nulla da fare e termina;
 - **crash o `taskkill /F`:** il file pendente appartiene alla sessione del processo morto; il watchdog ripristina prima le finestre di `tabs.pending` (verificando che siano davvero visibili), poi la taskbar e termina. Non serve rilanciare Nebula.
 
 Il watchdog agisce solo sul file della propria sessione: non tocca la taskbar di altre istanze o sessioni.
@@ -23,9 +25,9 @@ Il watchdog agisce solo sul file della propria sessione: non tocca la taskbar di
 
 | Evento | Taskbar | Dock e pannelli | Watchdog |
 | --- | --- | --- | --- |
-| Uscita normale | Stato originale esatto, anche auto-hide | Chiusi da Nebula | Termina senza interventi |
-| Crash / `taskkill /F` | Visibile, per sicurezza | Spariscono con il processo; le finestre raggruppate vengono ripristinate | Ripristina finestre e taskbar, poi termina |
-| Watchdog assente | Auto-hide di fallback | Restano gestiti da Nebula | Non disponibile |
+| Uscita normale | Visibile; l'auto-hide originale viene disattivato | Chiusi da Nebula | Termina senza interventi |
+| Crash / `taskkill /F` | Visibile, per sicurezza; l'AppBar viene rilasciata da Windows con la finestra | Spariscono con il processo; le finestre raggruppate vengono ripristinate | Ripristina finestre e taskbar, poi termina |
+| Watchdog assente | La taskbar resta visibile: il preflight blocca la sostituzione | La dock non viene mostrata | Non disponibile |
 
 Dopo un crash l'auto-hide originale non viene ripristinato: la taskbar viene mostrata visibile. È una scelta deliberata per non lasciare una barra nascosta e difficile da recuperare.
 
@@ -73,7 +75,9 @@ Messaggi tipici:
 
 ```text
 Native taskbar hidden; crash watchdog armed.
+AppBar reserved: edge=bottom, 74px on screen 1.
 Native taskbar restored.
+AppBar released: edge=bottom, 74px.
 taskbar restored after parent exit (state=0)
 no pending state; nothing to restore
 ```
@@ -84,13 +88,29 @@ no pending state; nothing to restore
 2. Verifica che `Nebula.Watchdog.exe` sia nella stessa cartella di `Nebula.exe`.
 3. Controlla `watchdog.log` per capire se il watchdog è stato avviato e se ha trovato lo stato pendente.
 4. Riavvia Nebula e scegli **Info → Esci da Nebula** per un ripristino pulito.
-5. In caso di emergenza, il riavvio di Esplora file o del PC ripristina comunque la taskbar di sistema.
+5. In caso di emergenza, esegui `scripts\ripristina-taskbar.cmd`: termina Nebula e lancia `Nebula.exe --restore-taskbar`.
+6. In alternativa, il riavvio di Esplora file o del PC ripristina comunque la taskbar di sistema.
 
 Non cancellare `taskbar.pending` mentre Nebula è in esecuzione: serve al watchdog. Se il file resta dopo un crash e non c'è alcun processo Nebula, il watchdog non è riuscito ad avviarsi; controlla il log e la presenza dei file del watchdog.
+
+## Verifica e ripristino d'emergenza
+
+`Nebula.exe --selftest` usa impostazioni temporanee, nasconde la taskbar solo
+dopo il preflight, verifica AppBar/work area/widget/layout e ripristina sempre
+in `finally`. Il watchdog del selftest ha un timeout: se l'harness si blocca,
+termina il processo e ripristina la shell. Il report è in
+`artifacts/selftest/<timestamp>/selftest-report.txt`.
+
+`Nebula.exe --restore-taskbar` viene gestito **prima** del mutex di istanza
+singola: funziona anche se un'altra istanza è aperta. Mostra `Shell_TrayWnd` e
+tutte le `Shell_SecondaryTrayWnd`, imposta lo stato visibile e cancella
+`taskbar.pending`. Se l'altra istanza è bloccata, `scripts\ripristina-taskbar.cmd`
+la termina prima di chiamare questo comando.
 
 ## Cosa non fa
 
 - Non crea un servizio di sistema.
 - Non resta in background dopo il ripristino.
 - Non richiede privilegi di amministratore.
-- Non nasconde mai completamente la taskbar senza una via di ripristino: in assenza del watchdog usa l'auto-hide.
+- Non nasconde mai la taskbar in assenza del watchdog: il preflight ferma la sostituzione e lascia la barra nativa visibile.
+- Non inietta codice in Explorer e non modifica file di sistema: l'AppBar è una normale finestra registrata presso la shell.

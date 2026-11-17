@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Net.NetworkInformation;
 using Nebula.Interop;
 using Nebula.Models;
 
@@ -19,6 +20,8 @@ public sealed class SystemMonitor : ObservableObject
     private string _uptime = "--";
     private string _ramDetail = "";
     private string _diskText = "";
+    private string _networkText = "Rete";
+    private bool _networkAvailable;
 
     public ObservableCollection<double> CpuHistory { get; } = new();
 
@@ -82,6 +85,18 @@ public sealed class SystemMonitor : ObservableObject
         private set => SetProperty(ref _diskText, value);
     }
 
+    public string NetworkText
+    {
+        get => _networkText;
+        private set => SetProperty(ref _networkText, value);
+    }
+
+    public bool NetworkAvailable
+    {
+        get => _networkAvailable;
+        private set => SetProperty(ref _networkAvailable, value);
+    }
+
     public SystemMonitor()
     {
         Update();
@@ -93,6 +108,7 @@ public sealed class SystemMonitor : ObservableObject
         UpdateMemory();
         UpdatePower();
         UpdateDisk();
+        UpdateNetwork();
 
         Uptime = FormatUptime(TimeSpan.FromMilliseconds(Environment.TickCount64));
     }
@@ -186,6 +202,29 @@ public sealed class SystemMonitor : ObservableObject
         catch
         {
             DiskText = "";
+        }
+    }
+
+    private void UpdateNetwork()
+    {
+        try
+        {
+            NetworkAvailable = NetworkInterface.GetIsNetworkAvailable();
+            NetworkInterface? active = NetworkInterface.GetAllNetworkInterfaces()
+                .FirstOrDefault(nic => nic.OperationalStatus == OperationalStatus.Up &&
+                                       nic.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                                       nic.NetworkInterfaceType != NetworkInterfaceType.Tunnel);
+
+            NetworkText = !NetworkAvailable
+                ? "Offline"
+                : active is null
+                    ? "Online"
+                    : active.Name;
+        }
+        catch
+        {
+            NetworkText = "Rete";
+            NetworkAvailable = false;
         }
     }
 

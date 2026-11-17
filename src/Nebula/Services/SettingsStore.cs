@@ -10,10 +10,24 @@ public sealed class SettingsStore : IDisposable
     private readonly DispatcherTimer _saveTimer;
     private bool _disposed;
 
+    /// <summary>
+    /// Settings live next to the real profile by default. The override exists so
+    /// the selftest can exercise persistence without touching the user's file.
+    /// </summary>
+    public static string DataDirectory
+    {
+        get
+        {
+            string? overrideDir = Environment.GetEnvironmentVariable("NEBULA_DATA_DIR");
+            return string.IsNullOrWhiteSpace(overrideDir)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Nebula")
+                : Path.GetFullPath(overrideDir);
+        }
+    }
+
     public SettingsStore()
     {
-        string dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Nebula");
+        string dir = DataDirectory;
         Directory.CreateDirectory(dir);
         FilePath = Path.Combine(dir, "settings.json");
         IsFirstRun = !File.Exists(FilePath);
@@ -107,6 +121,35 @@ public sealed class SettingsStore : IDisposable
         s.PinnedPaths ??= new List<string>();
         s.RecentApps ??= new List<string>();
         s.PanelWidgets ??= new List<string> { "clock", "calendar", "stats", "battery", "network" };
+
+        if (s.SettingsVersion < 2)
+        {
+            // Older builds rendered the clock, battery and system monitor at
+            // fixed positions. Preserve that exact look as taskbar widgets.
+            var migrated = new List<string>();
+            if (s.ShowStats)
+                migrated.Add("stats");
+            if (s.ShowBattery)
+                migrated.Add("battery");
+            if (s.ShowClock)
+                migrated.Add("clock");
+            s.TaskbarWidgets = migrated;
+            s.SettingsVersion = 2;
+        }
+
+        s.TaskbarWidgets ??= new List<string> { "stats", "battery", "clock" };
+        var taskbarWidgets = new List<string>();
+        foreach (string id in s.TaskbarWidgets)
+        {
+            string? known = TaskbarWidgetCatalog.Find(id)?.Id;
+            if (known is null || taskbarWidgets.Contains(known, StringComparer.OrdinalIgnoreCase))
+                continue;
+            taskbarWidgets.Add(known);
+            if (taskbarWidgets.Count >= 16)
+                break;
+        }
+        s.TaskbarWidgets = taskbarWidgets;
+
         s.CustomIcons ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         s.CustomIconStyles ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var styles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

@@ -15,7 +15,7 @@
     <ApplicationIcon>Assets\nebula.ico</ApplicationIcon>
     <Product>Nebula Taskbar Studio</Product>
     <AssemblyTitle>Nebula</AssemblyTitle>
-    <Version>1.2.2</Version>
+    <Version>1.4.0</Version>
     <DebugType>embedded</DebugType>
     <SatelliteResourceLanguages>it;en</SatelliteResourceLanguages>
     <!-- Injected by the GitHub release workflow; empty in a normal local build. -->

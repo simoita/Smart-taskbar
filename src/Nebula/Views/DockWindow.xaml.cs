@@ -21,8 +21,11 @@ public partial class DockWindow : Window
 
     private readonly DockViewModel _vm;
     private readonly SettingsStore _store;
+    private readonly TaskbarAppBar _appBar = new();
     private readonly DispatcherTimer _watchTimer;
     private readonly DispatcherTimer _backdropTimer;
+    private HwndSource? _hwndSource;
+    private uint _taskbarCreatedMessage;
     private bool _hidden;
     private bool _animating;
     private bool _userHidden;
@@ -47,6 +50,16 @@ public partial class DockWindow : Window
         Closed += (_, _) =>
         {
             _watchTimer.Stop();
+            try
+            {
+                _hwndSource?.RemoveHook(WndProc);
+            }
+            catch
+            {
+                // The source may already be disposing with the window.
+            }
+            _hwndSource = null;
+            _appBar.Dispose();
             _vm.Settings.PropertyChanged -= OnSettingsChanged;
         };
         _vm.Settings.PropertyChanged += OnSettingsChanged;
@@ -67,6 +80,18 @@ public partial class DockWindow : Window
     }
 
     public bool IsHidden => _hidden;
+    public bool IsAppBarRegistered => _appBar.IsRegistered;
+    public bool AppBarApplySucceeded { get; private set; }
+
+    /// <summary>Shell rectangle in window DIPs, excluding the transparent shadow.</summary>
+    public Rect ShellBoundsDip
+    {
+        get
+        {
+            Point origin = Shell.TranslatePoint(new Point(0, 0), this);
+            return new Rect(origin, Shell.RenderSize);
+        }
+    }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
@@ -76,6 +101,10 @@ public partial class DockWindow : Window
             long style = NativeMethods.GetWindowLongPtr(handle, NativeMethods.GWL_EXSTYLE).ToInt64();
             style |= NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_NOACTIVATE;
             NativeMethods.SetWindowLongPtr(handle, NativeMethods.GWL_EXSTYLE, (IntPtr)style);
+
+            _hwndSource = HwndSource.FromHwnd(handle);
+            _hwndSource?.AddHook(WndProc);
+            _taskbarCreatedMessage = NativeMethods.RegisterWindowMessage("TaskbarCreated");
         }
         catch (Exception ex)
         {
@@ -83,11 +112,25 @@ public partial class DockWindow : Window
         }
     }
 
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (_taskbarCreatedMessage != 0 && msg == (int)_taskbarCreatedMessage)
+        {
+            // Explorer restarted: the AppBar registration died with it. Re-arm
+            // the reservation on the new shell.
+            _appBar.Remove();
+            Dispatcher.InvokeAsync(UpdateAppBar, DispatcherPriority.Background);
+        }
+
+        return IntPtr.Zero;
+    }
+
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         ApplyZoneLayout();
         Reposition();
         UpdateBackdrop();
+        Dispatcher.InvokeAsync(UpdateAppBar, DispatcherPriority.Loaded);
 
         if (!_vm.Settings.AnimationsEnabled)
         {
@@ -122,8 +165,47 @@ public partial class DockWindow : Window
     {
         RefreshScreenGeometry();
         Rect work = _workAreaDip;
+
+        // The window keeps 26 px of transparent shadow on each side; the shell
+        // itself must still reach the requested edge margin.
+        const double horizontalShadow = 52;
+        double maxWidth = Math.Max(360, work.Width + horizontalShadow);
+        double maxHeight = Math.Max(140, work.Height - Math.Max(0, _vm.Settings.EdgeMargin) * 2);
+        if (Math.Abs(MaxWidth - maxWidth) > 0.5)
+            MaxWidth = maxWidth;
+        if (Math.Abs(MaxHeight - maxHeight) > 0.5)
+            MaxHeight = maxHeight;
+
+        bool fullWidth = _vm.Settings.ReplaceWindowsTaskbar && _vm.Settings.TaskbarFullWidth;
+        if (fullWidth)
+        {
+            double target = Math.Max(360,
+                work.Width - Math.Max(0, _vm.Settings.EdgeMargin) * 2 + horizontalShadow);
+            if (Math.Abs(Width - target) > 0.5)
+                Width = target;
+        }
+        else if (!double.IsNaN(Width))
+        {
+            Width = double.NaN;
+        }
+
+        UpdateLayout();
         if (ActualWidth < 1 || ActualHeight < 1)
             return;
+
+        if (fullWidth)
+        {
+            double desiredShell = Math.Max(320, work.Width - Math.Max(0, _vm.Settings.EdgeMargin) * 2);
+            // The window may keep a non-client frame even with WindowStyle=None.
+            // Absorb it in the transparent side margin so the *shell* keeps the
+            // exact requested width and edge distance on every DPI.
+            double side = Math.Max(0, (ActualWidth - desiredShell) / 2);
+            Root.Margin = new Thickness(side, ShadowTop, side, ShadowBottom);
+        }
+        else if (Math.Abs(Root.Margin.Left - 26) > 0.5)
+        {
+            Root.Margin = new Thickness(26, ShadowTop, 26, ShadowBottom);
+        }
 
         Left = work.Left + (work.Width - ActualWidth) / 2;
         if (!_hidden)
@@ -131,14 +213,38 @@ public partial class DockWindow : Window
             BeginAnimation(TopProperty, null);
             Top = VisibleTop();
         }
+
+        UpdateAppBar();
     }
 
     private void RefreshScreenGeometry()
     {
         System.Windows.Forms.Screen screen = ScreenGeometry.Target(_vm.Settings.MonitorIndex);
-        _workAreaDip = ScreenGeometry.WorkAreaDip(screen);
+        _workAreaDip = _vm.Settings.ReplaceWindowsTaskbar && _vm.Settings.ReserveTaskbarSpace
+            ? ScreenGeometry.BoundsDip(screen)
+            : ScreenGeometry.WorkAreaDip(screen);
         _physicalWorkArea = screen.WorkingArea;
         _screenBounds = screen.Bounds;
+    }
+
+    /// <summary>
+    /// Reserves the bar through the Windows AppBar API. This is what makes the
+    /// replacement behave like a real taskbar: maximized windows stop at it.
+    /// </summary>
+    private void UpdateAppBar()
+    {
+        if (!IsVisible || _hiddenForTaskbarRestore)
+            return;
+
+        if (!_vm.Settings.ReplaceWindowsTaskbar || !_vm.Settings.ReserveTaskbarSpace)
+        {
+            _appBar.Remove();
+            AppBarApplySucceeded = false;
+            return;
+        }
+
+        double height = Math.Max(28, ActualHeight - ShadowTop - ShadowBottom + _vm.Settings.EdgeMargin);
+        AppBarApplySucceeded = _appBar.Apply(this, _vm.Settings.DockOnTop, height, _vm.Settings.MonitorIndex);
     }
 
     private Rect CurrentWorkArea()
@@ -166,9 +272,20 @@ public partial class DockWindow : Window
             or nameof(Models.AppSettings.DockAppsScale)
             or nameof(Models.AppSettings.DockSystemScale)
             or nameof(Models.AppSettings.DockActionsScale)
-            or nameof(Models.AppSettings.DockZoneDividers))
+            or nameof(Models.AppSettings.DockZoneDividers)
+            or nameof(Models.AppSettings.TaskbarFullWidth))
         {
             ApplyZoneLayout();
+            Dispatcher.InvokeAsync(Reposition, DispatcherPriority.Background);
+        }
+
+        if (e.PropertyName is nameof(Models.AppSettings.ReserveTaskbarSpace)
+            or nameof(Models.AppSettings.ReplaceWindowsTaskbar)
+            or nameof(Models.AppSettings.DockOnTop)
+            or nameof(Models.AppSettings.MonitorIndex)
+            or nameof(Models.AppSettings.EdgeMargin)
+            or nameof(Models.AppSettings.DockHeight))
+        {
             Dispatcher.InvokeAsync(Reposition, DispatcherPriority.Background);
         }
     }
@@ -187,13 +304,21 @@ public partial class DockWindow : Window
             ["actions"] = ActionsZone
         };
 
+        // Hidden zones stay in a detached container when they are removed from
+        // the host; free every zone before reparenting any of them.
+        foreach (FrameworkElement zone in zones.Values)
+        {
+            if (zone.Parent is Panel parent)
+                parent.Children.Remove(zone);
+        }
+
         string[] requested = (settings.DockZoneOrder ?? "apps,system,actions")
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (requested.Length != 3 || requested.Distinct(StringComparer.OrdinalIgnoreCase).Count() != 3 ||
             requested.Any(key => !zones.ContainsKey(key)))
             requested = new[] { "apps", "system", "actions" };
 
-        ZoneHost.Children.Clear();
+        var entries = new List<(FrameworkElement Zone, Border? Divider)>();
         bool first = true;
         foreach (string key in requested)
         {
@@ -201,7 +326,7 @@ public partial class DockWindow : Window
             {
                 "apps" => settings.DockAppsZone,
                 "system" => settings.DockSystemZone &&
-                            (settings.ShowStats || settings.ShowBattery || settings.ShowClock),
+                            settings.TaskbarWidgets is { Count: > 0 },
                 _ => settings.DockActionsZone &&
                      (settings.EnableTabs || settings.ShowSearch || settings.ShowWidgets ||
                       settings.ShowQuickControls || settings.ShowSettingsButton)
@@ -212,9 +337,10 @@ public partial class DockWindow : Window
             if (!visible)
                 continue;
 
+            Border? divider = null;
             if (!first && settings.DockZoneDividers)
             {
-                var divider = new Border
+                divider = new Border
                 {
                     Width = 1,
                     Height = 24,
@@ -222,7 +348,6 @@ public partial class DockWindow : Window
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 divider.SetResourceReference(BackgroundProperty, "C.StrokeSoft");
-                ZoneHost.Children.Add(divider);
             }
 
             double scale = key switch
@@ -234,12 +359,93 @@ public partial class DockWindow : Window
             zone.LayoutTransform = Math.Abs(scale - 1) < 0.01
                 ? Transform.Identity
                 : new ScaleTransform(scale, scale);
-            zone.Margin = first
-                ? new Thickness(0)
-                : new Thickness(settings.DockZoneSpacing / 2, 0, 0, 0);
-            ZoneHost.Children.Add(zone);
+            zone.Margin = new Thickness(0);
+            entries.Add((zone, divider));
             first = false;
         }
+
+        // Reparenting a zone is only legal after detaching it from the previous
+        // container; otherwise WPF throws "element already has a logical parent".
+        foreach ((FrameworkElement zone, Border? divider) in entries)
+        {
+            if (zone.Parent is Panel zoneParent)
+                zoneParent.Children.Remove(zone);
+            if (divider?.Parent is Panel dividerParent)
+                dividerParent.Children.Remove(divider);
+        }
+
+        ZoneHost.Children.Clear();
+        ZoneHost.ColumnDefinitions.Clear();
+
+        bool fullWidth = settings.ReplaceWindowsTaskbar && settings.TaskbarFullWidth;
+
+        var containers = new List<StackPanel>();
+        for (int i = 0; i < entries.Count; i++)
+        {
+            (FrameworkElement zone, Border? divider) = entries[i];
+            var container = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            if (divider is not null)
+                container.Children.Add(divider);
+            container.Children.Add(zone);
+
+            if (!fullWidth)
+                container.Margin = i == 0
+                    ? new Thickness(0)
+                    : new Thickness(settings.DockZoneSpacing / 2, 0, 0, 0);
+            else if (entries.Count >= 3 && i == 1)
+                container.Margin = new Thickness(settings.DockZoneSpacing, 0, settings.DockZoneSpacing, 0);
+
+            containers.Add(container);
+        }
+
+        if (!fullWidth || containers.Count == 0)
+        {
+            for (int i = 0; i < containers.Count; i++)
+            {
+                ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                Grid.SetColumn(containers[i], i);
+                ZoneHost.Children.Add(containers[i]);
+            }
+
+            return;
+        }
+
+        ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        if (containers.Count == 1)
+        {
+            Grid.SetColumn(containers[0], 0);
+            Grid.SetColumnSpan(containers[0], 3);
+            containers[0].HorizontalAlignment = HorizontalAlignment.Center;
+            ZoneHost.Children.Add(containers[0]);
+            return;
+        }
+
+        Grid.SetColumn(containers[0], 0);
+        ZoneHost.Children.Add(containers[0]);
+
+        if (containers.Count == 2)
+        {
+            Grid.SetColumn(containers[1], 2);
+            containers[1].HorizontalAlignment = HorizontalAlignment.Right;
+            ZoneHost.Children.Add(containers[1]);
+            return;
+        }
+
+        Grid.SetColumn(containers[1], 1);
+        containers[1].HorizontalAlignment = HorizontalAlignment.Center;
+        ZoneHost.Children.Add(containers[1]);
+
+        Grid.SetColumn(containers[2], 2);
+        containers[2].HorizontalAlignment = HorizontalAlignment.Right;
+        ZoneHost.Children.Add(containers[2]);
     }
 
     private double VisibleTop()
@@ -285,6 +491,20 @@ public partial class DockWindow : Window
             }
         }
 
+
+        if (!_hidden && _tick % 8 == 0 &&
+            _vm.Settings.ReplaceWindowsTaskbar && _vm.Settings.ReserveTaskbarSpace &&
+            (!_appBar.IsRegistered || !AppBarApplySucceeded))
+        {
+            if (!AppBarApplySucceeded)
+            {
+                // Explorer restarted: the old HWND registration died with the
+                // shell, but our local flag did not. Force ABM_NEW again.
+                _appBar.Remove();
+            }
+            UpdateAppBar();
+        }
+
         bool nearEdge = IsCursorNearEdge();
         bool shouldHide = _userHidden || fullscreen ||
                           (_vm.Settings.AutoHideDock && !IsMouseOver && !nearEdge);
@@ -303,9 +523,12 @@ public partial class DockWindow : Window
         if (_physicalWorkArea.Width < 1)
             RefreshScreenGeometry();
 
+        bool reserved = _vm.Settings.ReplaceWindowsTaskbar && _vm.Settings.ReserveTaskbarSpace;
+        int topEdge = reserved ? _screenBounds.Top : _physicalWorkArea.Top;
+        int bottomEdge = reserved ? _screenBounds.Bottom : _physicalWorkArea.Bottom;
         return _vm.Settings.DockOnTop
-            ? point.Y <= _physicalWorkArea.Top + 3
-            : point.Y >= _physicalWorkArea.Bottom - 3;
+            ? point.Y <= topEdge + 3
+            : point.Y >= bottomEdge - 3;
     }
 
     public void HideDock()
@@ -375,6 +598,7 @@ public partial class DockWindow : Window
         _hidden = false;
         _animating = false;
         BeginAnimation(TopProperty, null);
+        _appBar.Remove();
         CloseOpenTooltips();
 
         if (IsVisible)
@@ -439,6 +663,78 @@ public partial class DockWindow : Window
     private void OnSettingsClick(object sender, RoutedEventArgs e) => App.Instance?.ShowSettings();
 
     private void OnTabsClick(object sender, RoutedEventArgs e) => App.Instance?.ShowGroupPicker();
+
+    private void OnTaskbarWidgetClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: TaskbarWidgetViewModel widget })
+            return;
+
+        switch (widget.Id)
+        {
+            case "search":
+                App.Instance?.ShowLauncher();
+                break;
+            case "clock":
+                App.Instance?.ShowWidgets();
+                break;
+            case "network":
+            case "controls":
+                App.Instance?.ShowControls();
+                break;
+            case "widgets":
+                App.Instance?.ShowWidgets();
+                break;
+            case "tabs":
+                App.Instance?.ShowGroupPicker();
+                break;
+            case "settings":
+                App.Instance?.ShowSettings();
+                break;
+            case "media":
+                App.Instance?.ToggleMediaPlayback();
+                break;
+        }
+    }
+
+    private void OnDockItemEnter(object sender, MouseEventArgs e)
+    {
+        if (!_vm.Settings.HoverMagnify || sender is not Button button)
+            return;
+
+        Panel.SetZIndex(button, 1);
+        AnimateItem(button, 1.13, 0.16, true);
+    }
+
+    private void OnDockItemLeave(object sender, MouseEventArgs e)
+    {
+        if (sender is not Button button)
+            return;
+
+        Panel.SetZIndex(button, 0);
+        AnimateItem(button, 1, 0.18, false);
+    }
+
+    private void AnimateItem(Button button, double to, double seconds, bool elastic)
+    {
+        if (button.Template.FindName("ItemScale", button) is not ScaleTransform scale)
+            return;
+
+        if (!_vm.Settings.AnimationsEnabled)
+        {
+            scale.ScaleX = to;
+            scale.ScaleY = to;
+            return;
+        }
+
+        double adjusted = seconds / Math.Clamp(_vm.Settings.AnimationSpeed, 0.5, 2);
+        IEasingFunction easing = elastic
+            ? new BackEase { Amplitude = 0.4, EasingMode = EasingMode.EaseOut }
+            : new CubicEase { EasingMode = EasingMode.EaseOut };
+
+        var animation = new DoubleAnimation(to, TimeSpan.FromSeconds(adjusted)) { EasingFunction = easing };
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
+    }
 
     private void OnDockBackgroundRightClick(object sender, MouseButtonEventArgs e)
     {

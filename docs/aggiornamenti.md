@@ -8,10 +8,10 @@ Nebula usa **GitHub Releases** come canale di aggiornamento. Il repository pubbl
 L'URL predefinito del manifest è:
 
 ```text
-https://github.com/OWNER/REPO/releases/latest/download/update.json
+https://github.com/simoita/Smart-taskbar/releases/latest/download/update.json
 ```
 
-`OWNER/REPO` viene inserito nella build dal workflow (`.github/workflows/release.yml`) tramite la proprietà MSBuild `UpdateRepository`, quindi non va scritto a mano nel codice. Le installazioni create da una Release GitHub hanno già l'URL corretto.
+`simoita/Smart-taskbar` viene inserito nella build dal workflow (`.github/workflows/release.yml`) tramite la proprietà MSBuild `UpdateRepository`, quindi non va scritto a mano nel codice. Le installazioni create da una Release GitHub hanno già l'URL corretto.
 
 ## Flusso di pubblicazione
 
@@ -29,7 +29,7 @@ Per pubblicare una nuova versione:
 ```powershell
 # Prima committa le modifiche al codice.
 # Poi, dalla radice del progetto:
-.\scripts\release.cmd -Version 1.3.0
+.\scripts\release.cmd -Version 1.4.0
 ```
 
 Se ometti `-Version`, viene incrementata la patch:
@@ -41,9 +41,9 @@ Se ometti `-Version`, viene incrementata la patch:
 Per creare commit e tag senza inviarli subito:
 
 ```powershell
-.\scripts\release.cmd -Version 1.3.0 -NoPush
+.\scripts\release.cmd -Version 1.4.0 -NoPush
 git push origin HEAD
-git push origin v1.3.0
+git push origin v1.4.0
 ```
 
 Il push del tag è l'evento che avvia la Release. In alternativa puoi avviare **Actions → Release Nebula → Run workflow** e inserire la versione; il workflow crea la Release e il tag.
@@ -56,7 +56,7 @@ Crea un repository vuoto su GitHub (senza README, `.gitignore` o licenza) e coll
 git init -b main
 git add .
 git commit -m "Initial commit"
-git remote add origin https://github.com/OWNER/REPO.git
+git remote add origin https://github.com/simoita/Smart-taskbar.git
 git push -u origin main
 ```
 
@@ -97,8 +97,8 @@ Una build locale non ha un repository GitHub incorporato, quindi il campo **Mani
 
 ```powershell
 .\.dotnet\dotnet.exe publish .\src\Nebula\Nebula.csproj -c Release -o .\dist `
-  -p:Version=1.3.0 `
-  -p:UpdateRepository=OWNER/REPO
+  -p:Version=1.4.0 `
+  -p:UpdateRepository=simoita/Smart-taskbar
 ```
 
 In alternativa inserisci nel campo **Manifest aggiornamenti** un URL personalizzato, anche un manifest locale servito in HTTP per i test. Un URL personalizzato ha precedenza sul valore predefinito.
@@ -107,8 +107,8 @@ In alternativa inserisci nel campo **Manifest aggiornamenti** un URL personalizz
 
 ```json
 {
-  "version": "1.3.0",
-  "downloadUrl": "https://github.com/OWNER/REPO/releases/download/v1.3.0/Nebula-win-x64.zip",
+  "version": "1.4.0",
+  "downloadUrl": "https://github.com/simoita/Smart-taskbar/releases/download/v1.4.0/Nebula-win-x64.zip",
   "sha256": "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
   "notes": "Nuovi widget e correzioni."
 }

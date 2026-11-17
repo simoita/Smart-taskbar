@@ -113,7 +113,7 @@ Disattivandola, il valore viene rimosso. Se sposti la cartella di Nebula, disatt
 
 Chiudi sempre con **Esci da Nebula** quando puoi. L'uscita normale:
 
-1. ripristina la taskbar nativa nello stato esatto precedente;
+1. rende visibile la taskbar nativa (disattivando l'auto-hide precedente);
 2. ripristina tutte le finestre dei gruppi di schede;
 3. chiude dock, tab bar, tooltip e pannelli;
 4. rimuove `%APPDATA%\Nebula\taskbar.pending` e `tabs.pending`;

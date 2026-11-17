@@ -237,7 +237,11 @@ public partial class WidgetsWindow : Window
     private void PositionPanel()
     {
         Rect work = ScreenGeometry.WorkAreaDip(ScreenGeometry.Target(_dock.Settings.MonitorIndex));
-        Left = work.Right - ActualWidth - 34;
+        MaxWidth = Math.Max(320, work.Width - 24);
+        MaxHeight = Math.Max(360, work.Height - 40);
+        Width = Math.Min(Width, MaxWidth);
+        UpdateLayout();
+        Left = Math.Max(work.Left + 12, work.Right - ActualWidth - 34);
         Top = Math.Max(work.Top + 24, work.Bottom - ActualHeight - 92);
     }
 

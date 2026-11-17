@@ -6,13 +6,19 @@ L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminan
 
 **Novità 1.2:** pannello **Icone di sistema** con stili applicabili a collegamenti `.lnk`, tipi file e cartelle utente del profilo, icone personali dal dialog di Windows, ICO multi-size 16–256 px, backup esatto e recovery dopo chiusura forzata. Dettagli in [docs/icone-sistema.md](docs/icone-sistema.md).
 
+**Novità 1.3:** taskbar sostitutiva **a tutta larghezza** con app a sinistra, widget al centro e controlli a destra; prenotazione reale dello spazio tramite **AppBar di Windows** (le finestre massimizzate si fermano alla barra); taskbar nativa nascosta anche sui monitor secondari e richiusa all'istante se Explorer la mostra; **widget riordinabili dentro la barra** (orologio, CPU/RAM, batteria, rete, media, ricerca, schede e altro); Studio adattivo che non esce più dallo schermo; righe impostazioni senza sovrapposizioni. Dettagli in [docs/taskbar-windows.md](docs/taskbar-windows.md).
+
+**Novità 1.4:** verifica **eseguibile** della sostituzione con `Nebula.exe --selftest` (AppBar reale, area di lavoro, taskbar nascosta su tutti i monitor, ordine widget dopo salvataggio/riavvio, layout a 1280×720 e 1920×1080) e ripristino d'emergenza `--restore-taskbar`; l'AppBar viene verificata sull'area di lavoro vera, non solo sulla risposta di `ABM_SETPOS`; dopo un riavvio reale di Explorer la registrazione viene rifatta automaticamente; se il watchdog manca o la verifica fallisce, Nebula **non nasconde** la taskbar nativa. Dettagli in [docs/taskbar-windows.md](docs/taskbar-windows.md) e [docs/ripristino-taskbar.md](docs/ripristino-taskbar.md).
+
 ## Funzioni
 
 - Dock personalizzabile: in alto o in basso, margine regolabile, auto-hide, dimensione e schermo di destinazione.
+- **Taskbar a tutta larghezza**: app a sinistra, widget al centro, azioni a destra; spazio riservato con l'API AppBar di Windows e ripristino watchdog.
 - **16 temi completi** (Nebula, Aurora, Neon Grid, Ember, Porcelain, Mint Glass, Sakura, Graphite, Solar, Ocean, Candy, Forest, Lavender, Midnight, Sunset, Sage) con accento personalizzato applicato dal vivo a dock, studio, widget e launcher.
 - **5 preset superficie — Vetro / Minimal / Neon / Soft / Mono** applicati dal vivo a widget, controlli rapidi e ricerca, indipendenti dallo stile delle schede.
 - **Tre zone dock indipendenti** (app, sistema, azioni): visibilità, ordine, scala, spaziatura e separatori si impostano separatamente.
 - **11 widget** selezionabili dal catalogo e inseribili nel pannello: orologio, data, calendario, sistema, batteria, rete, uptime, disco, media, ricerca e controlli.
+- **13 widget nella taskbar**, aggiungibili e riordinabili singolarmente: orologio, CPU, RAM, CPU+RAM, batteria, rete, media, ricerca, schede, pannello widget, controlli, impostazioni e separatore.
 - **Stati icona distinti**: indicatore separato per app aperta, ridotta a icona e chiusa, con forma, dimensione, opacità e stile icona (originale, riquadro, cerchio, monocromatico, neon).
 - **Icone personalizzate**: stile e forma globali per la dock, icona propria per ogni app fissata e cambio icona dei collegamenti `.lnk` del desktop tramite dialog di Windows.
 - **Icone di sistema per-utente**: pagina **Studio → Icone** per applicare stili (vetro, pieno, riquadro, cerchio, duotono, mono, contorno, neon) a collegamenti `.lnk` di Desktop/Start menu/pin, tipi file sotto `HKCU\Software\Classes` e cartelle utente tramite `desktop.ini`. Icone personali `.ico/.png/.jpg/.exe`, ICO multi-size 16–256 px, backup esatto e ripristino verificato. Nessuna patch a `System32`. Le cartelle fuori dalle sei cartelle shell del profilo restano personalizzabili singolarmente da Windows: non esiste un override globale per-utente. Dettagli in [docs/icone-sistema.md](docs/icone-sistema.md).
@@ -24,7 +30,7 @@ L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminan
 - **Controlli rapidi** dalla dock o dallo studio: volume/mute reali, play/pausa e precedente/successivo del player attivo, stato rete e apertura delle impostazioni di rete, luminosità DDC/CI quando il monitor la espone.
 - Ogni superficie ha un interruttore e almeno una regola grafica in **Studio → Widget / Ricerca / Controlli**.
 - Avvio con Windows realmente registrato in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
-- Ripristino automatico della taskbar su uscita normale, crash e terminazione forzata.
+- Ripristino automatico della taskbar su uscita normale, crash e terminazione forzata, con hook immediato sulle barre mostrate da Explorer.
 
 ## Requisiti
 
@@ -39,7 +45,21 @@ L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminan
 3. Al primo avvio la taskbar nativa viene nascosta e compare la dock. Lo studio si apre dall'icona impostazioni della dock o dal menu della tray.
 4. Per uscire in modo pulito: tray → **Esci da Nebula**, oppure **Info → Esci da Nebula** nello studio.
 
-La taskbar originale viene ripristinata nello stato esatto precedente all'uscita normale.
+La taskbar originale viene ripristinata **visibile** all'uscita normale; un eventuale auto-hide precedente viene disattivato per non lasciare una barra difficile da recuperare.
+
+Verifica automatica (usa impostazioni temporanee e ripristina sempre la taskbar):
+
+```powershell
+.\dist\Nebula.exe --selftest
+$latest = Get-ChildItem .\artifacts\selftest | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Get-Content (Join-Path $latest.FullName 'selftest-report.txt')
+```
+
+Ripristino d'emergenza, anche se Nebula è bloccata:
+
+```text
+scripts\ripristina-taskbar.cmd
+```
 
 Per aprire direttamente lo studio:
 
@@ -90,12 +110,19 @@ Dettagli, misure e limiti: [docs/superfici.md](docs/superfici.md).
 
 Nebula avvia `Nebula.Watchdog.exe` quando nasconde la taskbar nativa. Il watchdog attende la fine del processo Nebula e, se trova uno stato pendente della stessa sessione, ripristina la taskbar **visibile**.
 
-- **Uscita normale:** Nebula ripristina lo stato originale esatto, chiude dock, tooltip e pannelli, quindi rimuove lo stato pendente. Il watchdog non deve fare nulla.
+- **Uscita normale:** Nebula mostra la taskbar nativa (senza auto-hide), chiude dock, tooltip e pannelli, quindi rimuove lo stato pendente. Il watchdog non deve fare nulla.
 - **Crash o `taskkill /F`:** il watchdog ripristina la taskbar visibile, senza rilanciare Nebula. La dock e i pannelli spariscono insieme al processo.
-- **Auto-hide originale:** dopo un crash la taskbar viene mostrata visibile per sicurezza; l'auto-hide originale viene conservato solo nell'uscita normale.
-- **Watchdog assente o non avviabile:** Nebula ripiega sull'auto-hide, mai sulla taskbar completamente nascosta.
+- **Auto-hide originale:** sia dopo un crash sia dopo un'uscita normale la taskbar viene mostrata visibile; l'auto-hide precedente viene disattivato per non lasciare una barra difficile da recuperare.
+- **Watchdog assente o non avviabile:** il preflight ferma la sostituzione; la taskbar nativa resta visibile e la dock non viene mostrata.
+- **AppBar non verificata:** se l'area di lavoro non viene riservata, Nebula ripristina la taskbar nativa invece di lasciare una barra coperta dalle finestre massimizzate.
 
 Dettagli, test e diagnostica: [docs/ripristino-taskbar.md](docs/ripristino-taskbar.md).
+
+## Taskbar Windows e widget
+
+La barra viene registrata come **AppBar** di Windows: lo spazio è riservato dal sistema e le finestre massimizzate non la coprono. Con **Barra a tutta larghezza** le zone diventano sinistra/centro/destra come nella taskbar di Windows 11. I widget della barra si scelgono e si riordinano da **Studio → Widget → Widget nella taskbar**. Architettura, confronto con Windhawk/Windows 11 Taskbar Styler, diagnostica e limiti: [docs/taskbar-windows.md](docs/taskbar-windows.md).
+
+L'audit riproducibile di binding, handler e controlli duplicati è in [docs/audit-controlli.md](docs/audit-controlli.md); il comando `scripts/audit-ui-controls.ps1` rigenera il report.
 
 ## Schede delle finestre
 
@@ -113,6 +140,8 @@ Le finestre protette, elevate o UWP vengono rifiutate con un messaggio esplicito
 ## Prestazioni
 
 Misure finali della build 1.1 pubblicata in `dist/`, un monitor 1920×1080, preset superficie **Vetro**, animazioni attive, nessun gruppo di schede. La dock è stata misurata da un processo pulito dopo warm-up; la CPU è la media del tempo processo su una finestra di 20 s.
+
+**Build 1.4 (taskbar a tutta larghezza, 5 widget, animazioni attive, 1920×1080):** CPU **1,69% di un core** su 12 s, memoria privata **87,5 MB**, working set **169,9 MB**. La work area era riservata a 1008 px e la taskbar nativa era nascosta; dopo il kill la work area è tornata a 1032 px e la taskbar nativa è risultata visibile.
 
 | Scenario | CPU (un core) | Memoria privata |
 | --- | --- | --- |
@@ -151,12 +180,14 @@ Il repository include `.github/workflows/release.yml`: al push di un tag `vMAJOR
 Per pubblicare una versione dopo aver committato il codice:
 
 ```powershell
-.\scripts\release.cmd -Version 1.3.0
+.\scripts\release.cmd -Version 1.4.0
 ```
 
 Lo script aggiorna `<Version>` in `src/Nebula/Nebula.csproj`, crea commit e tag, e li invia a GitHub. Il repository deve essere **pubblico**, perché l'aggiornatore scarica gli asset senza credenziali. Il primo setup del repository e i dettagli del workflow sono in [docs/aggiornamenti.md](docs/aggiornamenti.md).
 
 ## Verifiche di questa release
+
+> Le verifiche seguenti si riferiscono alla release 1.2. La revisione 1.3 è stata verificata con build Release e publish; la revisione 1.4 ha aggiunto il selftest AppBar, il ripristino d'emergenza, l'audit dei controlli e il layout misurato a 1280×720 e 1920×1080. Il giro UI completo su taskbar sostitutiva, AppBar e widget è descritto qui sotto ed è stato rieseguito sulla macchina di destinazione.
 
 Eseguite sulla build pubblicata in `dist/`:
 
@@ -202,3 +233,4 @@ Eseguite sulla build pubblicata in `dist/`:
 - [Avvio e uso](docs/avvio.md)
 - [Schede delle finestre](docs/schede.md)
 - [Ripristino della taskbar](docs/ripristino-taskbar.md)
+- [Taskbar Windows, AppBar e widget](docs/taskbar-windows.md)

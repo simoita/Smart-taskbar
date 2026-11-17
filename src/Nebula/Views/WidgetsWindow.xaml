@@ -18,6 +18,8 @@
             <TranslateTransform x:Name="PanelShift" Y="18" />
         </Border.RenderTransform>
 
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
         <StackPanel>
             <Grid Margin="2,0,2,8">
                 <StackPanel Orientation="Horizontal">
@@ -54,7 +56,7 @@
                                Visibility="{Binding Settings.ShowClock, Converter={StaticResource BoolVis}}" />
                     <TextBlock x:Name="DateTextBlock" Text="{Binding DateText}" FontSize="12"
                                Foreground="{DynamicResource C.TextMuted}"
-                               Visibility="{Binding Settings.ShowDate, Converter={StaticResource BoolVis}}" />
+                               Visibility="{Binding Settings.ShowClock, Converter={StaticResource BoolVis}}" />
 
                     <Border Height="1" Background="{DynamicResource C.StrokeSoft}" Margin="0,16,0,14" />
 
@@ -248,5 +250,6 @@
                 </StackPanel>
             </Grid>
         </StackPanel>
+        </ScrollViewer>
     </Border>
 </Window>

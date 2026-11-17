@@ -39,7 +39,11 @@ public sealed class DockViewModel : ObservableObject
         _clockTimer.Tick += (_, _) => UpdateClock();
 
         _monitorTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(2) };
-        _monitorTimer.Tick += (_, _) => Monitor.Update();
+        _monitorTimer.Tick += (_, _) =>
+        {
+            Monitor.Update();
+            UpdateTaskbarWidgetValues();
+        };
 
         Settings.PropertyChanged += OnSettingsChanged;
         Theme.Changed += RefreshTheme;
@@ -47,6 +51,7 @@ public sealed class DockViewModel : ObservableObject
 
         RefreshTheme();
         UpdateClock();
+        RefreshTaskbarWidgets();
         _clockTimer.Start();
         _monitorTimer.Start();
     }
@@ -57,6 +62,9 @@ public sealed class DockViewModel : ObservableObject
     public SystemMonitor Monitor { get; }
 
     public ObservableCollection<DockItemViewModel> Items { get; } = new();
+
+    /// <summary>Widgets rendered directly in the taskbar, in user order.</summary>
+    public ObservableCollection<TaskbarWidgetViewModel> TaskbarWidgetItems { get; } = new();
 
     public string TimeText
     {
@@ -104,9 +112,22 @@ public sealed class DockViewModel : ObservableObject
     public double IconSize => Settings.IconSize;
     public Thickness ItemMargin => new(Settings.ItemSpacing / 2, 0, Settings.ItemSpacing / 2, 0);
 
-    public CornerRadius ShellRadius => new(Math.Min(
-        Settings.CornerRadius * Theme.Preset.RadiusBias + 8,
-        Settings.DockHeight / 2 + 4));
+    public CornerRadius ShellRadius
+    {
+        get
+        {
+            double radius = Math.Min(
+                Settings.CornerRadius * Theme.Preset.RadiusBias + 8,
+                Settings.DockHeight / 2 + 4);
+
+            // A full-width taskbar reads better with Windows 11-like corners
+            // instead of becoming one giant pill.
+            if (Settings.ReplaceWindowsTaskbar && Settings.TaskbarFullWidth)
+                radius = Math.Min(radius, 18);
+
+            return new CornerRadius(radius);
+        }
+    }
 
     public CornerRadius ItemRadius => new(Math.Min(ItemSize / 3.4, 16));
 
@@ -155,6 +176,30 @@ public sealed class DockViewModel : ObservableObject
         DateText = date.Length > 1
             ? char.ToUpper(date[0], Culture) + date[1..]
             : date;
+
+        UpdateTaskbarWidgetValues();
+    }
+
+    public void RefreshTaskbarWidgets()
+    {
+        TaskbarWidgetItems.Clear();
+        foreach (string id in Settings.TaskbarWidgets ?? new List<string>())
+        {
+            TaskbarWidgetDefinition? definition = TaskbarWidgetCatalog.Find(id);
+            if (definition is null)
+                continue;
+
+            var widget = new TaskbarWidgetViewModel(definition);
+            TaskbarWidgetItems.Add(widget);
+        }
+
+        UpdateTaskbarWidgetValues();
+    }
+
+    public void UpdateTaskbarWidgetValues()
+    {
+        foreach (TaskbarWidgetViewModel widget in TaskbarWidgetItems)
+            widget.Apply(this);
     }
 
     public void RefreshItems()
@@ -360,6 +405,11 @@ public sealed class DockViewModel : ObservableObject
                 OnPropertyChanged(nameof(ItemRadius));
                 ItemsChanged?.Invoke();
                 break;
+            case nameof(AppSettings.TaskbarFullWidth):
+            case nameof(AppSettings.ReserveTaskbarSpace):
+            case nameof(AppSettings.ReplaceWindowsTaskbar):
+                OnPropertyChanged(nameof(ShellRadius));
+                break;
             case nameof(AppSettings.ShowPinned):
             case nameof(AppSettings.ShowRunning):
                 RefreshItems();
@@ -385,6 +435,12 @@ public sealed class DockViewModel : ObservableObject
             case nameof(AppSettings.ShowSeconds):
             case nameof(AppSettings.Clock24Hour):
                 UpdateClock();
+                break;
+            case nameof(AppSettings.ShowDate):
+                UpdateTaskbarWidgetValues();
+                break;
+            case nameof(AppSettings.TaskbarWidgets):
+                RefreshTaskbarWidgets();
                 break;
             case nameof(AppSettings.ShowGlow):
             case nameof(AppSettings.ShowGrain):

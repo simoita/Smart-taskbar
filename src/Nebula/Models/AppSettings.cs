@@ -16,6 +16,8 @@ public sealed class AppSettings : ObservableObject
     private bool _autoHideDock;
     private bool _hideInFullscreen = true;
     private bool _replaceWindowsTaskbar = true;
+    private bool _reserveTaskbarSpace = true;
+    private bool _taskbarFullWidth = true;
     private bool _showPinned = true;
     private bool _showRunning = true;
     private bool _showClock = true;
@@ -68,6 +70,7 @@ public sealed class AppSettings : ObservableObject
     private string _updateManifestUrl = UpdateDefaults.ManifestUrl;
     private bool _autoUpdate = true;
     private List<string> _panelWidgets = new() { "clock", "calendar", "stats", "battery", "network" };
+    private List<string> _taskbarWidgets = new() { "stats", "battery", "clock" };
     private Dictionary<string, string> _customIcons = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string> _customIconStyles = new(StringComparer.OrdinalIgnoreCase);
 
@@ -142,6 +145,23 @@ public sealed class AppSettings : ObservableObject
     {
         get => _replaceWindowsTaskbar;
         set => SetProperty(ref _replaceWindowsTaskbar, value);
+    }
+
+    /// <summary>
+    /// Reserves the strip used by the bar through the Windows AppBar API, so
+    /// maximized windows stop above/below it exactly like the native taskbar.
+    /// </summary>
+    public bool ReserveTaskbarSpace
+    {
+        get => _reserveTaskbarSpace;
+        set => SetProperty(ref _reserveTaskbarSpace, value);
+    }
+
+    /// <summary>Stretches the replacement bar across the monitor like a real taskbar.</summary>
+    public bool TaskbarFullWidth
+    {
+        get => _taskbarFullWidth;
+        set => SetProperty(ref _taskbarFullWidth, value);
     }
 
     public bool ShowPinned
@@ -468,6 +488,16 @@ public sealed class AppSettings : ObservableObject
         set => SetProperty(ref _panelWidgets, value);
     }
 
+    /// <summary>Widgets rendered inside the taskbar strip, in display order.</summary>
+    public List<string> TaskbarWidgets
+    {
+        get => _taskbarWidgets;
+        set => SetProperty(ref _taskbarWidgets, value);
+    }
+
+    /// <summary>Schema version used to migrate older settings files in place.</summary>
+    public int SettingsVersion { get; set; }
+
     /// <summary>Per-app icon overrides: app path/key to an .ico, .png or .exe path.</summary>
     public Dictionary<string, string> CustomIcons
     {
@@ -486,5 +516,5 @@ public sealed class AppSettings : ObservableObject
 
     public List<string> RecentApps { get; set; } = new();
 
-    public static AppSettings CreateDefault() => new();
+    public static AppSettings CreateDefault() => new() { SettingsVersion = 2 };
 }

@@ -47,8 +47,10 @@ public partial class SettingsWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        FitToScreen();
         NavStyle.IsChecked = true;
         ShowPage("style");
+        NormalizeSettingRows();
 
         if (_vm.Settings.AnimationsEnabled)
         {
@@ -68,6 +70,65 @@ public partial class SettingsWindow : Window
         else
         {
             Chrome.Opacity = 1;
+        }
+    }
+
+    /// <summary>Clamps the Studio to the current work area instead of overflowing small screens.</summary>
+    private void FitToScreen()
+    {
+        Rect work = SystemParameters.WorkArea;
+        Width = Math.Min(1160, Math.Max(700, work.Width - 32));
+        Height = Math.Min(780, Math.Max(320, work.Height - 32));
+        Left = work.Left + Math.Max(0, (work.Width - Width) / 2);
+        Top = work.Top + Math.Max(0, (work.Height - Height) / 2);
+    }
+
+    /// <summary>
+    /// Older rows put the label and its switch in the same grid cell. On narrow
+    /// windows the two overlapped; give every simple row a real text/control
+    /// column pair without rewriting dozens of markup blocks.
+    /// </summary>
+    private void NormalizeSettingRows()
+    {
+        if (TryFindResource("Row") is not Style rowStyle)
+            return;
+
+        foreach (Border border in FindVisualChildren<Border>(Chrome))
+        {
+            if (!ReferenceEquals(border.Style, rowStyle) ||
+                border.Child is not Grid grid ||
+                grid.ColumnDefinitions.Count > 0 ||
+                grid.Children.Count != 2 ||
+                grid.Children[0] is not FrameworkElement label ||
+                grid.Children[1] is not FrameworkElement control)
+                continue;
+
+            if (label is not (StackPanel or TextBlock) ||
+                control is not (CheckBox or ComboBox or Button or TextBox or Slider))
+                continue;
+
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(label, 0);
+            Grid.SetColumn(control, 1);
+            label.HorizontalAlignment = HorizontalAlignment.Left;
+            control.HorizontalAlignment = HorizontalAlignment.Right;
+            control.VerticalAlignment = VerticalAlignment.Center;
+            control.Margin = new Thickness(18, 0, 0, 0);
+        }
+    }
+
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root) where T : DependencyObject
+    {
+        int count = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            DependencyObject child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+                yield return match;
+
+            foreach (T descendant in FindVisualChildren<T>(child))
+                yield return descendant;
         }
     }
 
@@ -132,6 +193,7 @@ public partial class SettingsWindow : Window
         }
 
         ContentScroll.ScrollToTop();
+        Dispatcher.InvokeAsync(NormalizeSettingRows, System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void OnStyleCardClick(object sender, RoutedEventArgs e)
@@ -202,6 +264,42 @@ public partial class SettingsWindow : Window
         _vm.Settings.PinnedPaths.AddRange(PinSeeder.DiscoverDefaults());
         _vm.RebuildPins();
         _vm.Preview.RefreshItems();
+        _store.MarkDirty();
+    }
+
+    private void OnAddTaskbarWidget(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: TaskbarWidgetOptionViewModel option })
+            return;
+
+        _vm.AddTaskbarWidget(option);
+        _store.MarkDirty();
+    }
+
+    private void OnRemoveTaskbarWidget(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: TaskbarWidgetOptionViewModel option })
+            return;
+
+        _vm.RemoveTaskbarWidget(option);
+        _store.MarkDirty();
+    }
+
+    private void OnMoveTaskbarWidgetUp(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: TaskbarWidgetOptionViewModel option })
+            return;
+
+        _vm.MoveTaskbarWidget(option, -1);
+        _store.MarkDirty();
+    }
+
+    private void OnMoveTaskbarWidgetDown(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: TaskbarWidgetOptionViewModel option })
+            return;
+
+        _vm.MoveTaskbarWidget(option, 1);
         _store.MarkDirty();
     }
 

@@ -199,17 +199,20 @@ public partial class TabBarWindow : Window
         if (handle == IntPtr.Zero)
             return;
 
+        System.Windows.Forms.Screen screen =
+            System.Windows.Forms.Screen.FromHandle(active.Handle) ??
+            System.Windows.Forms.Screen.PrimaryScreen!;
+        System.Drawing.Rectangle work = screen.WorkingArea;
+
+        MaxWidth = Math.Max(320, work.Width - 40);
         UpdateLayout();
+
         var barRect = new NativeMethods.RECT();
         if (!NativeMethods.GetWindowRect(handle, out barRect))
             return;
 
         int width = Math.Max(180, barRect.Right - barRect.Left);
         int height = Math.Max(34, barRect.Bottom - barRect.Top);
-        System.Windows.Forms.Screen screen =
-            System.Windows.Forms.Screen.FromHandle(active.Handle) ??
-            System.Windows.Forms.Screen.PrimaryScreen!;
-        System.Drawing.Rectangle work = screen.WorkingArea;
 
         int x = target.Left + 8;
         int y = string.Equals(_settings.TabsBarPosition, "bottom", StringComparison.OrdinalIgnoreCase)

@@ -52,6 +52,14 @@ public static class ScreenGeometry
         return new Rect(work.Left / scale, work.Top / scale, work.Width / scale, work.Height / scale);
     }
 
+    /// <summary>Full monitor rectangle in DIPs, ignoring taskbar reservations.</summary>
+    public static Rect BoundsDip(Forms.Screen screen)
+    {
+        double scale = Scale(screen);
+        var bounds = screen.Bounds;
+        return new Rect(bounds.Left / scale, bounds.Top / scale, bounds.Width / scale, bounds.Height / scale);
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct Point32
     {

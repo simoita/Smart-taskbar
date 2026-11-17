@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using Nebula.Interop;
 
 namespace Nebula.Services;
@@ -19,17 +21,21 @@ public sealed class NativeTaskbarController
 
     private readonly string _session = Guid.NewGuid().ToString("N");
     private Process? _watchdog;
+    private int? _watchdogTimeoutSeconds;
     private bool _canHide;
+    private NativeMethods.WinEventDelegate? _showCallback;
+    private IntPtr _showHook;
 
     public bool IsApplied { get; private set; }
     public int OriginalState { get; private set; }
 
-    public void Apply(bool replace)
+    public bool Apply(bool replace, int? watchdogTimeoutSeconds = null)
     {
+        _watchdogTimeoutSeconds = watchdogTimeoutSeconds;
         if (!replace)
         {
             Restore();
-            return;
+            return true;
         }
 
         if (IsApplied)
@@ -39,38 +45,51 @@ public sealed class NativeTaskbarController
                 HideTray();
                 EnsureProtection();
             }
-            else
+            else if (!TryEnableProtection())
             {
-                TryEnableProtection();
+                Restore();
+                return false;
             }
 
-            return;
+            return IsApplied && _canHide;
+        }
+
+        if (!Preflight(out string reason))
+        {
+            Log.Write("Taskbar replacement aborted; native taskbar left visible: " + reason);
+            return false;
         }
 
         OriginalState = GetState();
 
         if (!WritePending())
         {
-            Log.Write("Taskbar recovery state could not be written; using safe auto-hide fallback.");
-            SetState(AbsAutoHide);
-            IsApplied = true;
-            return;
+            Log.Write("Taskbar replacement aborted: recovery state could not be written.");
+            return false;
         }
 
         if (!StartWatchdog())
         {
-            Log.Write("Taskbar watchdog unavailable; using safe auto-hide fallback.");
+            Log.Write("Taskbar replacement aborted: watchdog unavailable.");
             TryDelete(StateFile);
-            SetState(AbsAutoHide);
-            IsApplied = true;
-            return;
+            return false;
         }
 
         _canHide = true;
+        InstallHideHook();
+        IsApplied = true;
         SetState(AbsAutoHide);
         HideTray();
-        IsApplied = true;
+
+        if (!TrayHidden())
+        {
+            Log.Write("Taskbar replacement failed verification: a shell bar is still visible; restoring.");
+            Restore();
+            return false;
+        }
+
         Log.Write("Native taskbar hidden; crash watchdog armed.");
+        return true;
     }
 
     /// <summary>Keeps the native bar hidden and the watchdog alive while replacement is active.</summary>
@@ -81,6 +100,7 @@ public sealed class NativeTaskbarController
 
         if (_watchdog is { HasExited: false })
         {
+            InstallHideHook();
             HideTray();
             return;
         }
@@ -94,6 +114,11 @@ public sealed class NativeTaskbarController
         }
 
         HideTray();
+        if (!TrayHidden())
+        {
+            Log.Write("Taskbar guard could not keep every shell bar hidden; restoring.");
+            Restore();
+        }
     }
 
     public void Restore()
@@ -101,12 +126,97 @@ public sealed class NativeTaskbarController
         if (!IsApplied)
             return;
 
-        ShowTray();
-        SetState(OriginalState);
+        // Disarm first: showing the tray while the hook is still armed would
+        // make the callback hide it again immediately.
+        RemoveHideHook();
         IsApplied = false;
         _canHide = false;
+        ShowTray();
+        // Never restore into auto-hide: the user must get a visible bar back.
+        SetState(OriginalState & AbsAlwaysOnTop);
         TryDelete(StateFile);
         Log.Write("Native taskbar restored.");
+    }
+
+    /// <summary>
+    /// Emergency path used by <c>--restore-taskbar</c>. It does not depend on
+    /// this process having hidden the bar: it always makes the shell bars visible.
+    /// </summary>
+    public static void RestoreNow()
+    {
+        try
+        {
+            ShowTray();
+            SetState(0);
+            TryDelete(StateFile);
+            Log.Write("Emergency restore: native taskbar shown and pending state cleared.");
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Emergency taskbar restore failed: " + ex.Message);
+        }
+    }
+
+    /// <summary>True when at least one primary/secondary shell bar is visible.</summary>
+    public static bool AnyTrayVisible()
+    {
+        try
+        {
+            return TrayWindows().Any(NativeMethods.IsWindowVisible);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Refuses to hide the shell unless Explorer's taskbar exists, the watchdog
+    /// is deployed beside the app and the recovery state can be written. This is
+    /// the "do not hide if verification cannot pass" gate for normal startup too.
+    /// </summary>
+    public static bool Preflight(out string reason)
+    {
+        reason = "";
+        try
+        {
+            if (NativeMethods.FindWindow("Shell_TrayWnd", null) == IntPtr.Zero)
+            {
+                reason = "Shell_TrayWnd non trovata (Explorer non è attivo).";
+                return false;
+            }
+
+            string watchdog = Path.Combine(AppContext.BaseDirectory, "Nebula.Watchdog.exe");
+            if (!File.Exists(watchdog))
+            {
+                reason = "Nebula.Watchdog.exe non trovato accanto all'eseguibile.";
+                return false;
+            }
+
+            string dir = Path.GetDirectoryName(StateFile)!;
+            Directory.CreateDirectory(dir);
+            string probe = StateFile + ".probe";
+            File.WriteAllText(probe, "ok");
+            File.Delete(probe);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            reason = "Stato di recupero non scrivibile: " + ex.Message;
+            return false;
+        }
+    }
+
+    private static bool TrayHidden()
+    {
+        try
+        {
+            return TrayWindows().All(tray => !NativeMethods.IsWindowVisible(tray));
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>Restores the taskbar if a previous session ended without cleaning up.</summary>
@@ -149,21 +259,82 @@ public sealed class NativeTaskbarController
         }
     }
 
-    private void TryEnableProtection()
+    private bool TryEnableProtection()
     {
+        if (!Preflight(out string reason))
+        {
+            Log.Write("Taskbar protection could not be enabled: " + reason);
+            return false;
+        }
+
         if (!WritePending())
-            return;
+            return false;
 
         if (!StartWatchdog())
         {
             TryDelete(StateFile);
-            return;
+            return false;
         }
 
         _canHide = true;
+        InstallHideHook();
+        IsApplied = true;
         SetState(AbsAutoHide);
         HideTray();
+        if (!TrayHidden())
+        {
+            Log.Write("Taskbar protection verification failed; restoring.");
+            Restore();
+            return false;
+        }
+
         Log.Write("Taskbar watchdog enabled; native taskbar hidden.");
+        return true;
+    }
+
+    /// <summary>
+    /// Hides the native bar the instant the shell shows it again (for example
+    /// when hovering the autohide edge or after an Explorer restart), instead
+    /// of waiting for the next watchdog tick.
+    /// </summary>
+    private void InstallHideHook()
+    {
+        if (_showHook != IntPtr.Zero)
+            return;
+
+        _showCallback = OnWindowShown;
+        _showHook = NativeMethods.SetWinEventHook(
+            NativeMethods.EVENT_OBJECT_SHOW, NativeMethods.EVENT_OBJECT_SHOW,
+            IntPtr.Zero, _showCallback, 0, 0, NativeMethods.WINEVENT_OUTOFCONTEXT);
+
+        if (_showHook == IntPtr.Zero)
+            Log.Write("Taskbar show hook unavailable; the guard timer will keep hiding it.");
+    }
+
+    private void RemoveHideHook()
+    {
+        if (_showHook == IntPtr.Zero)
+            return;
+
+        NativeMethods.UnhookWinEvent(_showHook);
+        _showHook = IntPtr.Zero;
+        _showCallback = null;
+    }
+
+    private void OnWindowShown(IntPtr hook, uint eventType, IntPtr hwnd, int idObject, int idChild,
+        uint thread, uint time)
+    {
+        if (!IsApplied || !_canHide || hwnd == IntPtr.Zero)
+            return;
+
+        var name = new StringBuilder(64);
+        NativeMethods.GetClassName(hwnd, name, name.Capacity);
+        string className = name.ToString();
+        if (!string.Equals(className, "Shell_TrayWnd", StringComparison.Ordinal) &&
+            !string.Equals(className, "Shell_SecondaryTrayWnd", StringComparison.Ordinal))
+            return;
+
+        NativeMethods.ShowWindow(hwnd, NativeMethods.SW_HIDE);
     }
 
     private bool StartWatchdog()
@@ -183,7 +354,8 @@ public sealed class NativeTaskbarController
 
         try
         {
-            var start = new ProcessStartInfo(exe, $"{Environment.ProcessId} {_session}")
+            string timeoutArg = _watchdogTimeoutSeconds is int seconds ? " " + seconds : "";
+            var start = new ProcessStartInfo(exe, $"{Environment.ProcessId} {_session}{timeoutArg}")
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -247,8 +419,7 @@ public sealed class NativeTaskbarController
     {
         try
         {
-            IntPtr tray = NativeMethods.FindWindow("Shell_TrayWnd", null);
-            if (tray != IntPtr.Zero)
+            foreach (IntPtr tray in TrayWindows())
                 NativeMethods.ShowWindow(tray, NativeMethods.SW_HIDE);
         }
         catch (Exception ex)
@@ -261,14 +432,36 @@ public sealed class NativeTaskbarController
     {
         try
         {
-            IntPtr tray = NativeMethods.FindWindow("Shell_TrayWnd", null);
-            if (tray != IntPtr.Zero)
+            foreach (IntPtr tray in TrayWindows())
                 NativeMethods.ShowWindow(tray, NativeMethods.SW_SHOW);
         }
         catch (Exception ex)
         {
             Log.Write("Taskbar show failed: " + ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Finds the primary taskbar and every secondary taskbar, so replacing the
+    /// shell bar also works on multi-monitor setups.
+    /// </summary>
+    private static List<IntPtr> TrayWindows()
+    {
+        var handles = new List<IntPtr>();
+        IntPtr primary = NativeMethods.FindWindow("Shell_TrayWnd", null);
+        if (primary != IntPtr.Zero)
+            handles.Add(primary);
+
+        NativeMethods.EnumWindows((handle, _) =>
+        {
+            var name = new StringBuilder(64);
+            NativeMethods.GetClassName(handle, name, name.Capacity);
+            if (string.Equals(name.ToString(), "Shell_SecondaryTrayWnd", StringComparison.Ordinal))
+                handles.Add(handle);
+            return true;
+        }, IntPtr.Zero);
+
+        return handles;
     }
 
     private static void TryDelete(string path)

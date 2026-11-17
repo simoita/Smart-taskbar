@@ -21,7 +21,7 @@ if ($changes.Length -gt 0) {
 
 $remote = ((& git remote get-url origin 2>$null) -join "`n").Trim()
 if (-not $NoPush -and $remote.Length -eq 0) {
-    throw "Nessun remote 'origin'. Aggiungi il repository GitHub prima della release: git remote add origin https://github.com/OWNER/REPO.git"
+    throw "Nessun remote 'origin'. Aggiungi il repository GitHub prima della release: git remote add origin https://github.com/simoita/Smart-taskbar.git"
 }
 
 $projectPath = Join-Path $root "src\Nebula\Nebula.csproj"

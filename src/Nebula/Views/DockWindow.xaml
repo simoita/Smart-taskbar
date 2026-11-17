@@ -1,7 +1,7 @@
 <Window x:Class="Nebula.Views.DockWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Nebula Dock" SizeToContent="WidthAndHeight"
+        Title="Nebula Dock" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ShowInTaskbar="False" ShowActivated="False" Topmost="True"
         ResizeMode="NoResize" UseLayoutRounding="True" SnapsToDevicePixels="True"
@@ -59,7 +59,7 @@
                         IsHitTestVisible="False"
                         Visibility="{Binding Settings.ShowShimmer, Converter={StaticResource BoolVis}}" />
 
-                <StackPanel x:Name="ZoneHost" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0">
+                <Grid x:Name="ZoneHost" VerticalAlignment="Center" Margin="10,0">
                     <StackPanel x:Name="AppsZone" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="StartButton" Width="{Binding ItemSize}" Height="{Binding ItemSize}"
                             Style="{StaticResource DockOrbButton}" Click="OnStartClick"
@@ -87,9 +87,14 @@
                                         Width="{Binding DataContext.ItemSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                         Height="{Binding DataContext.ItemSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                         Margin="{Binding DataContext.ItemMargin, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                        Click="OnItemClick" MouseRightButtonUp="OnItemRightClick">
+                                        Click="OnItemClick" MouseRightButtonUp="OnItemRightClick"
+                                        MouseEnter="OnDockItemEnter" MouseLeave="OnDockItemLeave">
                                     <Grid>
-                                        <Border x:Name="ActiveGlow" CornerRadius="11"
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Border x:Name="ActiveGlow" Grid.RowSpan="2" CornerRadius="11"
                                                 Background="{DynamicResource C.AccentFaint}" Opacity="0" />
                                         <Border Margin="1"
                                                 CornerRadius="{Binding IconPlateCornerRadius}"
@@ -117,25 +122,25 @@
                                                        Foreground="{DynamicResource C.Text}"
                                                        VerticalAlignment="Center" HorizontalAlignment="Center" />
                                         </Border>
-                                        <Border x:Name="OpenIndicator"
+                                        <Border x:Name="OpenIndicator" Grid.Row="1"
                                                 Width="{Binding IndicatorWidth}" Height="{Binding IndicatorHeight}"
                                                 CornerRadius="{Binding IndicatorRadius}"
                                                 Background="{DynamicResource C.TextMuted}"
                                                 Visibility="{Binding OpenIndicatorVisibility}"
-                                                VerticalAlignment="Bottom" Margin="0,0,0,2" />
-                                        <Border x:Name="MinimizedIndicator"
+                                                VerticalAlignment="Center" Margin="0" />
+                                        <Border x:Name="MinimizedIndicator" Grid.Row="1"
                                                 Width="{Binding IndicatorWidth}" Height="{Binding IndicatorHeight}"
                                                 CornerRadius="{Binding IndicatorRadius}"
                                                 Background="{DynamicResource C.Warn}"
                                                 Visibility="{Binding MinimizedIndicatorVisibility}"
-                                                VerticalAlignment="Bottom" Margin="0,0,0,2" />
-                                        <Border x:Name="ClosedIndicator"
+                                                VerticalAlignment="Center" Margin="0" />
+                                        <Border x:Name="ClosedIndicator" Grid.Row="1"
                                                 Width="{Binding IndicatorWidth}" Height="{Binding IndicatorHeight}"
                                                 CornerRadius="{Binding IndicatorRadius}"
                                                 Background="{DynamicResource C.TextFaint}"
                                                 Opacity="0.55"
                                                 Visibility="{Binding ClosedIndicatorVisibility}"
-                                                VerticalAlignment="Bottom" Margin="0,0,0,2" />
+                                                VerticalAlignment="Center" Margin="0" />
                                     </Grid>
                                     <Button.ToolTip>
                                         <StackPanel MaxWidth="280">
@@ -180,47 +185,115 @@
                     </StackPanel>
 
                     <StackPanel x:Name="SystemZone" Orientation="Horizontal" VerticalAlignment="Center">
-                        <StackPanel Width="96" Margin="8,0,6,0" VerticalAlignment="Center"
-                                    Visibility="{Binding Settings.ShowStats, Converter={StaticResource BoolVis}}">
-                            <Grid>
-                                <TextBlock Text="CPU" FontSize="8.5" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource C.TextMuted}" />
-                                <TextBlock Text="{Binding Monitor.CpuText}" FontSize="8.5"
-                                           HorizontalAlignment="Right" Foreground="{DynamicResource C.Text}" />
-                            </Grid>
-                            <ProgressBar Style="{StaticResource MiniBar}" Maximum="100"
-                                         Value="{Binding Monitor.Cpu, Mode=OneWay}" Margin="0,3,0,6" />
-                            <Grid>
-                                <TextBlock Text="RAM" FontSize="8.5" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource C.TextMuted}" />
-                                <TextBlock Text="{Binding Monitor.RamText}" FontSize="8.5"
-                                           HorizontalAlignment="Right" Foreground="{DynamicResource C.Text}" />
-                            </Grid>
-                            <ProgressBar Style="{StaticResource MiniBar}" Maximum="100"
-                                         Value="{Binding Monitor.Ram, Mode=OneWay}" Margin="0,3,0,0" />
-                        </StackPanel>
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Disabled"
+                                      HorizontalContentAlignment="Center"
+                                      CanContentScroll="False" Focusable="False">
+                        <ItemsControl x:Name="TaskbarWidgets" ItemsSource="{Binding TaskbarWidgetItems}"
+                                      VerticalAlignment="Center">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource TaskbarWidgetButton}"
+                                            Click="OnTaskbarWidgetClick"
+                                            ToolTip="{Binding Tooltip}">
+                                        <Grid MinHeight="28">
+                                            <Border x:Name="SeparatorPart" Width="1" Height="20"
+                                                    Background="{DynamicResource C.StrokeSoft}"
+                                                    Visibility="Collapsed" />
 
-                        <Border Width="1" Height="24" Margin="2,0,8,0" VerticalAlignment="Center"
-                                Background="{DynamicResource C.StrokeSoft}"
-                                Visibility="{Binding Settings.ShowStats, Converter={StaticResource BoolVis}}" />
+                                            <StackPanel x:Name="ClockPart" VerticalAlignment="Center"
+                                                        Visibility="Collapsed">
+                                                <TextBlock Text="{Binding PrimaryText}" FontSize="14.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource C.Text}"
+                                                           Typography.NumeralAlignment="Tabular" />
+                                                <TextBlock Text="{Binding SecondaryText}" FontSize="9.5"
+                                                           Foreground="{DynamicResource C.TextMuted}"
+                                                           Visibility="{Binding HasSecondaryText, Converter={StaticResource BoolVis}}" />
+                                            </StackPanel>
 
-                        <StackPanel Margin="0,0,10,0" VerticalAlignment="Center"
-                                    Visibility="{Binding Settings.ShowBattery, Converter={StaticResource BoolVis}}">
-                            <TextBlock Text="{Binding Monitor.BatteryText}" FontSize="11.5" FontWeight="SemiBold"
-                                       HorizontalAlignment="Center" Foreground="{DynamicResource C.Text}" />
-                            <TextBlock Text="BATTERIA" FontSize="7.5" HorizontalAlignment="Center"
-                                       Foreground="{DynamicResource C.TextMuted}" />
-                        </StackPanel>
+                                            <StackPanel x:Name="MetricPart" Width="82"
+                                                        VerticalAlignment="Center"
+                                                        Visibility="Collapsed">
+                                                <Grid>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons"
+                                                                   FontSize="9"
+                                                                   Foreground="{DynamicResource C.TextMuted}"
+                                                                   VerticalAlignment="Center" />
+                                                        <TextBlock Text="{Binding Label}" FontSize="8.5"
+                                                                   Margin="4,0,0,0"
+                                                                   Foreground="{DynamicResource C.TextMuted}"
+                                                                   VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding PrimaryText}" FontSize="8.5"
+                                                               HorizontalAlignment="Right"
+                                                               Foreground="{DynamicResource C.Text}"
+                                                               VerticalAlignment="Center" />
+                                                </Grid>
+                                                <ProgressBar Style="{StaticResource MiniBar}" Maximum="100"
+                                                             Value="{Binding Value, Mode=OneWay}"
+                                                             Margin="0,3,0,3" />
+                                                <Grid Visibility="{Binding HasSecondBar, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="{Binding Label2}" FontSize="8.5"
+                                                               Foreground="{DynamicResource C.TextMuted}" />
+                                                    <TextBlock Text="{Binding Value2Text}" FontSize="8.5"
+                                                               HorizontalAlignment="Right"
+                                                               Foreground="{DynamicResource C.Text}" />
+                                                </Grid>
+                                                <ProgressBar Style="{StaticResource MiniBar}" Maximum="100"
+                                                             Value="{Binding Value2, Mode=OneWay}"
+                                                             Margin="0,3,0,0"
+                                                             Visibility="{Binding HasSecondBar, Converter={StaticResource BoolVis}}" />
+                                            </StackPanel>
 
-                        <StackPanel Margin="4,0,8,0" VerticalAlignment="Center"
-                                    Visibility="{Binding Settings.ShowClock, Converter={StaticResource BoolVis}}">
-                            <TextBlock Text="{Binding TimeText}" FontSize="15.5" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource C.Text}"
-                                       Typography.NumeralAlignment="Tabular" />
-                            <TextBlock Text="{Binding DateText}" FontSize="10.5"
-                                       Foreground="{DynamicResource C.TextMuted}"
-                                       Visibility="{Binding Settings.ShowDate, Converter={StaticResource BoolVis}}" />
-                        </StackPanel>
+                                            <StackPanel x:Name="TextPart" Orientation="Horizontal"
+                                                        VerticalAlignment="Center"
+                                                        Visibility="Collapsed">
+                                                <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons"
+                                                           FontSize="12"
+                                                           Foreground="{DynamicResource C.TextMuted}"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding PrimaryText}" FontSize="10.5"
+                                                           Margin="5,0,0,0"
+                                                           Foreground="{DynamicResource C.Text}"
+                                                           VerticalAlignment="Center" MaxWidth="110"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+
+                                            <TextBlock x:Name="IconPart" Text="{Binding Glyph}"
+                                                       FontFamily="Segoe Fluent Icons" FontSize="13.5"
+                                                       Foreground="{DynamicResource C.TextMuted}"
+                                                       VerticalAlignment="Center"
+                                                       Visibility="Collapsed" />
+                                        </Grid>
+                                    </Button>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding KindKey}" Value="Clock">
+                                            <Setter TargetName="ClockPart" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding KindKey}" Value="Metric">
+                                            <Setter TargetName="MetricPart" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding KindKey}" Value="Text">
+                                            <Setter TargetName="TextPart" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding KindKey}" Value="Icon">
+                                            <Setter TargetName="IconPart" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding KindKey}" Value="Separator">
+                                            <Setter TargetName="SeparatorPart" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        </ScrollViewer>
                     </StackPanel>
 
                     <StackPanel x:Name="ActionsZone" Orientation="Horizontal" VerticalAlignment="Center">
@@ -279,7 +352,7 @@
                             <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons" FontSize="15" />
                         </Button>
                     </StackPanel>
-                </StackPanel>
+                </Grid>
             </Grid>
         </Border>
     </Grid>

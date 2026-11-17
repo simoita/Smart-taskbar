@@ -13,7 +13,9 @@ namespace Nebula.Watchdog;
 internal static class Program
 {
     private const int Synchronize = 0x00100000;
+    private const int Terminate = 0x0001;
     private const uint Infinite = 0xFFFFFFFF;
+    private const uint WaitTimeout = 0x00000102;
     private const int SwShow = 5;
     private const uint AbmSetState = 0x0000000A;
     private const uint AbsAlwaysOnTop = 0x00000002;
@@ -36,14 +38,26 @@ internal static class Program
             }
 
             string session = args[1];
-            Log($"watchdog armed pid={parentPid} session={session[..Math.Min(8, session.Length)]}");
+            int timeoutSeconds = 0;
+            if (args.Length >= 3 && int.TryParse(args[2], out int parsedTimeout))
+                timeoutSeconds = Math.Clamp(parsedTimeout, 5, 600);
 
-            IntPtr handle = OpenProcess(Synchronize, false, parentPid);
+            Log($"watchdog armed pid={parentPid} session={session[..Math.Min(8, session.Length)]}" +
+                (timeoutSeconds > 0 ? $" timeout={timeoutSeconds}s" : ""));
+
+            IntPtr handle = OpenProcess(Synchronize | Terminate, false, parentPid);
             if (handle != IntPtr.Zero)
             {
                 try
                 {
-                    WaitForSingleObject(handle, Infinite);
+                    uint wait = timeoutSeconds > 0 ? (uint)(timeoutSeconds * 1000) : Infinite;
+                    uint result = WaitForSingleObject(handle, wait);
+                    if (result == WaitTimeout && timeoutSeconds > 0)
+                    {
+                        Log("selftest/emergency timeout reached; terminating the parent for a guaranteed restore");
+                        TerminateProcess(handle, 3);
+                        Thread.Sleep(120);
+                    }
                 }
                 finally
                 {
@@ -334,6 +348,9 @@ internal static class Program
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateProcess(IntPtr handle, uint exitCode);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr handle);

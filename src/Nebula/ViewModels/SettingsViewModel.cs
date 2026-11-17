@@ -159,6 +159,7 @@ public sealed class SettingsViewModel : ObservableObject
         foreach (WidgetDefinition widget in WidgetCatalog.All)
             WidgetOptions.Add(new WidgetOptionViewModel(settings, widget));
         SyncWidgetOptions();
+        SyncTaskbarWidgets();
 
         AccentInput = settings.AccentHex;
 
@@ -205,6 +206,10 @@ public sealed class SettingsViewModel : ObservableObject
         {
             SyncWidgetOptions();
         }
+        else if (e.PropertyName == nameof(AppSettings.TaskbarWidgets))
+        {
+            SyncTaskbarWidgets();
+        }
     }
 
     public AppSettings Settings { get; }
@@ -216,6 +221,8 @@ public sealed class SettingsViewModel : ObservableObject
     public ObservableCollection<PinnedAppViewModel> Pins { get; } = new();
     public ObservableCollection<ScreenOptionViewModel> Screens { get; } = new();
     public ObservableCollection<WidgetOptionViewModel> WidgetOptions { get; } = new();
+    public ObservableCollection<TaskbarWidgetOptionViewModel> ActiveTaskbarWidgets { get; } = new();
+    public ObservableCollection<TaskbarWidgetOptionViewModel> AvailableTaskbarWidgets { get; } = new();
     public ObservableCollection<ShortcutInfoViewModel> DesktopShortcuts { get; } = new();
     public IReadOnlyList<TabStyleOptionViewModel> TabStyleOptions { get; } = new List<TabStyleOptionViewModel>
     {
@@ -459,6 +466,68 @@ public sealed class SettingsViewModel : ObservableObject
     public string WidgetCountText =>
         $"{Settings.PanelWidgets.Count} widget attivi · scegli dal catalogo";
 
+    public string TaskbarWidgetCountText =>
+        $"{Settings.TaskbarWidgets?.Count ?? 0} widget nella barra · usa le frecce per cambiarne l'ordine";
+
+    public Visibility NoTaskbarWidgetsVisibility =>
+        Settings.TaskbarWidgets is { Count: > 0 } ? Visibility.Collapsed : Visibility.Visible;
+
+    private void SyncTaskbarWidgets()
+    {
+        ActiveTaskbarWidgets.Clear();
+        AvailableTaskbarWidgets.Clear();
+
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string id in Settings.TaskbarWidgets ?? new List<string>())
+        {
+            TaskbarWidgetDefinition? definition = TaskbarWidgetCatalog.Find(id);
+            if (definition is null || !used.Add(definition.Id))
+                continue;
+            ActiveTaskbarWidgets.Add(new TaskbarWidgetOptionViewModel(definition));
+        }
+
+        foreach (TaskbarWidgetDefinition definition in TaskbarWidgetCatalog.All)
+        {
+            if (!used.Contains(definition.Id))
+                AvailableTaskbarWidgets.Add(new TaskbarWidgetOptionViewModel(definition));
+        }
+
+        OnPropertyChanged(nameof(TaskbarWidgetCountText));
+        OnPropertyChanged(nameof(NoTaskbarWidgetsVisibility));
+    }
+
+    public void AddTaskbarWidget(TaskbarWidgetOptionViewModel option)
+    {
+        var widgets = new List<string>(Settings.TaskbarWidgets ?? new List<string>());
+        if (widgets.Contains(option.Id, StringComparer.OrdinalIgnoreCase) || widgets.Count >= 16)
+            return;
+
+        widgets.Add(option.Id);
+        Settings.TaskbarWidgets = widgets;
+        SyncTaskbarWidgets();
+    }
+
+    public void RemoveTaskbarWidget(TaskbarWidgetOptionViewModel option)
+    {
+        var widgets = new List<string>(Settings.TaskbarWidgets ?? new List<string>());
+        widgets.RemoveAll(id => string.Equals(id, option.Id, StringComparison.OrdinalIgnoreCase));
+        Settings.TaskbarWidgets = widgets;
+        SyncTaskbarWidgets();
+    }
+
+    public void MoveTaskbarWidget(TaskbarWidgetOptionViewModel option, int delta)
+    {
+        var widgets = new List<string>(Settings.TaskbarWidgets ?? new List<string>());
+        int index = widgets.FindIndex(id => string.Equals(id, option.Id, StringComparison.OrdinalIgnoreCase));
+        int target = index + delta;
+        if (index < 0 || target < 0 || target >= widgets.Count)
+            return;
+
+        (widgets[index], widgets[target]) = (widgets[target], widgets[index]);
+        Settings.TaskbarWidgets = widgets;
+        SyncTaskbarWidgets();
+    }
+
     public void AddPin(string path)
     {
         if (string.IsNullOrWhiteSpace(path) ||
@@ -493,6 +562,20 @@ public sealed record TabStyleOptionViewModel(string Id, string Name);
 public sealed record TabPositionOptionViewModel(string Id, string Name);
 public sealed record ZoneOrderOptionViewModel(string Id, string Name);
 public sealed record ShortcutInfoViewModel(string Name, string Path);
+
+public sealed class TaskbarWidgetOptionViewModel
+{
+    public TaskbarWidgetOptionViewModel(TaskbarWidgetDefinition definition)
+    {
+        Definition = definition;
+    }
+
+    public TaskbarWidgetDefinition Definition { get; }
+    public string Id => Definition.Id;
+    public string Name => Definition.Name;
+    public string Description => Definition.Description;
+    public string Glyph => Definition.Glyph;
+}
 
 public sealed class WidgetOptionViewModel : ObservableObject
 {

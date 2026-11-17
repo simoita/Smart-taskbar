@@ -28,6 +28,7 @@ public partial class App : Application
     private TabGroupService? _tabs;
     private readonly Dictionary<TabGroup, TabBarWindow> _tabBars = new();
     private UpdateWindow? _updatePrompt;
+    private QuickControls? _mediaControls;
     private readonly HashSet<string> _promptedUpdateVersions = new(StringComparer.OrdinalIgnoreCase);
     private DispatcherTimer? _trackerTimer;
     private DispatcherTimer? _taskbarGuard;
@@ -53,6 +54,21 @@ public partial class App : Application
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         TaskScheduler.UnobservedTaskException += (_, args) => args.SetObserved();
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Taskbar?.Restore();
+
+        // These modes must work even while another Nebula instance is running.
+        // They are deliberately handled before the single-instance mutex.
+        if (e.Args.Any(a => string.Equals(a, "--restore-taskbar", StringComparison.OrdinalIgnoreCase)))
+        {
+            NativeTaskbarController.RestoreNow();
+            Shutdown(0);
+            return;
+        }
+
+        if (e.Args.Any(a => string.Equals(a, "--selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            _ = RunSelfTestAsync();
+            return;
+        }
 
         _mutex = new Mutex(true, MutexName, out bool isNewInstance);
         if (!isNewInstance)
@@ -112,17 +128,29 @@ public partial class App : Application
 
         _taskbarGuard = new DispatcherTimer(DispatcherPriority.Background)
         {
-            Interval = TimeSpan.FromSeconds(2)
+            Interval = TimeSpan.FromMilliseconds(500)
         };
         _taskbarGuard.Tick += (_, _) => Taskbar.EnsureProtection();
 
-        Taskbar.Apply(Settings.ReplaceWindowsTaskbar);
+        bool replacementApplied = Taskbar.Apply(Settings.ReplaceWindowsTaskbar);
         UpdateTaskbarGuard();
 
         _dockWindow = new DockWindow(Dock, _store);
-        if (Settings.ReplaceWindowsTaskbar)
+        if (Settings.ReplaceWindowsTaskbar && replacementApplied)
             _dockWindow.Show();
         _dockWindow.ApplySettings();
+
+        // Hiding the native bar is only half the guarantee. If the AppBar did
+        // not reserve the work area, put the native bar back instead of leaving
+        // a bar that maximized windows can cover.
+        if (Settings.ReplaceWindowsTaskbar && Settings.ReserveTaskbarSpace &&
+            replacementApplied && !_dockWindow.AppBarApplySucceeded)
+        {
+            Log.Write("AppBar verification failed at startup; restoring the native taskbar.");
+            Taskbar.Restore();
+            _dockWindow.HideForTaskbarRestore();
+            replacementApplied = false;
+        }
 
         Tracker.Refresh();
 
@@ -139,6 +167,13 @@ public partial class App : Application
 
         _tray = new TrayService(ShowSettings, ShowLauncher, ShowWidgets,
             ToggleDockVisibility, RestoreWindowsTaskbar, ExitApp);
+
+        if (Settings.ReplaceWindowsTaskbar && !replacementApplied)
+        {
+            Log.Write("Replacement requested at startup, but native taskbar was left visible.");
+            _tray.ShowBalloon("Taskbar non sostituita",
+                "Nebula ha lasciato la taskbar di Windows visibile. Controlla app.log e riprova dalle impostazioni.");
+        }
 
         Updates.UpdateReady += OnUpdateReady;
         Updates.UpdateAvailable += OnUpdateAvailable;
@@ -200,12 +235,17 @@ public partial class App : Application
                 break;
 
             case nameof(AppSettings.ReplaceWindowsTaskbar):
-                Taskbar.Apply(Settings.ReplaceWindowsTaskbar);
+                bool replacementApplied = Taskbar.Apply(Settings.ReplaceWindowsTaskbar);
                 UpdateTaskbarGuard();
-                if (Settings.ReplaceWindowsTaskbar)
+                if (Settings.ReplaceWindowsTaskbar && replacementApplied)
                     _dockWindow?.ShowForTaskbarReplace();
                 else
+                {
                     HideDockAndPanels();
+                    if (Settings.ReplaceWindowsTaskbar)
+                        _tray?.ShowBalloon("Taskbar non sostituita",
+                            "La taskbar di Windows è rimasta visibile. Controlla app.log per il motivo.");
+                }
                 break;
 
             case nameof(AppSettings.LaunchAtStartup):
@@ -227,8 +267,6 @@ public partial class App : Application
                 break;
 
             case nameof(AppSettings.TabsStyle):
-                if (Settings.SurfaceStyle != Settings.TabsStyle)
-                    Settings.SurfaceStyle = Settings.TabsStyle;
                 Theme.Reload();
                 _tabs?.ApplyAppearance();
                 break;
@@ -284,8 +322,10 @@ public partial class App : Application
     public void ApplyAll()
     {
         Theme.Reload();
-        Taskbar.Apply(Settings.ReplaceWindowsTaskbar);
+        bool replacementApplied = Taskbar.Apply(Settings.ReplaceWindowsTaskbar);
         UpdateTaskbarGuard();
+        if (Settings.ReplaceWindowsTaskbar && !replacementApplied)
+            HideDockAndPanels();
         StartupManager.Apply(Settings.LaunchAtStartup);
         Dock.RefreshItems();
         Dock.UpdateClock();
@@ -446,6 +486,21 @@ public partial class App : Application
             case "lock":
                 Interop.NativeMethods.LockWorkStation();
                 break;
+        }
+    }
+
+    /// <summary>Play/pause from the taskbar media widget.</summary>
+    public void ToggleMediaPlayback()
+    {
+        try
+        {
+            _mediaControls ??= new QuickControls();
+            if (!_mediaControls.SendMedia(MediaCommand.PlayPause))
+                _tray?.ShowBalloon("Media", "Nessun player attivo ha accettato il comando.");
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Taskbar media command failed: " + ex.Message);
         }
     }
 
@@ -643,6 +698,8 @@ public partial class App : Application
 
         _hotkeys?.Dispose();
         _hotkeys = null;
+        _mediaControls?.Dispose();
+        _mediaControls = null;
         _tray?.Dispose();
         _tray = null;
         Updates?.Dispose();
@@ -657,6 +714,7 @@ public partial class App : Application
         Taskbar?.Restore();
         SystemIcons?.CleanupOnExit();
         Updates?.Dispose();
+        _mediaControls?.Dispose();
         _tabs?.Dispose();
         _store?.Dispose();
         _trackerTimer?.Stop();
