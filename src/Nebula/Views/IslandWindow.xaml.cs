@@ -1,10 +1,14 @@
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using Nebula.Interop;
 using Nebula.Models;
 using Nebula.Services;
@@ -15,10 +19,8 @@ using Forms = System.Windows.Forms;
 namespace Nebula.Views;
 
 /// <summary>
-/// Floating top-center capsule. It stays compact at rest and expands only on
-/// pointer enter or click; no frame timer runs while idle. Clock and metrics are
-/// bound to the existing DockViewModel/SystemMonitor, so the island does not add
-/// another polling loop.
+/// Floating top-center capsule. Compact at rest, it expands into a small system
+/// dashboard with live activities, media controls and a temporary file drawer.
 /// </summary>
 public partial class IslandWindow : Window
 {
@@ -26,22 +28,34 @@ public partial class IslandWindow : Window
     private const int HTTRANSPARENT = -1;
 
     private readonly DockViewModel _dock;
+    private readonly ActivityCenter _activities;
+    private readonly FileShelf _shelf;
     private readonly QuickControls _controls = new();
     private readonly DispatcherTimer _hideTimer;
     private HwndSource? _source;
 
     private bool _expanded;
     private bool _pinned;
-    private double _compactWidth = 220;
-    private double _compactHeight = 40;
-    private double _expandedWidth = 400;
-    private double _expandedHeight = 190;
+    private bool _dragHover;
+    private double _compactWidth = 250;
+    private double _compactHeight = 42;
+    private double _expandedWidth = 440;
+    private double _expandedHeight = 500;
 
-    public IslandWindow(DockViewModel dock)
+    private Point _shelfDragStart;
+    private ShelfItem? _shelfDragItem;
+
+    public IslandWindow(DockViewModel dock, ActivityCenter activities, FileShelf shelf)
     {
         _dock = dock;
+        _activities = activities;
+        _shelf = shelf;
+
         InitializeComponent();
         DataContext = dock;
+
+        ActivityList.ItemsSource = _activities.Activities;
+        ShelfList.ItemsSource = _shelf.Items;
 
         _hideTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -60,7 +74,19 @@ public partial class IslandWindow : Window
         Closed += OnClosed;
         _dock.Settings.PropertyChanged += OnSettingsChanged;
         _dock.Theme.Changed += OnThemeChanged;
+        _activities.Changed += RefreshActivitySummary;
+        _activities.Activities.CollectionChanged += OnActivitiesCollectionChanged;
+        _shelf.Changed += RefreshShelfSummary;
+
+        RefreshActivitySummary();
+        RefreshShelfSummary();
     }
+
+    /// <summary>True when the capsule is docked inside the Nebula bar instead of floating.</summary>
+    private bool InTaskbar =>
+        _dock.Settings.IslandPlacement == "taskbar" &&
+        _dock.Settings.ReplaceWindowsTaskbar &&
+        _dock.Settings.TaskbarFullWidth;
 
     public bool IsExpanded => _expanded;
     public bool IsPinned => _pinned;
@@ -108,7 +134,6 @@ public partial class IslandWindow : Window
             PositionIsland();
     }
 
-    /// <summary>Used by the self-test and capture harness; no animation.</summary>
     public void ExpandForTest()
     {
         _pinned = true;
@@ -121,7 +146,6 @@ public partial class IslandWindow : Window
         SetExpanded(false, false);
     }
 
-    /// <summary>Used by the real-session capture harness to show the spring animation.</summary>
     public void ExpandAnimated()
     {
         _pinned = true;
@@ -155,10 +179,6 @@ public partial class IslandWindow : Window
                 System.Drawing.Point cursor = Forms.Cursor.Position;
                 if (!IsPointInteractive(new Point(cursor.X, cursor.Y)))
                 {
-                    // The window is larger than the capsule for the spring
-                    // animation. Outside the capsule the OS must pass the click
-                    // to the window underneath, or the island would eat desktop
-                    // clicks inside an invisible rectangle.
                     handled = true;
                     return (IntPtr)HTTRANSPARENT;
                 }
@@ -176,6 +196,7 @@ public partial class IslandWindow : Window
     {
         ApplyAppearance();
         PositionIsland();
+        RefreshControls();
         AnimateIn();
     }
 
@@ -209,10 +230,14 @@ public partial class IslandWindow : Window
             style = "capsule";
 
         double scale = Math.Clamp(settings.IslandScale, 0.8, 1.3);
-        _compactWidth = 220 * scale;
-        _compactHeight = 40 * scale;
-        _expandedWidth = 400 * scale;
-        _expandedHeight = 190 * scale;
+        bool inBar = InTaskbar;
+        _compactWidth = (inBar ? 208 : 250) * scale;
+        _compactHeight = inBar
+            ? Math.Clamp(settings.DockHeight - 18, 26, 44)
+            : 42 * scale;
+
+        _expandedWidth = 440 * scale;
+        _expandedHeight = ComputeExpandedHeight();
         AppliedStyleKey = style;
 
         Capsule.BeginAnimation(WidthProperty, null);
@@ -226,6 +251,8 @@ public partial class IslandWindow : Window
             "minimal" => (_expanded ? 14 : 10) * scale,
             _ => (_expanded ? 24 : 20) * scale
         };
+        if (inBar)
+            radius = _expanded ? 24 * scale : _compactHeight / 2;
 
         Capsule.CornerRadius = new CornerRadius(radius);
         IslandGlow.CornerRadius = new CornerRadius(radius);
@@ -246,6 +273,67 @@ public partial class IslandWindow : Window
         CompactView.Opacity = _expanded ? 0 : 1;
         ExpandedView.Opacity = _expanded ? 1 : 0;
         ExpandedView.Visibility = _expanded ? Visibility.Visible : Visibility.Collapsed;
+
+        UpdateSections();
+        RefreshActivitySummary();
+        RefreshShelfSummary();
+    }
+
+    /// <summary>Only sections with something to show take space in the island.</summary>
+    private bool ActivitiesVisible =>
+        _dock.Settings.IslandShowActivities && _activities.Activities.Count > 0;
+
+    private bool ShelfVisible =>
+        _dock.Settings.IslandShowShelf && (_shelf.Items.Count > 0 || _dragHover);
+
+    private double ComputeExpandedHeight()
+    {
+        double scale = Math.Clamp(_dock.Settings.IslandScale, 0.8, 1.3);
+        double content = 150;
+
+        // Sections grow with what they actually contain: one download does not
+        // reserve room for four, and an empty drawer reserves nothing.
+        if (ActivitiesVisible)
+            content += 34 + Math.Min(196, _activities.Activities.Count * 68);
+
+        if (ShelfVisible)
+        {
+            int rows = Math.Max(1, (int)Math.Ceiling(_shelf.Items.Count / 2.0));
+            content += 46 + Math.Min(150, rows * 42);
+        }
+
+        if (_dock.Settings.IslandShowControls)
+            content += 42;
+
+        // The minimum only guards the controls row: an island with nothing to
+        // report stays short instead of showing empty space.
+        return Math.Max(210, content) * scale;
+    }
+
+    /// <summary>
+    /// Hides the activity list when nothing is running and the file drawer when
+    /// it is empty, so the expanded capsule never shows empty zones.
+    /// </summary>
+    private void UpdateSections()
+    {
+        if (ActivitiesSection is null || ShelfSection is null)
+            return;
+
+        ActivitiesSection.Visibility = ActivitiesVisible ? Visibility.Visible : Visibility.Collapsed;
+        ShelfSection.Visibility = ShelfVisible ? Visibility.Visible : Visibility.Collapsed;
+
+        if (ActivityEmpty is not null)
+            ActivityEmpty.Visibility = Visibility.Collapsed;
+        if (ShelfEmptyText is not null)
+            ShelfEmptyText.Visibility = Visibility.Collapsed;
+
+        _expandedHeight = ComputeExpandedHeight();
+        if (_expanded && IsLoaded)
+        {
+            Capsule.BeginAnimation(HeightProperty, null);
+            Capsule.Height = _expandedHeight;
+            PositionIsland();
+        }
     }
 
     private void SetExpanded(bool expand, bool animate)
@@ -257,21 +345,27 @@ public partial class IslandWindow : Window
         _expanded = expand;
         _hideTimer.Stop();
 
+        if (expand)
+            UpdateSections();
+
         double width = expand ? _expandedWidth : _compactWidth;
         double height = expand ? _expandedHeight : _compactHeight;
+        double scale = Math.Clamp(_dock.Settings.IslandScale, 0.8, 1.3);
         double radius = AppliedStyleKey switch
         {
-            "pill" => expand ? 30 * Math.Clamp(_dock.Settings.IslandScale, 0.8, 1.3)
-                             : _compactHeight / 2,
-            "minimal" => (expand ? 14 : 10) * Math.Clamp(_dock.Settings.IslandScale, 0.8, 1.3),
-            _ => (expand ? 24 : 20) * Math.Clamp(_dock.Settings.IslandScale, 0.8, 1.3)
+            "pill" => expand ? 30 * scale : _compactHeight / 2,
+            "minimal" => (expand ? 14 : 10) * scale,
+            _ => (expand ? 24 : 20) * scale
         };
+        if (InTaskbar)
+            radius = expand ? 24 * scale : _compactHeight / 2;
 
         if (expand)
+        {
+            UpdateSections();
             ExpandedView.Visibility = Visibility.Visible;
-
-        if (expand)
             RefreshControls();
+        }
 
         bool motion = animate && _dock.Settings.AnimationsEnabled;
         if (!motion)
@@ -290,7 +384,7 @@ public partial class IslandWindow : Window
         else
         {
             double speed = Math.Clamp(_dock.Settings.AnimationSpeed, 0.5, 2);
-            double seconds = 0.26 / speed;
+            double seconds = 0.28 / speed;
             var sizeEase = new BackEase { Amplitude = 0.10, EasingMode = EasingMode.EaseOut };
             Capsule.BeginAnimation(WidthProperty,
                 new DoubleAnimation(width, TimeSpan.FromSeconds(seconds)) { EasingFunction = sizeEase });
@@ -318,7 +412,6 @@ public partial class IslandWindow : Window
         Capsule.CornerRadius = new CornerRadius(radius);
         IslandGlow.CornerRadius = new CornerRadius(radius);
         IslandGlow2.CornerRadius = new CornerRadius(radius);
-
     }
 
     private void PositionIsland()
@@ -328,12 +421,48 @@ public partial class IslandWindow : Window
         double scale = Math.Clamp(_dock.Settings.IslandScale, 0.8, 1.3);
 
         Width = Math.Max(_expandedWidth + 40, 480 * scale);
-        Height = Math.Max(_expandedHeight + 30, 260 * scale);
+        Height = Math.Max(_expandedHeight + 30, 300 * scale);
         Left = bounds.Left + (bounds.Width - Width) / 2;
 
-        double top = bounds.Top + _dock.Settings.IslandTopMargin;
-        if (_dock.Settings.ReplaceWindowsTaskbar && _dock.Settings.DockOnTop)
-            top = bounds.Top + _dock.Settings.DockHeight + 20 + _dock.Settings.IslandTopMargin;
+        AppSettings settings = _dock.Settings;
+        bool inBar = InTaskbar;
+
+        // Without a reserved work area the bar sits above the native taskbar,
+        // exactly like the dock itself does.
+        Rect barArea = settings.ReplaceWindowsTaskbar && settings.ReserveTaskbarSpace
+            ? bounds
+            : ScreenGeometry.WorkAreaDip(screen);
+
+        // Anchoring the capsule to the bottom keeps its screen position stable
+        // while the panel grows upwards, which is what a bar at the bottom of
+        // the screen needs.
+        Capsule.VerticalAlignment = inBar && !settings.DockOnTop
+            ? VerticalAlignment.Bottom
+            : VerticalAlignment.Top;
+
+        if (inBar)
+        {
+            double barHeight = Math.Max(44, settings.DockHeight);
+            double barTop = settings.DockOnTop
+                ? barArea.Top + settings.EdgeMargin
+                : barArea.Bottom - settings.EdgeMargin - barHeight;
+
+            if (settings.DockOnTop)
+            {
+                Top = barTop + (barHeight - _compactHeight) / 2;
+            }
+            else
+            {
+                double capsuleBottom = barTop + (barHeight + _compactHeight) / 2;
+                Top = capsuleBottom - Height;
+            }
+
+            return;
+        }
+
+        double top = bounds.Top + settings.IslandTopMargin;
+        if (settings.ReplaceWindowsTaskbar && settings.DockOnTop)
+            top = bounds.Top + settings.DockHeight + 20 + settings.IslandTopMargin;
         Top = top;
     }
 
@@ -351,6 +480,54 @@ public partial class IslandWindow : Window
             VolumeText.Text = "—";
             IslandStatus.Text = "Controlli non disponibili";
         }
+    }
+
+    private void OnActivitiesCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) =>
+        RefreshActivitySummary();
+
+    private void RefreshActivitySummary()
+    {
+        if (_activities is null || ActivityCountText is null)
+            return;
+
+        int active = _activities.Activities.Count(activity => !activity.IsFinished);
+        bool enabled = _dock.Settings.IslandShowActivities;
+        CompactActivityBadge.Visibility = enabled && active > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        SystemActivity? first = _activities.Activities.FirstOrDefault(activity => !activity.IsFinished);
+        CompactActivityText.Text = active switch
+        {
+            0 => "",
+            1 => first?.Title ?? "1 attività",
+            _ => $"{active} attività"
+        };
+
+        ActivityCountText.Text = active switch
+        {
+            0 => "nessuna attività",
+            1 => "1 attività",
+            _ => $"{active} attività"
+        };
+
+        // The list and the capsule height follow the real state of the PC.
+        UpdateSections();
+    }
+
+    private void RefreshShelfSummary()
+    {
+        if (ShelfCountText is null)
+            return;
+
+        ShelfCountText.Text = _shelf.Items.Count switch
+        {
+            0 => "",
+            1 => "1 file",
+            _ => $"{_shelf.Items.Count} file"
+        };
+
+        UpdateSections();
     }
 
     private void ChangeVolume(int delta)
@@ -372,13 +549,13 @@ public partial class IslandWindow : Window
         IslandStatus.Text = "Volume aggiornato";
     }
 
-    private void OnCapsuleEnter(object sender, System.Windows.Input.MouseEventArgs e)
+    private void OnCapsuleEnter(object sender, MouseEventArgs e)
     {
         _hideTimer.Stop();
         SetExpanded(true, true);
     }
 
-    private void OnCapsuleLeave(object sender, System.Windows.Input.MouseEventArgs e)
+    private void OnCapsuleLeave(object sender, MouseEventArgs e)
     {
         if (_pinned || !_expanded)
             return;
@@ -387,7 +564,7 @@ public partial class IslandWindow : Window
         _hideTimer.Start();
     }
 
-    private void OnCapsuleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private void OnCapsuleClick(object sender, MouseButtonEventArgs e)
     {
         if (FindButton(e.OriginalSource as DependencyObject) is not null)
             return;
@@ -436,6 +613,180 @@ public partial class IslandWindow : Window
         };
     }
 
+    private void OnDismissActivity(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: SystemActivity activity })
+            _activities.Dismiss(activity);
+    }
+
+    private async void OnIslandDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        await AddDroppedFilesAsync(e);
+    }
+
+    private async void OnShelfDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        await AddDroppedFilesAsync(e);
+    }
+
+    private async Task AddDroppedFilesAsync(DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+            return;
+
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] files || files.Length == 0)
+            return;
+
+        IslandStatus.Text = "Copio nel cassetto…";
+        (int added, int skipped, string? error) = await _shelf.AddFilesAsync(files);
+        IslandStatus.Text = added switch
+        {
+            0 => error ?? "Nessun file aggiunto",
+            1 => "File conservato nel cassetto",
+            _ => $"{added} file conservati"
+        };
+
+        if (skipped > 0)
+            IslandStatus.Text += $" · {skipped} saltati";
+
+        ResetShelfHighlight();
+        _dragHover = false;
+        RefreshShelfSummary();
+    }
+
+    private void OnIslandDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+            return;
+
+        e.Effects = DragDropEffects.Copy;
+        e.Handled = true;
+
+        // The drawer appears while a file is over the island, even when it is
+        // empty, and disappears again when the drag leaves.
+        if (!_dragHover)
+        {
+            _dragHover = true;
+            UpdateSections();
+        }
+
+        if (!_expanded)
+            SetExpanded(true, true);
+        HighlightShelf();
+    }
+
+    private void OnShelfDragOver(object sender, DragEventArgs e) => OnIslandDragOver(sender, e);
+
+    private void OnIslandDragLeave(object sender, DragEventArgs e)
+    {
+        ResetShelfHighlight();
+        if (_dragHover)
+        {
+            _dragHover = false;
+            UpdateSections();
+        }
+
+        if (!_pinned && _expanded && !Capsule.IsMouseOver)
+        {
+            _hideTimer.Stop();
+            _hideTimer.Start();
+        }
+    }
+
+    private void OnShelfDragLeave(object sender, DragEventArgs e) => OnIslandDragLeave(sender, e);
+
+    private void HighlightShelf()
+    {
+        ShelfZone.BorderBrush = FindBrush("C.Accent", Brushes.MediumPurple);
+        ShelfZone.BorderThickness = new Thickness(1.5);
+        ShelfDropHint.Text = "Rilascia qui: il file resterà nel cassetto finché non lo sposti.";
+    }
+
+    private void ResetShelfHighlight()
+    {
+        ShelfZone.BorderBrush = FindBrush("S.InnerBorder", Brushes.Transparent);
+        ShelfZone.BorderThickness = new Thickness(1);
+        ShelfDropHint.Text = "Trascina qui i file per conservarli temporaneamente.";
+    }
+
+    private void OnShelfItemMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (FindButton(e.OriginalSource as DependencyObject) is not null)
+        {
+            _shelfDragItem = null;
+            return;
+        }
+
+        _shelfDragItem = (sender as FrameworkElement)?.DataContext as ShelfItem;
+        _shelfDragStart = e.GetPosition(this);
+    }
+
+    private void OnShelfItemMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _shelfDragItem is null)
+            return;
+
+        Point current = e.GetPosition(this);
+        if (Math.Abs(current.X - _shelfDragStart.X) < 8 &&
+            Math.Abs(current.Y - _shelfDragStart.Y) < 8)
+            return;
+
+        ShelfItem item = _shelfDragItem;
+        _shelfDragItem = null;
+        var data = new DataObject(DataFormats.FileDrop, new[] { item.StoredPath });
+        DragDropEffects effect = DragDrop.DoDragDrop((DependencyObject)sender, data,
+            DragDropEffects.Copy | DragDropEffects.Move);
+        if (effect == DragDropEffects.Move)
+        {
+            // Explorer moved the stored copy: the drawer no longer owns it.
+            _shelf.Remove(item);
+            IslandStatus.Text = "File spostato fuori dal cassetto";
+            RefreshShelfSummary();
+        }
+        else if (effect == DragDropEffects.Copy)
+        {
+            IslandStatus.Text = "Copia del file lasciata fuori dal cassetto";
+        }
+    }
+
+    private void OnShelfMove(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: ShelfItem item })
+            return;
+
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Sposta il file dal cassetto",
+            Multiselect = false
+        };
+
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        if (_shelf.MoveTo(item, dialog.FolderName))
+        {
+            IslandStatus.Text = "File spostato";
+            RefreshShelfSummary();
+        }
+        else
+        {
+            IslandStatus.Text = "Spostamento non riuscito";
+        }
+    }
+
+    private void OnShelfRemove(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: ShelfItem item })
+            return;
+
+        IslandStatus.Text = _shelf.Remove(item)
+            ? "File rimosso dal cassetto"
+            : "Impossibile rimuovere il file";
+        RefreshShelfSummary();
+    }
+
     private void OnOpenSearch(object sender, RoutedEventArgs e)
     {
         CollapseAfterAction();
@@ -460,6 +811,30 @@ public partial class IslandWindow : Window
         App.Instance?.ShowSettings();
     }
 
+    private void OnPowerMenuClick(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu();
+
+        void Add(string header, string action)
+        {
+            var item = new MenuItem { Header = header };
+            item.Click += (_, _) => App.Instance?.RunPowerAction(action);
+            menu.Items.Add(item);
+        }
+
+        Add("Blocca", "lock");
+        Add("Sospendi", "sleep");
+        menu.Items.Add(new Separator());
+        Add("Riavvia il PC", "restart");
+        Add("Spegni il PC", "shutdown");
+        menu.Items.Add(new Separator());
+        Add("Esci da Nebula", "exit");
+
+        menu.PlacementTarget = sender as Button;
+        menu.Placement = PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
     private void CollapseAfterAction()
     {
         _pinned = false;
@@ -470,7 +845,11 @@ public partial class IslandWindow : Window
     {
         if (e.PropertyName is nameof(AppSettings.IslandStyle)
             or nameof(AppSettings.IslandScale)
-            or nameof(AppSettings.IslandTopMargin))
+            or nameof(AppSettings.IslandTopMargin)
+            or nameof(AppSettings.IslandPlacement)
+            or nameof(AppSettings.IslandShowActivities)
+            or nameof(AppSettings.IslandShowShelf)
+            or nameof(AppSettings.IslandShowControls))
         {
             ApplyAppearance();
             if (IsLoaded)
@@ -479,6 +858,8 @@ public partial class IslandWindow : Window
         else if (e.PropertyName is nameof(AppSettings.MonitorIndex)
                  or nameof(AppSettings.DockOnTop)
                  or nameof(AppSettings.DockHeight)
+                 or nameof(AppSettings.TaskbarFullWidth)
+                 or nameof(AppSettings.EdgeMargin)
                  or nameof(AppSettings.ReplaceWindowsTaskbar))
         {
             if (IsLoaded)
@@ -505,6 +886,9 @@ public partial class IslandWindow : Window
         }
         _source = null;
         _controls.Dispose();
+        _activities.Changed -= RefreshActivitySummary;
+        _activities.Activities.CollectionChanged -= OnActivitiesCollectionChanged;
+        _shelf.Changed -= RefreshShelfSummary;
         _dock.Settings.PropertyChanged -= OnSettingsChanged;
         _dock.Theme.Changed -= OnThemeChanged;
         DataContext = null;

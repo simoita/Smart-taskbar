@@ -10,6 +10,7 @@ public sealed class SystemMonitor : ObservableObject
 {
     private ulong _prevIdle, _prevKernel, _prevUser;
     private bool _primed;
+    private int _tick;
     private double _cpu;
     private double _ram;
     private string _cpuText = "--";
@@ -104,11 +105,19 @@ public sealed class SystemMonitor : ObservableObject
 
     public void Update()
     {
+        _tick++;
         UpdateCpu();
         UpdateMemory();
-        UpdatePower();
-        UpdateDisk();
-        UpdateNetwork();
+
+        // Power, disk and network enumeration are comparatively expensive and
+        // change slowly. CPU and RAM refresh every tick; the rest is throttled
+        // so an idle dock does not enumerate adapters and volumes every 2 s.
+        if (_tick == 1 || _tick % 10 == 0)
+            UpdatePower();
+        if (_tick == 1 || _tick % 15 == 0)
+            UpdateDisk();
+        if (_tick == 1 || _tick % 15 == 0)
+            UpdateNetwork();
 
         Uptime = FormatUptime(TimeSpan.FromMilliseconds(Environment.TickCount64));
     }
@@ -209,17 +218,15 @@ public sealed class SystemMonitor : ObservableObject
     {
         try
         {
-            NetworkAvailable = NetworkInterface.GetIsNetworkAvailable();
+            // One enumeration instead of GetIsNetworkAvailable() plus a full
+            // adapter scan: the status of the Up adapter is the same answer.
             NetworkInterface? active = NetworkInterface.GetAllNetworkInterfaces()
                 .FirstOrDefault(nic => nic.OperationalStatus == OperationalStatus.Up &&
                                        nic.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
                                        nic.NetworkInterfaceType != NetworkInterfaceType.Tunnel);
 
-            NetworkText = !NetworkAvailable
-                ? "Offline"
-                : active is null
-                    ? "Online"
-                    : active.Name;
+            NetworkAvailable = active is not null;
+            NetworkText = active is null ? "Offline" : active.Name;
         }
         catch
         {

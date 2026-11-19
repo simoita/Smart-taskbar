@@ -18,9 +18,11 @@ public partial class DockWindow : Window
 {
     private const double ShadowTop = 22;
     private const double ShadowBottom = 26;
+    private const int WmDisplayChange = 0x007E;
 
     private readonly DockViewModel _vm;
     private readonly SettingsStore _store;
+    private readonly int? _forcedMonitor;
     private readonly TaskbarAppBar _appBar = new();
     private readonly DispatcherTimer _watchTimer;
     private readonly DispatcherTimer _backdropTimer;
@@ -31,17 +33,30 @@ public partial class DockWindow : Window
     private bool _userHidden;
     private bool _hiddenForTaskbarRestore;
     private int _tick;
+    private int _followMonitor = -1;
+    private int _followTicks;
     private Rect _workAreaDip;
     private System.Drawing.Rectangle _physicalWorkArea;
     private System.Drawing.Rectangle _screenBounds;
 
-    public DockWindow(DockViewModel vm, SettingsStore store)
+    public DockWindow(DockViewModel vm, SettingsStore store, int? monitor = null)
     {
         _vm = vm;
         _store = store;
+        _forcedMonitor = monitor;
 
         InitializeComponent();
         DataContext = vm;
+
+        // Fullscreen, AppBar and auto-hide checks do not need a 6.7 Hz UI
+        // timer while the dock is idle. 500 ms still hides promptly on a
+        // foreground change and keeps auto-hide responsive.
+        _watchTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(500)
+        };
+        _watchTimer.Tick += OnWatchTick;
+        _watchTimer.Start();
 
         SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
@@ -64,13 +79,6 @@ public partial class DockWindow : Window
         };
         _vm.Settings.PropertyChanged += OnSettingsChanged;
 
-        _watchTimer = new DispatcherTimer(DispatcherPriority.Background)
-        {
-            Interval = TimeSpan.FromMilliseconds(150)
-        };
-        _watchTimer.Tick += OnWatchTick;
-        _watchTimer.Start();
-
         _backdropTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(260) };
         _backdropTimer.Tick += (_, _) =>
         {
@@ -82,6 +90,9 @@ public partial class DockWindow : Window
     public bool IsHidden => _hidden;
     public bool IsAppBarRegistered => _appBar.IsRegistered;
     public bool AppBarApplySucceeded { get; private set; }
+
+    /// <summary>Monitor this bar draws on: its own index on multi-monitor bars.</summary>
+    public int MonitorIndex => _forcedMonitor ?? ScreenGeometry.Clamp(_vm.Settings.MonitorIndex);
 
     /// <summary>Shell rectangle in window DIPs, excluding the transparent shadow.</summary>
     public Rect ShellBoundsDip
@@ -122,6 +133,13 @@ public partial class DockWindow : Window
             Dispatcher.InvokeAsync(UpdateAppBar, DispatcherPriority.Background);
         }
 
+        if (msg == WmDisplayChange)
+        {
+            // A monitor was attached, removed or reconfigured. Rebuild the
+            // geometry before the next guard tick works with stale bounds.
+            Dispatcher.InvokeAsync(OnDisplayChanged, DispatcherPriority.Background);
+        }
+
         return IntPtr.Zero;
     }
 
@@ -132,6 +150,7 @@ public partial class DockWindow : Window
         UpdateBackdrop();
         CenterLiquidSheen(false);
         Dispatcher.InvokeAsync(UpdateAppBar, DispatcherPriority.Loaded);
+        Dispatcher.InvokeAsync(AnimateDockItemsIn, DispatcherPriority.Loaded);
 
         if (!_vm.Settings.AnimationsEnabled)
         {
@@ -218,9 +237,36 @@ public partial class DockWindow : Window
         UpdateAppBar();
     }
 
+    /// <summary>
+    /// Keeps the bar on a screen that still exists after a hot-plug or a
+    /// resolution change, then re-applies its position and AppBar strip.
+    /// </summary>
+    private void OnDisplayChanged()
+    {
+        if (_forcedMonitor is int forced && forced >= ScreenGeometry.Count)
+        {
+            // The screen this bar lived on is gone; the app owns the lifetime.
+            _hiddenForTaskbarRestore = true;
+            Hide();
+            return;
+        }
+
+        if (_forcedMonitor is null)
+        {
+            int clamped = ScreenGeometry.Clamp(_vm.Settings.MonitorIndex);
+            if (clamped != _vm.Settings.MonitorIndex)
+                _vm.Settings.MonitorIndex = clamped;
+        }
+
+        _workAreaDip = default;
+        _followMonitor = -1;
+        _followTicks = 0;
+        Reposition();
+    }
+
     private void RefreshScreenGeometry()
     {
-        System.Windows.Forms.Screen screen = ScreenGeometry.Target(_vm.Settings.MonitorIndex);
+        System.Windows.Forms.Screen screen = ScreenGeometry.Target(MonitorIndex);
         _workAreaDip = _vm.Settings.ReplaceWindowsTaskbar && _vm.Settings.ReserveTaskbarSpace
             ? ScreenGeometry.BoundsDip(screen)
             : ScreenGeometry.WorkAreaDip(screen);
@@ -245,7 +291,16 @@ public partial class DockWindow : Window
         }
 
         double height = Math.Max(28, ActualHeight - ShadowTop - ShadowBottom + _vm.Settings.EdgeMargin);
-        AppBarApplySucceeded = _appBar.Apply(this, _vm.Settings.DockOnTop, height, _vm.Settings.MonitorIndex);
+        AppBarApplySucceeded = _appBar.Apply(this, _vm.Settings.DockOnTop, height, MonitorIndex);
+
+        // Windows can grant a strip that is not flush with the monitor edge
+        // (the bottom edge is shared with the native bar). Follow the granted
+        // rectangle instead of the edge the user asked for.
+        if (AppBarApplySucceeded && !_hidden && IsLoaded)
+        {
+            BeginAnimation(TopProperty, null);
+            Top = VisibleTop();
+        }
     }
 
     private Rect CurrentWorkArea()
@@ -274,6 +329,9 @@ public partial class DockWindow : Window
             or nameof(Models.AppSettings.DockSystemScale)
             or nameof(Models.AppSettings.DockActionsScale)
             or nameof(Models.AppSettings.DockZoneDividers)
+            or nameof(Models.AppSettings.DockZonesSeparate)
+            or nameof(Models.AppSettings.IslandPlacement)
+            or nameof(Models.AppSettings.ShowIsland)
             or nameof(Models.AppSettings.TaskbarFullWidth))
         {
             ApplyZoneLayout();
@@ -284,11 +342,56 @@ public partial class DockWindow : Window
             or nameof(Models.AppSettings.ReplaceWindowsTaskbar)
             or nameof(Models.AppSettings.DockOnTop)
             or nameof(Models.AppSettings.MonitorIndex)
+            or nameof(Models.AppSettings.MonitorFollowCursor)
             or nameof(Models.AppSettings.EdgeMargin)
             or nameof(Models.AppSettings.DockHeight))
         {
+            if (e.PropertyName is nameof(Models.AppSettings.MonitorFollowCursor))
+            {
+                _followMonitor = -1;
+                _followTicks = 0;
+            }
+
             Dispatcher.InvokeAsync(Reposition, DispatcherPriority.Background);
         }
+    }
+
+    /// <summary>
+    /// "Active screen" mode: when the pointer rests on another monitor for about
+    /// a second the bar, its AppBar strip and the island move there.
+    /// </summary>
+    private void UpdateMonitorFollow()
+    {
+        // Bars on every monitor and a single bar that follows the pointer are
+        // mutually exclusive: otherwise two bars would share one screen.
+        if (_forcedMonitor is not null || _vm.Settings.TaskbarAllMonitors)
+            return;
+
+        if (!_vm.Settings.MonitorFollowCursor ||
+            !NativeMethods.GetCursorPos(out NativeMethods.POINT point))
+            return;
+
+        int index = ScreenGeometry.IndexForPoint(point.X, point.Y);
+        if (index < 0 || index == _vm.Settings.MonitorIndex)
+        {
+            _followMonitor = -1;
+            _followTicks = 0;
+            return;
+        }
+
+        if (index != _followMonitor)
+        {
+            _followMonitor = index;
+            _followTicks = 0;
+        }
+
+        // Two 500 ms ticks: crossing a monitor edge does not relocate the bar.
+        if (++_followTicks < 2)
+            return;
+
+        _followMonitor = -1;
+        _followTicks = 0;
+        _vm.Settings.MonitorIndex = index;
     }
 
     /// <summary>Rebuilds the dock from independent app/system/action zones.</summary>
@@ -298,6 +401,7 @@ public partial class DockWindow : Window
             return;
 
         var settings = _vm.Settings;
+        ApplyZoneChrome();
         var zones = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase)
         {
             ["apps"] = AppsZone,
@@ -319,6 +423,14 @@ public partial class DockWindow : Window
             requested.Any(key => !zones.ContainsKey(key)))
             requested = new[] { "apps", "system", "actions" };
 
+        bool separate = settings.DockZonesSeparate;
+        double spacing = separate
+            ? Math.Max(6, settings.DockZoneSpacing)
+            : settings.DockZoneSpacing;
+        // Separate shells need a real gap so the pills read as distinct blocks;
+        // a single bar keeps the original half-spacing rhythm.
+        double gap = separate ? Math.Max(8, spacing) : spacing / 2;
+
         var entries = new List<(FrameworkElement Zone, Border? Divider)>();
         bool first = true;
         foreach (string key in requested)
@@ -339,7 +451,7 @@ public partial class DockWindow : Window
                 continue;
 
             Border? divider = null;
-            if (!first && settings.DockZoneDividers)
+            if (!separate && !first && settings.DockZoneDividers)
             {
                 divider = new Border
                 {
@@ -380,7 +492,7 @@ public partial class DockWindow : Window
 
         bool fullWidth = settings.ReplaceWindowsTaskbar && settings.TaskbarFullWidth;
 
-        var containers = new List<StackPanel>();
+        var blocks = new List<FrameworkElement>();
         for (int i = 0; i < entries.Count; i++)
         {
             (FrameworkElement zone, Border? divider) = entries[i];
@@ -394,23 +506,26 @@ public partial class DockWindow : Window
                 container.Children.Add(divider);
             container.Children.Add(zone);
 
+            Thickness margin = default;
             if (!fullWidth)
-                container.Margin = i == 0
-                    ? new Thickness(0)
-                    : new Thickness(settings.DockZoneSpacing / 2, 0, 0, 0);
+                margin = i == 0 ? new Thickness(0) : new Thickness(gap, 0, 0, 0);
             else if (entries.Count >= 3 && i == 1)
-                container.Margin = new Thickness(settings.DockZoneSpacing, 0, settings.DockZoneSpacing, 0);
+                margin = new Thickness(spacing, 0, spacing, 0);
 
-            containers.Add(container);
+            FrameworkElement block = separate
+                ? CreateZonePill(container)
+                : container;
+            block.Margin = margin;
+            blocks.Add(block);
         }
 
-        if (!fullWidth || containers.Count == 0)
+        if (!fullWidth || blocks.Count == 0)
         {
-            for (int i = 0; i < containers.Count; i++)
+            for (int i = 0; i < blocks.Count; i++)
             {
                 ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                Grid.SetColumn(containers[i], i);
-                ZoneHost.Children.Add(containers[i]);
+                Grid.SetColumn(blocks[i], i);
+                ZoneHost.Children.Add(blocks[i]);
             }
 
             return;
@@ -420,39 +535,126 @@ public partial class DockWindow : Window
         ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        if (containers.Count == 1)
+        if (blocks.Count == 1)
         {
-            Grid.SetColumn(containers[0], 0);
-            Grid.SetColumnSpan(containers[0], 3);
-            containers[0].HorizontalAlignment = HorizontalAlignment.Center;
-            ZoneHost.Children.Add(containers[0]);
+            Grid.SetColumn(blocks[0], 0);
+            Grid.SetColumnSpan(blocks[0], 3);
+            blocks[0].HorizontalAlignment = HorizontalAlignment.Center;
+            ZoneHost.Children.Add(blocks[0]);
             return;
         }
 
-        Grid.SetColumn(containers[0], 0);
-        ZoneHost.Children.Add(containers[0]);
+        Grid.SetColumn(blocks[0], 0);
+        ZoneHost.Children.Add(blocks[0]);
 
-        if (containers.Count == 2)
+        if (blocks.Count == 2)
         {
-            Grid.SetColumn(containers[1], 2);
-            containers[1].HorizontalAlignment = HorizontalAlignment.Right;
-            ZoneHost.Children.Add(containers[1]);
+            Grid.SetColumn(blocks[1], 2);
+            blocks[1].HorizontalAlignment = HorizontalAlignment.Right;
+            ZoneHost.Children.Add(blocks[1]);
             return;
         }
 
-        Grid.SetColumn(containers[1], 1);
-        containers[1].HorizontalAlignment = HorizontalAlignment.Center;
-        ZoneHost.Children.Add(containers[1]);
+        // With the Dynamic Island docked inside the bar, the middle of the bar
+        // must stay free: the system and action groups share the right side.
+        // Only the bar that hosts the island keeps its middle free; the bars on
+        // the other monitors use the full width.
+        if (_forcedMonitor is null && settings.IslandPlacement == "taskbar" && settings.ShowIsland)
+        {
+            var right = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
 
-        Grid.SetColumn(containers[2], 2);
-        containers[2].HorizontalAlignment = HorizontalAlignment.Right;
-        ZoneHost.Children.Add(containers[2]);
+            foreach (FrameworkElement block in blocks.Skip(1))
+            {
+                block.Margin = new Thickness(gap, 0, 0, 0);
+                right.Children.Add(block);
+            }
+
+            Grid.SetColumn(right, 2);
+            ZoneHost.Children.Add(right);
+            return;
+        }
+
+        Grid.SetColumn(blocks[1], 1);
+        blocks[1].HorizontalAlignment = HorizontalAlignment.Center;
+        ZoneHost.Children.Add(blocks[1]);
+
+        Grid.SetColumn(blocks[2], 2);
+        blocks[2].HorizontalAlignment = HorizontalAlignment.Right;
+        ZoneHost.Children.Add(blocks[2]);
+    }
+
+    /// <summary>
+    /// Wraps one zone in its own glass shell so the three zones read as separate
+    /// capsules instead of sections of a single bar.
+    /// </summary>
+    private Border CreateZonePill(FrameworkElement content)
+    {
+        Models.AppSettings settings = _vm.Settings;
+        var pill = new Border
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            CornerRadius = new CornerRadius(Math.Clamp(settings.CornerRadius + 6, 12, 26)),
+            Padding = new Thickness(10, 2, 10, 2),
+            BorderThickness = new Thickness(_vm.DockFinish == "flat" ? 0 : 1),
+            Child = content
+        };
+
+        // The simple finishes stay monochrome even with separate zone capsules.
+        if (_vm.DockFinish == "glass")
+            pill.SetResourceReference(BackgroundProperty, "DockShellBackground");
+        else
+            pill.Background = _vm.FlatFillBrush;
+
+        pill.SetResourceReference(BorderBrushProperty, "C.StrokeSoft");
+        return pill;
+    }
+
+    /// <summary>Hides the continuous bar chrome while the zones are separate shells.</summary>
+    private void ApplyZoneChrome()
+    {
+        if (Shell is null || ShellChrome is null)
+            return;
+
+        bool separate = _vm.Settings.DockZonesSeparate;
+        ShellChrome.Visibility = separate ? Visibility.Collapsed : Visibility.Visible;
+
+        // The flat finish is a single full colour: no border, no glass shell.
+        bool borderless = separate || _vm.DockFinish == "flat";
+        Shell.BorderThickness = borderless ? new Thickness(0) : new Thickness(1);
+        Shell.Background = _vm.DockFinish != "glass"
+            ? Brushes.Transparent
+            : separate
+                ? Brushes.Transparent
+                : (Brush)FindResource("DockShellBackground");
     }
 
     private double VisibleTop()
     {
-        Rect work = CurrentWorkArea();
         double margin = _vm.Settings.EdgeMargin;
+
+        // Prefer the strip Windows actually reserved: on the bottom edge the
+        // shell can move it above the space still claimed by the native bar, and
+        // a dock drawn from the monitor edge would end up off screen.
+        if (_vm.Settings.ReplaceWindowsTaskbar && _vm.Settings.ReserveTaskbarSpace &&
+            _appBar.HasAppliedBounds && AppBarApplySucceeded)
+        {
+            System.Drawing.Rectangle strip = _appBar.AppliedBounds;
+            double scale = Math.Max(0.5, ScreenGeometry.Scale(ScreenGeometry.Target(MonitorIndex)));
+            double stripTop = strip.Top / scale;
+            double stripBottom = strip.Bottom / scale;
+            double shellHeight = Math.Max(1, ActualHeight - ShadowTop - ShadowBottom);
+
+            return _vm.Settings.DockOnTop
+                ? stripTop + margin - ShadowTop
+                : stripBottom - margin - shellHeight - ShadowTop;
+        }
+
+        Rect work = CurrentWorkArea();
         return _vm.Settings.DockOnTop
             ? work.Top - ShadowTop + margin
             : work.Bottom + ShadowBottom - margin - ActualHeight;
@@ -475,6 +677,7 @@ public partial class DockWindow : Window
             return;
 
         _tick++;
+        UpdateMonitorFollow();
         bool fullscreen = false;
 
         if (_vm.Settings.HideInFullscreen && (_tick % 4 == 0 || _hidden))
@@ -506,9 +709,16 @@ public partial class DockWindow : Window
             UpdateAppBar();
         }
 
-        bool nearEdge = IsCursorNearEdge();
+        // The cursor poll only matters while auto-hide is active.
+        bool nearEdge = _vm.Settings.AutoHideDock && IsCursorNearEdge();
         bool shouldHide = _userHidden || fullscreen ||
                           (_vm.Settings.AutoHideDock && !IsMouseOver && !nearEdge);
+
+        // A bar without an AppBar reservation can sit above a maximized window;
+        // never hide it silently while it is the only bar on that screen.
+        if (shouldHide && _vm.Settings.ReplaceWindowsTaskbar &&
+            _vm.Settings.ReserveTaskbarSpace && !AppBarApplySucceeded)
+            shouldHide = _userHidden;
 
         if (shouldHide && !_hidden)
             HideDock();
@@ -653,7 +863,7 @@ public partial class DockWindow : Window
             ShowDock();
     }
 
-    private void OnStartClick(object sender, RoutedEventArgs e) => App.Instance?.ShowLauncher();
+    private void OnStartClick(object sender, RoutedEventArgs e) => App.Instance?.ToggleStartPanel();
 
     private void OnSearchClick(object sender, RoutedEventArgs e) => App.Instance?.ShowLauncher();
 
@@ -755,10 +965,13 @@ public partial class DockWindow : Window
         if (button.Template.FindName("ItemScale", button) is not ScaleTransform scale)
             return;
 
+        TranslateTransform? lift = button.Template.FindName("ItemLift", button) as TranslateTransform;
         if (!_vm.Settings.AnimationsEnabled)
         {
             scale.ScaleX = to;
             scale.ScaleY = to;
+            if (lift is not null)
+                lift.Y = to > 1 ? -4 : 0;
             return;
         }
 
@@ -770,6 +983,45 @@ public partial class DockWindow : Window
         var animation = new DoubleAnimation(to, TimeSpan.FromSeconds(adjusted)) { EasingFunction = easing };
         scale.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
         scale.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
+
+        if (lift is not null)
+        {
+            lift.BeginAnimation(TranslateTransform.YProperty,
+                new DoubleAnimation(to > 1 ? -4 : 0, TimeSpan.FromSeconds(adjusted))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                });
+        }
+    }
+
+    /// <summary>Staggered entrance for the dock icons; skipped when motion is off.</summary>
+    private void AnimateDockItemsIn()
+    {
+        if (!_vm.Settings.AnimationsEnabled || DockItems is null)
+            return;
+
+        double speed = Math.Clamp(_vm.Settings.AnimationSpeed, 0.5, 2);
+        for (int index = 0; index < _vm.Items.Count; index++)
+        {
+            if (DockItems.ItemContainerGenerator.ContainerFromIndex(index) is not FrameworkElement item)
+                continue;
+
+            item.Opacity = 0;
+            var shift = new TranslateTransform(0, 12);
+            item.RenderTransform = shift;
+            item.BeginAnimation(OpacityProperty,
+                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(210 / speed))
+                {
+                    BeginTime = TimeSpan.FromMilliseconds(24 * index / speed),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                });
+            shift.BeginAnimation(TranslateTransform.YProperty,
+                new DoubleAnimation(12, 0, TimeSpan.FromMilliseconds(260 / speed))
+                {
+                    BeginTime = TimeSpan.FromMilliseconds(24 * index / speed),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                });
+        }
     }
 
     private void OnDockBackgroundRightClick(object sender, MouseButtonEventArgs e)
@@ -843,7 +1095,7 @@ public partial class DockWindow : Window
         }
 
         if (!string.IsNullOrWhiteSpace(item.LaunchPath))
-            Launch(item.LaunchPath);
+            Launch(item.LaunchPath, MonitorIndex);
     }
 
     private void OnItemRightClick(object sender, MouseButtonEventArgs e)
@@ -853,6 +1105,7 @@ public partial class DockWindow : Window
             return;
 
         var menu = new ContextMenu();
+        int monitor = MonitorIndex;
 
         if (item.Group is { } group)
         {
@@ -878,18 +1131,68 @@ public partial class DockWindow : Window
                 menu.Items.Add(minimize);
             }
 
+            // Ends the app the way Task Manager does: close request first, then
+            // terminate the processes that ignore it.
+            var endTask = new MenuItem { Header = "Termina attività" };
+            endTask.Click += (_, _) => _vm.Tracker.EndTask(group);
+            menu.Items.Add(endTask);
+
             var close = new MenuItem { Header = "Chiudi" };
             close.Click += (_, _) => _vm.Tracker.CloseAll(group);
             menu.Items.Add(close);
+            menu.Items.Add(new Separator());
         }
         else
         {
             var open = new MenuItem { Header = "Apri" };
-            open.Click += (_, _) => Launch(item.LaunchPath);
+            open.Click += (_, _) => Launch(item.LaunchPath, monitor);
             menu.Items.Add(open);
         }
 
-        var pin = new MenuItem { Header = item.IsPinned ? "Rimuovi dalla dock" : "Fissa alla dock" };
+        if (!string.IsNullOrWhiteSpace(item.LaunchPath) || !string.IsNullOrWhiteSpace(item.TargetPath))
+        {
+            string path = item.LaunchPath;
+
+            var admin = new MenuItem { Header = "Apri come amministratore" };
+            admin.Click += (_, _) =>
+            {
+                AppActions.RunAsAdmin(path, out string? error);
+                Report(error);
+            };
+            menu.Items.Add(admin);
+
+            var openWith = new MenuItem { Header = "Apri con…" };
+            openWith.Click += (_, _) =>
+            {
+                AppActions.OpenWith(path, out string? error);
+                Report(error);
+            };
+            menu.Items.Add(openWith);
+
+            var reveal = new MenuItem { Header = "Apri percorso file" };
+            reveal.Click += (_, _) =>
+            {
+                string target = item.TargetPath ?? path;
+                AppLauncher.RevealInExplorer(target, out string? error);
+                Report(error);
+            };
+            menu.Items.Add(reveal);
+
+            var uninstall = new MenuItem { Header = "Disinstalla" };
+            uninstall.Click += (_, _) =>
+            {
+                if (MessageBox.Show($"Disinstallare “{item.Name}”?", "Nebula",
+                        MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                    return;
+
+                AppActions.Uninstall(item.TargetPath ?? path, item.Name, out string? error);
+                Report(error);
+            };
+            menu.Items.Add(uninstall);
+            menu.Items.Add(new Separator());
+        }
+
+        var pin = new MenuItem { Header = item.IsPinned ? "Rimuovi dalla taskbar" : "Fissa alla taskbar" };
         pin.Click += (_, _) =>
         {
             if (item.IsPinned)
@@ -905,6 +1208,13 @@ public partial class DockWindow : Window
 
         menu.PlacementTarget = element;
         menu.IsOpen = true;
+    }
+
+    /// <summary>Shows a shell failure in the tray instead of a blocking dialog.</summary>
+    private static void Report(string? error)
+    {
+        if (!string.IsNullOrWhiteSpace(error))
+            Log.Write("Dock action: " + error);
     }
 
     private void Pulse(FrameworkElement element)
@@ -923,15 +1233,18 @@ public partial class DockWindow : Window
         scale.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
     }
 
-    private static void Launch(string path)
+    private void Launch(string path, int monitor)
     {
-        try
+        // A bar on a specific screen opens the app there, even when the monitor
+        // that would normally host the new window is another one.
+        if (AppLauncher.LaunchOnMonitor(path, monitor, out string? error))
         {
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            App.Instance?.RecordRecent(path);
+            return;
         }
-        catch (Exception ex)
-        {
-            Log.Write($"Launch failed for '{path}': {ex.Message}");
-        }
+
+        Log.Write($"Launch failed for '{path}': {error}");
+        MessageBox.Show(error ?? "Impossibile aprire l'app.", "Nebula",
+            MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 }

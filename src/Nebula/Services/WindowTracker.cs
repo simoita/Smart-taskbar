@@ -2,8 +2,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Nebula.Interop;
 
 namespace Nebula.Services;
@@ -28,6 +31,15 @@ public sealed class AppGroup
 
 public sealed class WindowTracker
 {
+    private const uint EventSystemForeground = 0x0003;
+    private const uint EventSystemMinimizeStart = 0x0016;
+    private const uint EventSystemMinimizeEnd = 0x0017;
+    private const uint EventObjectCreate = 0x8000;
+    private const uint EventObjectDestroy = 0x8001;
+    private const uint EventObjectShow = 0x8002;
+    private const uint EventObjectHide = 0x8003;
+    private const uint EventObjectNameChange = 0x800C;
+
     private static readonly string[] IgnoredClasses =
     {
         "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd",
@@ -37,18 +49,51 @@ public sealed class WindowTracker
     private readonly List<AppGroup> _groups = new();
     private readonly Dictionary<string, string> _nameCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ImageSource?> _iconCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<uint, string> _exeCache = new();
+    private readonly List<IntPtr> _eventHooks = new();
     private readonly int _ownPid = Environment.ProcessId;
+    private NativeMethods.WinEventDelegate? _eventCallback;
+    private int _refreshScheduled;
+    private bool _disposed;
+    private string _signature = "";
+    private int _refreshes;
+
+    public WindowTracker()
+    {
+        _eventCallback = OnDesktopEvent;
+
+        // Polling every 1.4 s re-enumerates every top-level window even when
+        // nothing changed. Use shell events for the common changes and keep
+        // the App timer only as a reconciliation fallback.
+        bool foreground = InstallHook(EventSystemForeground, EventSystemForeground);
+        bool windows = InstallHook(EventObjectCreate, EventObjectHide);
+        bool titles = InstallHook(EventObjectNameChange, EventObjectNameChange);
+        bool minimized = InstallHook(EventSystemMinimizeStart, EventSystemMinimizeEnd);
+        EventDriven = foreground && windows && titles && minimized;
+        if (!EventDriven)
+            Log.Write("Window events unavailable; falling back to the reconciliation poll.");
+    }
 
     public IReadOnlyList<AppGroup> Groups => _groups;
+
+    public bool EventDriven { get; }
 
     public event Action? Updated;
 
     public void Refresh()
     {
+        if (_disposed)
+            return;
+        // Bound the PID cache: Windows can reuse an exited PID for another
+        // executable during a long session.
+        _refreshes++;
+        if (_refreshes % 60 == 0)
+            _exeCache.Clear();
+
         IntPtr foreground = NativeMethods.GetForegroundWindow();
         var groups = new List<AppGroup>();
         var byPath = new Dictionary<string, AppGroup>(StringComparer.OrdinalIgnoreCase);
-        var visible = new List<(IntPtr Hwnd, string Title, string Class, string Exe)>();
+        var visible = new List<(IntPtr Hwnd, string Title, string Class, string Exe, bool Iconic)>();
 
         NativeMethods.EnumWindows((hwnd, _) =>
         {
@@ -75,19 +120,27 @@ public sealed class WindowTracker
                 if (string.IsNullOrWhiteSpace(title))
                     return true;
 
-                var rect = new NativeMethods.RECT();
-                if (!NativeMethods.GetWindowRect(hwnd, out rect) || rect.Right - rect.Left < 40 || rect.Bottom - rect.Top < 30)
-                    return true;
+                // A minimized window still belongs on the taskbar. Windows
+                // reports its rectangle at -32000 with the 160x28 iconic size,
+                // so the minimum-size filter must only run on restored windows.
+                bool iconic = NativeMethods.IsIconic(hwnd);
+                if (!iconic)
+                {
+                    var rect = new NativeMethods.RECT();
+                    if (!NativeMethods.GetWindowRect(hwnd, out rect) ||
+                        rect.Right - rect.Left < 40 || rect.Bottom - rect.Top < 30)
+                        return true;
+                }
 
                 string cls = ReadClass(hwnd);
                 if (IgnoredClasses.Contains(cls, StringComparer.Ordinal))
                     return true;
 
-                string? exe = GetProcessPath(pid);
+                string? exe = GetProcessPathCached(pid);
                 if (string.IsNullOrWhiteSpace(exe))
                     return true;
 
-                visible.Add((hwnd, title.Trim(), cls, exe));
+                visible.Add((hwnd, title.Trim(), cls, exe, iconic));
             }
             catch
             {
@@ -97,16 +150,40 @@ public sealed class WindowTracker
             return true;
         }, IntPtr.Zero);
 
-        foreach ((IntPtr hwnd, string title, string cls, string exe) in visible)
+        // Rebuilding the dock for an unchanged desktop is the most expensive
+        // work this poll can do: it re-renders every icon and tooltip. Compare
+        // a cheap signature first and stay idle when nothing changed.
+        var signature = new StringBuilder(visible.Count * 48 + 16);
+        signature.Append(foreground.ToInt64()).Append('|');
+        foreach (var window in visible)
         {
-            if (!byPath.TryGetValue(exe, out AppGroup? group))
+            signature.Append(window.Exe).Append('\u001f')
+                .Append(window.Hwnd.ToInt64()).Append('\u001f')
+                .Append(window.Iconic ? '1' : '0').Append('\u001f')
+                .Append(window.Title).Append('\n');
+        }
+
+        string current = signature.ToString();
+        if (string.Equals(current, _signature, StringComparison.Ordinal))
+            return;
+
+        _signature = current;
+
+        foreach (var window in visible)
+        {
+            if (!byPath.TryGetValue(window.Exe, out AppGroup? group))
             {
-                group = new AppGroup { ExePath = exe, Name = GetDisplayName(exe) };
-                byPath[exe] = group;
+                group = new AppGroup { ExePath = window.Exe, Name = GetDisplayName(window.Exe) };
+                byPath[window.Exe] = group;
                 groups.Add(group);
             }
 
-            group.Windows.Add(new TrackedWindow { Handle = hwnd, Title = title, ClassName = cls });
+            group.Windows.Add(new TrackedWindow
+            {
+                Handle = window.Hwnd,
+                Title = window.Title,
+                ClassName = window.Class
+            });
         }
 
         foreach (AppGroup group in groups)
@@ -125,6 +202,72 @@ public sealed class WindowTracker
         _groups.Clear();
         _groups.AddRange(groups);
         Updated?.Invoke();
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        foreach (IntPtr hook in _eventHooks)
+            NativeMethods.UnhookWinEvent(hook);
+        _eventHooks.Clear();
+        _eventCallback = null;
+    }
+
+    private bool InstallHook(uint eventMin, uint eventMax)
+    {
+        IntPtr hook = NativeMethods.SetWinEventHook(
+            eventMin, eventMax, IntPtr.Zero, _eventCallback!, 0, 0, NativeMethods.WINEVENT_OUTOFCONTEXT);
+        if (hook == IntPtr.Zero)
+            return false;
+
+        _eventHooks.Add(hook);
+        return true;
+    }
+
+    private void OnDesktopEvent(IntPtr hook, uint eventType, IntPtr hwnd, int idObject, int idChild,
+        uint thread, uint time)
+    {
+        // Only top-level window events affect the dock. This filters out the
+        // high-frequency child-control events that a broad hook would receive.
+        if (_disposed || hwnd == IntPtr.Zero || idObject != 0)
+            return;
+
+        switch (eventType)
+        {
+            case EventSystemForeground:
+            case EventSystemMinimizeStart:
+            case EventSystemMinimizeEnd:
+            case EventObjectCreate:
+            case EventObjectDestroy:
+            case EventObjectShow:
+            case EventObjectHide:
+            case EventObjectNameChange:
+                ScheduleRefresh();
+                break;
+        }
+    }
+
+    private void ScheduleRefresh()
+    {
+        if (_disposed || Interlocked.Exchange(ref _refreshScheduled, 1) != 0)
+            return;
+
+        Dispatcher? dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.HasShutdownStarted)
+        {
+            Interlocked.Exchange(ref _refreshScheduled, 0);
+            return;
+        }
+
+        dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            Interlocked.Exchange(ref _refreshScheduled, 0);
+            if (!_disposed)
+                Refresh();
+        }));
     }
 
     public void ActivateOrMinimize(AppGroup group)
@@ -173,6 +316,50 @@ public sealed class WindowTracker
     {
         const uint WM_CLOSE = 0x0010;
         NativeMethods.SendMessage(hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    /// <summary>
+    /// Ends the app like Task Manager does: every window gets WM_CLOSE first so
+    /// the program can save, then the remaining processes are terminated. The
+    /// kill runs on a worker thread because waiting on a hung window would block
+    /// the bar.
+    /// </summary>
+    public void EndTask(AppGroup group)
+    {
+        var processIds = new HashSet<uint>();
+        foreach (TrackedWindow window in group.Windows)
+        {
+            uint pid;
+            NativeMethods.GetWindowThreadProcessId(window.Handle, out pid);
+            if (pid != 0 && pid != _ownPid)
+                processIds.Add(pid);
+
+            PostClose(window.Handle);
+        }
+
+        if (processIds.Count == 0)
+            return;
+
+        _ = Task.Run(() =>
+        {
+            Thread.Sleep(1200);
+            foreach (uint pid in processIds)
+            {
+                if (pid == (uint)_ownPid)
+                    continue;
+
+                try
+                {
+                    using Process process = Process.GetProcessById((int)pid);
+                    if (!process.HasExited)
+                        process.Kill();
+                }
+                catch
+                {
+                    // The window closed cleanly or the process is protected.
+                }
+            }
+        });
     }
 
     public bool IsForegroundFullscreen(System.Drawing.Rectangle? targetBounds = null)
@@ -239,6 +426,27 @@ public sealed class WindowTracker
 
         _nameCache[exePath] = name;
         return name;
+    }
+
+    /// <summary>
+    /// Process paths do not change during a session: resolving them once per
+    /// PID removes an OpenProcess + QueryFullProcessImageName round trip for
+    /// every visible window on every poll.
+    /// </summary>
+    private string? GetProcessPathCached(uint pid)
+    {
+        if (_exeCache.TryGetValue(pid, out string? cached))
+            return cached;
+
+        string? path = GetProcessPath(pid);
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+
+        if (_exeCache.Count > 1024)
+            _exeCache.Clear();
+
+        _exeCache[pid] = path;
+        return path;
     }
 
     private static string? GetProcessPath(uint pid)

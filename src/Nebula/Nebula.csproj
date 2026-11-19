@@ -15,11 +15,19 @@
     <ApplicationIcon>Assets\nebula.ico</ApplicationIcon>
     <Product>Nebula Taskbar Studio</Product>
     <AssemblyTitle>Nebula</AssemblyTitle>
-    <Version>1.5.0</Version>
+    <Version>1.6.1</Version>
     <DebugType>embedded</DebugType>
     <SatelliteResourceLanguages>it;en</SatelliteResourceLanguages>
+    <!-- WPF owns DPI awareness through app.manifest; WFAC010 is a WinForms-only suggestion. -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
     <!-- Injected by the GitHub release workflow; empty in a normal local build. -->
     <UpdateRepository Condition="'$(UpdateRepository)' == ''"></UpdateRepository>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <WatchdogProject>..\Nebula.Watchdog\Nebula.Watchdog.csproj</WatchdogProject>
+    <WatchdogTargetFramework>net8.0-windows</WatchdogTargetFramework>
+    <WatchdogBuildDir>..\Nebula.Watchdog\bin\$(Configuration)\$(WatchdogTargetFramework)</WatchdogBuildDir>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,27 +39,57 @@
 
   <ItemGroup>
     <!-- Builds and restores the watchdog; it is not referenced as an assembly. -->
-    <ProjectReference Include="..\Nebula.Watchdog\Nebula.Watchdog.csproj"
+    <ProjectReference Include="$(WatchdogProject)"
                       ReferenceOutputAssembly="false"
                       Private="false" />
   </ItemGroup>
 
-  <!-- Keep the crash watchdog next to the app in build and publish output. -->
-  <Target Name="BuildTaskbarWatchdog" AfterTargets="Build">
+  <!--
+    Development builds get the watchdog next to the app too, so F5 and the
+    framework-dependent publish stay complete.
+  -->
+  <Target Name="BuildTaskbarWatchdog" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == ''">
     <ItemGroup>
-      <WatchdogFiles Include="..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.exe" />
-      <WatchdogFiles Include="..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.dll" />
-      <WatchdogFiles Include="..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.deps.json" />
-      <WatchdogFiles Include="..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.runtimeconfig.json" />
+      <WatchdogFiles Include="$(WatchdogBuildDir)\Nebula.Watchdog.exe" />
+      <WatchdogFiles Include="$(WatchdogBuildDir)\Nebula.Watchdog.dll" />
+      <WatchdogFiles Include="$(WatchdogBuildDir)\Nebula.Watchdog.deps.json" />
+      <WatchdogFiles Include="$(WatchdogBuildDir)\Nebula.Watchdog.runtimeconfig.json" />
     </ItemGroup>
 
     <Copy SourceFiles="@(WatchdogFiles)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true"
-          Condition="Exists('..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.exe')" />
+          Condition="Exists('$(WatchdogBuildDir)\Nebula.Watchdog.exe')" />
   </Target>
 
-  <Target Name="CopyTaskbarWatchdogToPublish" AfterTargets="Publish" DependsOnTargets="BuildTaskbarWatchdog">
-    <Copy SourceFiles="@(WatchdogFiles)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true"
-          Condition="Exists('..\Nebula.Watchdog\bin\$(Configuration)\net8.0-windows\Nebula.Watchdog.exe')" />
+  <!--
+    A published app must not depend on a separately installed .NET runtime for
+    its crash watchdog: if the watchdog cannot start, Nebula refuses to hide the
+    native taskbar. Publishing it with the same RID and self-contained mode makes
+    both executables use the runtime files that are already in the publish folder.
+  -->
+  <Target Name="PublishTaskbarWatchdog" AfterTargets="Publish">
+    <PropertyGroup>
+      <WatchdogStageDir>$(MSBuildProjectDirectory)\obj\watchdog-publish\$(Configuration)\</WatchdogStageDir>
+    </PropertyGroup>
+
+    <RemoveDir Directories="$(WatchdogStageDir)" />
+
+    <MSBuild Projects="$(WatchdogProject)"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishDir=$(WatchdogStageDir);PublishSingleFile=false;PublishReadyToRun=false;DebugType=embedded" />
+
+    <ItemGroup>
+      <WatchdogPublishedFiles Include="$(WatchdogStageDir)Nebula.Watchdog.exe" />
+      <WatchdogPublishedFiles Include="$(WatchdogStageDir)Nebula.Watchdog.dll" />
+      <WatchdogPublishedFiles Include="$(WatchdogStageDir)Nebula.Watchdog.deps.json" />
+      <WatchdogPublishedFiles Include="$(WatchdogStageDir)Nebula.Watchdog.runtimeconfig.json" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(WatchdogPublishedFiles)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+
+    <Error Condition="!Exists('$(PublishDir)Nebula.Watchdog.exe')"
+           Text="Nebula.Watchdog.exe non è stato copiato in $(PublishDir): la sostituzione della taskbar non sarebbe sicura." />
+    <Error Condition="!Exists('$(PublishDir)Nebula.Watchdog.runtimeconfig.json')"
+           Text="Nebula.Watchdog.runtimeconfig.json non è stato copiato in $(PublishDir)." />
   </Target>
 
 </Project>

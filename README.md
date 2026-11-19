@@ -6,6 +6,10 @@ L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminan
 
 **Novità 1.2:** pannello **Icone di sistema** con stili applicabili a collegamenti `.lnk`, tipi file e cartelle utente del profilo, icone personali dal dialog di Windows, ICO multi-size 16–256 px, backup esatto e recovery dopo chiusura forzata. Dettagli in [docs/icone-sistema.md](docs/icone-sistema.md).
 
+**Novità 1.6.1:** scrittura **sempre fluida** nel pannello Start e nella ricerca: i tasti vengono raggruppati in un'unica ricerca quando si smette di premere (non più una ricerca per lettera), le icone si caricano in background invece di bloccare l'interfaccia, i file si cercano su un thread separato e la lista viene ricostruita solo quando i risultati cambiano davvero, mantenendo la selezione. Misurato sul campo: l'interfaccia resta impegnata ~1–7 ms per ricerca, con i file elaborati fuori dal thread UI.
+
+**Novità 1.6:** taskbar **in basso affidabile** (la barra segue il rettangolo AppBar realmente concesso da Windows invece del bordo del monitor, quindi resta visibile e utilizzabile); **menu completo sull'icona** con *Apri come amministratore*, *Apri con…*, *Apri percorso file*, *Fissa* e *Disinstalla*, sia nella taskbar sia nel pannello Start; **Termina attività** sul tasto destro di un'icona della barra; **finiture semplici monocolore** (Vetro / Monocolore piatto / Monocolore con bordo); **barra su tutti gli schermi** con apertura delle app sullo schermo dell'icona premuta; pannelli che si aprono sullo **schermo attivo**; **Dynamic Island** che riconosce il tipo di attività (download, copia, salvataggio, compressione, estrazione, caricamento, riproduzione), distingue *in corso*, *in pausa* e *completato* e nasconde le sezioni vuote (il cassetto compare solo con file o durante un trascinamento).
+
 **Novità 1.3:** taskbar sostitutiva **a tutta larghezza** con app a sinistra, widget al centro e controlli a destra; prenotazione reale dello spazio tramite **AppBar di Windows** (le finestre massimizzate si fermano alla barra); taskbar nativa nascosta anche sui monitor secondari e richiusa all'istante se Explorer la mostra; **widget riordinabili dentro la barra** (orologio, CPU/RAM, batteria, rete, media, ricerca, schede e altro); Studio adattivo che non esce più dallo schermo; righe impostazioni senza sovrapposizioni. Dettagli in [docs/taskbar-windows.md](docs/taskbar-windows.md).
 
 **Novità 1.5:** nuovo preset **Liquid Glass** per widget, controlli rapidi e ricerca, nuovo stile **Liquid** per le schede e **riflesso liquido** sulla barra: una luce soffusa segue il puntatore lungo il vetro. Arrivano anche tre temi — **Prism**, **Obsidian** e **Cyber** — per un totale di 19. Dettagli in [docs/superfici.md](docs/superfici.md) e [docs/schede.md](docs/schede.md).
@@ -24,7 +28,7 @@ L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminan
 - **13 widget nella taskbar**, aggiungibili e riordinabili singolarmente: orologio, CPU, RAM, CPU+RAM, batteria, rete, media, ricerca, schede, pannello widget, controlli, impostazioni e separatore.
 - **Stati icona distinti**: indicatore separato per app aperta, ridotta a icona e chiusa, con forma, dimensione, opacità e stile icona (originale, riquadro, cerchio, monocromatico, neon).
 - **Icone personalizzate**: stile e forma globali per la dock, icona propria per ogni app fissata e cambio icona dei collegamenti `.lnk` del desktop tramite dialog di Windows.
-- **Icone di sistema per-utente**: pagina **Studio → Icone** per applicare stili (vetro, pieno, riquadro, cerchio, duotono, mono, contorno, neon) a collegamenti `.lnk` di Desktop/Start menu/pin, tipi file sotto `HKCU\Software\Classes` e cartelle utente tramite `desktop.ini`. Icone personali `.ico/.png/.jpg/.exe`, ICO multi-size 16–256 px, backup esatto e ripristino verificato. Nessuna patch a `System32`. Le cartelle fuori dalle sei cartelle shell del profilo restano personalizzabili singolarmente da Windows: non esiste un override globale per-utente. Dettagli in [docs/icone-sistema.md](docs/icone-sistema.md).
+- **Icone di sistema per-utente**: pagina **Studio → Icone** per applicare stili (vetro, pieno, riquadro, cerchio, duotono, mono, contorno, neon) a collegamenti `.lnk` di Desktop/Start menu/pin, tipi file sotto `HKCU\Software\Classes` e cartelle utente tramite `desktop.ini`. Icone personali `.ico/.png/.jpg/.exe`, ICO multi-size 16–256 px, backup esatto e ripristino verificato. Nessuna patch a `System32`. I tipi file la cui icona è il file stesso (`%1`, come `.exe` e `.ico`) e le sorgenti non risolvibili vengono saltati: non perdono mai la propria icona originale. Le cartelle fuori dalle sei cartelle shell del profilo restano personalizzabili singolarmente da Windows: non esiste un override globale per-utente. Dettagli in [docs/icone-sistema.md](docs/icone-sistema.md).
 - **Aggiornamenti da GitHub Releases** con popup **Aggiorna e riavvia**, download ZIP, verifica SHA-256 e riavvio: controllo all'avvio e ogni 15 minuti, attivo per impostazione predefinita; dettagli e flusso di pubblicazione in [docs/aggiornamenti.md](docs/aggiornamenti.md).
 - App fissate e app in esecuzione, con menu contestuale per fissare/rimuovere.
 - **Schede delle finestre**: raggruppa finestre esterne in una tab bar Nebula con titoli, icone, riordino, stacco e ripristino della geometria.
@@ -35,16 +39,29 @@ L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminan
 - Avvio con Windows realmente registrato in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 - Ripristino automatico della taskbar su uscita normale, crash e terminazione forzata, con hook immediato sulle barre mostrate da Explorer.
 
+## Installazione
+
+Scarica `Nebula-Setup-<versione>-x64.exe` dalla Release e avvialo. Il setup:
+
+- installa solo per l'utente corrente in `%LOCALAPPDATA%\Programs\Nebula`, senza richiedere privilegi di amministratore;
+- è **self-contained**: non serve installare .NET;
+- crea il collegamento nel menu Start e, opzionalmente, sul Desktop e in avvio automatico;
+- registra Nebula in **Impostazioni → App → App installate**, con disinstallazione completa.
+
+La disinstallazione chiude Nebula in modo pulito, ripristina la taskbar nativa, i gruppi di schede e le icone di sistema, quindi rimuove programma, collegamenti e voci di avvio. Le impostazioni in `%APPDATA%\Nebula` restano disponibili per una reinstallazione: elimina quella cartella per rimuovere tutto.
+
+Chi preferisce non installare può estrarre `Nebula-win-x64.zip` e avviare `Nebula.exe`: anche lo ZIP è self-contained e contiene `Nebula.Watchdog.exe` accanto all'app.
+
 ## Requisiti
 
 - Windows 10 1903 o successivo, oppure Windows 11.
-- .NET 8 Desktop Runtime (la build in `dist/` è framework-dependent).
-- Tenere `Nebula.exe` e `Nebula.Watchdog.exe` nella stessa cartella, insieme ai rispettivi `.dll`, `.deps.json` e `.runtimeconfig.json`.
+- Nessun runtime .NET da installare: setup e ZIP includono il runtime.
+- Tenere `Nebula.exe` e `Nebula.Watchdog.exe` nella stessa cartella, insieme ai rispettivi `.dll`, `.deps.json` e `.runtimeconfig.json` (vale anche per la versione portatile e per gli aggiornamenti).
 
 ## Avvio rapido
 
-1. Apri la cartella `dist/`.
-2. Avvia `Nebula.exe`.
+1. Avvia `Nebula-Setup-<versione>-x64.exe` e completa l'installazione.
+2. Avvia Nebula dal menu Start (o lascia attiva l'opzione di avvio alla fine del setup).
 3. Al primo avvio la taskbar nativa viene nascosta e compare la dock. Lo studio si apre dall'icona impostazioni della dock o dal menu della tray.
 4. Per uscire in modo pulito: tray → **Esci da Nebula**, oppure **Info → Esci da Nebula** nello studio.
 
@@ -63,6 +80,14 @@ Ripristino d'emergenza, anche se Nebula è bloccata:
 ```text
 scripts\ripristina-taskbar.cmd
 ```
+
+Ripristino delle icone di sistema dal backup, senza aprire lo Studio:
+
+```powershell
+.\dist\Nebula.exe --restore-icons
+```
+
+Se il backup non esiste più, il comando rimuove solo i riferimenti alle icone generate da Nebula, senza toccare le altre icone.
 
 Per aprire direttamente lo studio:
 
@@ -114,6 +139,8 @@ Dettagli, misure e limiti: [docs/superfici.md](docs/superfici.md).
 
 Nebula avvia `Nebula.Watchdog.exe` quando nasconde la taskbar nativa. Il watchdog attende la fine del processo Nebula e, se trova uno stato pendente della stessa sessione, ripristina la taskbar **visibile**.
 
+Una sola istanza possiede la taskbar nativa, l'AppBar e il watchdog. Un secondo avvio normale, o un `--selftest` lanciato mentre Nebula è già attiva, cede all'istanza esistente e termina con codice 0 senza creare una seconda proprietaria; l'area di lavoro e la taskbar restano quelle dell'istanza originale.
+
 - **Uscita normale:** Nebula mostra la taskbar nativa (senza auto-hide), chiude dock, tooltip e pannelli, quindi rimuove lo stato pendente. Il watchdog non deve fare nulla.
 - **Crash o `taskkill /F`:** il watchdog ripristina la taskbar visibile, senza rilanciare Nebula. La dock e i pannelli spariscono insieme al processo.
 - **Auto-hide originale:** sia dopo un crash sia dopo un'uscita normale la taskbar viene mostrata visibile; l'auto-hide precedente viene disattivato per non lasciare una barra difficile da recuperare.
@@ -156,6 +183,8 @@ Misure finali della build 1.1 pubblicata in `dist/`, un monitor 1920×1080, pres
 
 La dock sola resta **sotto il target di 116 MB**. Il pannello aperto no: il pavimento misurato è **128,6–130,0 MB**, quindi ancora sopra il bersaglio. Il costo è la seconda finestra WPF layered (`AllowsTransparency`) con il calendario, i grafici e la striscia dei widget; non è heap gestito incontrollato. Alla chiusura vengono fermati timer, grafico e calendario, svuotata anche la striscia widget e rilasciato l'endpoint COM; la memoria scende a **129,6 MB**, perché WPF/DWM trattengono cache native della finestra. Per scendere sotto il target con il pannello aperto servirebbe unire il pannello alla dock o rimuovere la superficie layered.
 
+**Misura idle finale del 18 novembre 2026 (1.5.1 installata con il flusso reale di aggiornamento e la soppressione dei pacchetti guasti, tema Aurora, accento #123456, altezza dock 78, spaziatura 7, widget orologio/batteria, isola disattivata, aggiornamenti automatici attivi, 1920×1080, 18 s di warm-up, un solo monitor):** 60,5 s con **0,2839% di un core** (0,1718 s di CPU), working set medio **182,74 MB** e memoria privata media **93,16 MB**. La misura precedente dello stesso profilo era **0,2574%**, **175,77 MB** e **88,96 MB**; la baseline dichiarata era **0,7791%**, **186,40 MB** e **97,74 MB**; la 1.5.0 precedente alle ottimizzazioni era **1,1167%**, **197,05 MB** e **108,93 MB**. La misura finale resta sotto il limite di **0,7791%** e **186,40 MB**. Sono stati rimossi il timer della dock a 150 ms (ora 500 ms), il controllo della taskbar a 500 ms (ora 1 s) e il polling delle finestre ogni 1,4 s (ora eventi WinEvent con riconciliazione ogni 5 s).
+
 La tab bar con tre finestre raggruppate era stata misurata in una build precedente a **147,6 MB** e **0,78%** di CPU, con apertura in **16–29 ms**; non è stata rimisurata in questa revisione, ma non è stata modificata.
 
 ## Monitor e DPI
@@ -166,20 +195,28 @@ Su questa macchina è presente **un solo monitor fisico** (`\\.\DISPLAY5`, 1920�
 
 ## Build e pubblicazione
 
-Dalla radice del progetto:
+Per creare publish self-contained e setup in un solo passaggio serve **Inno Setup 6** (il compilatore `ISCC.exe`):
+
+```powershell
+.\scripts\package.ps1
+```
+
+Lo script pubblica `src/Nebula/Nebula.csproj` con `-r win-x64 --self-contained true`, verifica che il watchdog sia self-contained e crea `artifacts\setup\Nebula-Setup-<versione>-x64.exe`. La build manuale equivalente:
 
 ```powershell
 .\.dotnet\dotnet.exe build .\src\Nebula\Nebula.csproj -c Release
-.\.dotnet\dotnet.exe publish .\src\Nebula\Nebula.csproj -c Release -o .\dist
+.\.dotnet\dotnet.exe publish .\src\Nebula\Nebula.csproj -c Release -r win-x64 --self-contained true -o .\dist
 ```
 
-Il target MSBuild copia automaticamente i file del watchdog in `bin/` e in `dist/`. Prima di ripubblicare, chiudi Nebula: altrimenti l'eseguibile in uso resta bloccato.
+Il target MSBuild compila il watchdog con lo stesso RID e la stessa modalità self-contained dell'app, poi lo copia nel publish. Se il watchdog non può partire, Nebula non nasconde la taskbar nativa: il controllo è anche nel report `selftest`.
 
-La build è framework-dependent: sul PC di destinazione serve il .NET 8 Desktop Runtime.
+Prima di ripubblicare, chiudi Nebula: altrimenti l'eseguibile in uso resta bloccato.
 
 ## Release e aggiornamenti con GitHub
 
-Il repository include `.github/workflows/release.yml`: al push di un tag `vMAJOR.MINOR.PATCH` GitHub Actions compila la build, crea `Nebula-win-x64.zip` e `update.json`, calcola lo SHA-256 e pubblica la Release. Le installazioni con aggiornamenti automatici ricevono il popup **Aggiorna e riavvia**.
+Il repository include `.github/workflows/release.yml`: al push di un tag `vMAJOR.MINOR.PATCH` GitHub Actions compila la build self-contained, crea `Nebula-Setup-<versione>-x64.exe`, `Nebula-win-x64.zip` e `update.json`, calcola gli SHA-256 e pubblica la Release. Il setup è il percorso consigliato; lo ZIP serve alla versione portatile e agli aggiornamenti automatici, che mostrano il popup **Aggiorna e riavvia**.
+
+L'aggiornamento in-app è **transazionale**. Prima dello swap l'app scrive `update-state.json`, `recover-update.ps1` e una voce `RunOnce`; la vecchia cartella resta in `.old` e la nuova build viene avviata. La nuova build scrive `update-confirmed.txt` solo dopo il Boot e il controllo di taskbar/AppBar; lo script attende fino a **60 secondi**. Se la conferma non arriva, ripristina `.old`, avvia la versione precedente e mostra il motivo. Se il PC si spegne o il processo viene ucciso, il `RunOnce` completa il rollback al logon successivo e rimuove stato e cartelle temporanee, senza loop. Un rollback scrive anche `failed-update.json` con versione e SHA-256: il controllo successivo non ripropone quello stesso pacchetto, mentre un correttivo con lo stesso numero di versione ma SHA diverso resta installabile; un aggiornamento confermato elimina il file.
 
 Per pubblicare una versione dopo aver committato il codice:
 
@@ -191,7 +228,24 @@ Lo script aggiorna `<Version>` in `src/Nebula/Nebula.csproj`, crea commit e tag,
 
 ## Verifiche di questa release
 
-> Le verifiche seguenti si riferiscono alla release 1.2. La revisione 1.3 è stata verificata con build Release e publish; la revisione 1.4 ha aggiunto il selftest AppBar, il ripristino d'emergenza, l'audit dei controlli e il layout misurato a 1280×720 e 1920×1080. La revisione 1.5 aggiunge i preset Liquid, il riflesso sulla barra e tre temi, verificati con build Release e selftest completo. Il giro UI completo su taskbar sostitutiva, AppBar e widget è descritto qui sotto ed è stato rieseguito sulla macchina di destinazione.
+> Le verifiche UI seguenti si riferiscono alla release 1.2. La revisione 1.3 è stata verificata con build Release e publish; la revisione 1.4 ha aggiunto il selftest AppBar, il ripristino d'emergenza, l'audit dei controlli e il layout misurato a 1280×720 e 1920×1080. La revisione 1.5 aggiunge i preset Liquid, il riflesso sulla barra e tre temi, verificati con build Release e selftest completo. Il 18 novembre 2026 è stato inoltre eseguito il flusso di aggiornamento in-app su un'installazione reale 1.5.0, con una build di prova 1.5.1 servita via loopback: i risultati sono nella sezione seguente. Il giro UI completo su taskbar sostitutiva, AppBar e widget è descritto qui sotto ed è stato rieseguito sulla macchina di destinazione.
+
+### Installazione, aggiornamento e disinstallazione (18 novembre 2026)
+
+- Setup self-contained `Nebula-Setup-1.5.0-x64.exe` da **47,4 MB**: installazione per-utente senza UAC in `%LOCALAPPDATA%\Programs\Nebula`, **265 file** installati, collegamento nel menu Start, voce in **App installate**, chiave `App Paths` e avvio automatico opzionale.
+- Verifica del watchdog nel publish: `Nebula.Watchdog.runtimeconfig.json` contiene `includedFrameworks`, quindi il ripristino della taskbar non dipende dal .NET installato sul PC.
+- Installazione sopra un'istanza in esecuzione: il setup ha chiesto a Nebula di uscire con `--exit` (circa 1 s), zero processi residui, installazione completata con exit code 0.
+- **Rollback reale di una 1.5.1 guasta:** installazione 1.5.0 aggiornata tramite manifest HTTP loopback e ZIP reale con `Nebula.exe` deliberatamente a **0 byte**. La nuova build non ha superato l'avvio, lo script ha ripristinato `.old` entro la finestra di verifica e ha riaperto la 1.5.0: **265 file, 0 mancanti**, `unins000.exe/.dat` presenti, nessuna cartella `.old/.new/.failed`, nessun `update-state.json` e nessuna voce `RunOnce`. Restano `theme=aurora`, `AccentHex=#123456`, `DockHeight=78`, `ItemSpacing=7`, widget `clock,battery`, `LaunchAtStartup=True` e voce `Run` con `--startup`; taskbar riservata a **990 px** e app viva.
+- **Pacchetto guasto soppresso, correzione con lo stesso numero:** dopo il rollback il file `failed-update.json` conteneva `Version=1.5.1` e lo SHA-256 del pacchetto guasto; al controllo automatico successivo, nella nuova istanza 1.5.0 avviata dal rollback, il log riportava `Update package suppressed after a failed start: 1.5.1` e **non compariva alcun popup**. Sostituito il manifest con una 1.5.1 valida ma con SHA diverso, il popup è ricomparso; l'aggiornamento ha scritto `Update startup health confirmed: 1.5.1`, è rimasto installato e ha rimosso `failed-update.json`. Impostazioni, autostart e voce `Run` sono rimasti intatti; taskbar riservata a **990 px**.
+- **Aggiornamento sano della stessa 1.5.1:** eseguito dalla 1.5.0 appena ripristinata; la nuova build ha scritto `Update startup health confirmed: 1.5.1` e `Update health confirmation written for 1.5.1`, è rimasta installata e viva oltre la finestra di 60 s, con **265 file**, `unins000.exe/.dat` preservati e nessun rollback falso. Lo stesso aggiornamento è stato ripetuto dopo il test di stato pendente.
+- **Stato pendente da esecuzione interrotta:** creato uno stato reale con 1.5.1 in posizione, `.old` 1.5.0 e nessuna conferma; la voce `RunOnce` che l'app registra è stata eseguita. Il recovery ha ripristinato la 1.5.0, rimosso stato, `.old` e `RunOnce`, riavviato l'app e lasciato la taskbar a **990 px**. Una seconda esecuzione del recovery senza stato è uscita 0 senza modificare nulla: nessun loop. Se il kill avviene **prima dello swap** (`.old` assente), il recovery lascia l'installazione viva e rimuove solo stato e `RunOnce`; provato con uno stato pendente senza `.old`, la 1.5.1 è rimasta intatta e non è comparso `.failed`.
+- **Self-test finale:** eseguito da processo pulito con `RESULT: PASS`; taskbar nativa visibile, area di lavoro tornata a **1032 px**, AppBar rilasciata.
+- **Seconda istanza:** con la 1.5.1 attiva, un secondo avvio normale e un secondo `--selftest` sono usciti con codice 0 lasciando **un solo processo Nebula**, lo stesso PID e la stessa area di lavoro riservata (990 px). `--selftest` usa lo stesso mutex dell'avvio normale e non tocca la taskbar se un'altra istanza la possiede.
+- **Fallimento SHA-256 errato:** Nebula ha mostrato **Hash del pacchetto non valido: aggiornamento annullato**, ha mantenuto la 1.5.0 avviabile e non ha lasciato ZIP o staging.
+- **Fallimento con file bloccato:** con `createdump.exe` aperto in modo esclusivo, lo swap non è partito. La 1.5.0 è rimasta intatta (265 file, 0 mancanti), la finestra non modale **Nebula · Aggiornamento non riuscito** ha spiegato l'errore e non sono rimasti `.new/.old`, staging, ZIP o marker. `Nebula.exe --exit` ha chiuso anche quella finestra con exit code 0 e zero processi.
+- **Disinstallazione 1.5.1:** exit code 0, zero processi residui, cartella, collegamenti Desktop/Start, voce `App Paths`, voce `Run` e voce **App installate** rimossi; taskbar visibile e `taskbar.pending` assente.
+- `--restore-icons`: exit 0 in 1 s senza finestre modali, condizione necessaria per il disinstallatore silenzioso.
+- Build Release e `-r win-x64 --self-contained true` con **0 avvisi e 0 errori**.
 
 Eseguite sulla build pubblicata in `dist/`:
 
@@ -203,9 +257,9 @@ Eseguite sulla build pubblicata in `dist/`:
 - Icone di sistema: applicato **Neon** e **Cerchio** a un vero `.lnk` del Desktop e verificato il cambio su Explorer; applicato **Neon** a `.zip` tramite il ProgID `CompressedFolder` e visto il cambio da icona ZIP a piastra; applicato **Pieno** a `.jpg`; caricato un `.png` personale dal dialog di Windows e applicato sia a un `.lnk` sia alla cartella **Desktop**, con anteprima Explorer visibile, poi ripristinato. L'ICO generato contiene **10 frame da 16 a 256 px** (256 in PNG).
 - Ripristino icone di sistema: `.lnk` tornato al valore precedente, `.zip` tornato senza chiave `CompressedFolder\DefaultIcon`, `.jpg` tornato senza chiave `jpegfile\DefaultIcon`, `desktop.ini` di Desktop/Download tornato byte per byte (incluso `LocalizedResourceName` e `IconResource` originali), backup rimosso e cartella `icons` vuota. Applicate e ripristinate **156 voci** con **Applica a tutte** (29 collegamenti, 121 superfici di registro, 6 cartelle utente).
 - Journal icone: ripristino interrotto e app riavviata; il journal incompleto ha riportato le voci originali. Uscita normale e `taskkill /F` senza processi residui né file `.tmp`.
-- Aggiornatore automatico: manifest locale valido letto come versione **9.9.9**, pacchetto reale scaricato, SHA-256 verificato, aggiornamento applicato e processo riavviato automaticamente; verificato il passaggio dal PID **29884** al PID **20436** e il log `Automatic update ready: 9.9.9`. Il controllo manuale e il rifiuto di un hash errato restano verificati.
+- Aggiornatore automatico self-healing: il flusso reale è stato rieseguito end-to-end il 18 novembre 2026 su un'installazione 1.5.0, con rollback di una build guasta, soppressione persistente di quel pacchetto, conferma di una build sana e recovery di uno stato pendente (vedi sopra). Il manifest e gli ZIP erano serviti su HTTP loopback; il canale GitHub pubblicato non è stato usato perché non è stata creata una Release.
 - Animazioni disattivate sulle superfici: nessuna transizione di ingresso residua; riattivate, le transizioni tornano.
-- Misure finali da processo pulito con warm-up e campioni a 20 s: dock **98,1–98,4 MB** e **1,17%**; pannello Widget **128,6–130,0 MB** e **0,47%**; chiusura **129,6 MB**; la dock è sotto il target di 116 MB, il pannello aperto no.
+- Misure storiche della build 1.1 da processo pulito con warm-up e campioni a 20 s: dock **98,1–98,4 MB** e **1,17%**; pannello Widget **128,6–130,0 MB** e **0,47%**; chiusura **129,6 MB**; la dock è sotto il target di 116 MB, il pannello aperto no. La misura idle corrente della 1.5.1 è nella sezione **Prestazioni**.
 - Ricerca della finestra **Senza titolo - Blocco note**: `Invio` l'ha portata in primo piano (foreground verificato). Ricerca di **Prompt dei comandi**: `Invio` ha avviato un nuovo processo `cmd` (conteggio 1 → 2).
 - Ricerca con **Cerca finestre aperte** disattivato: la finestra non compare; riattivato: ricompare. Larghezza ricerca modificata, verificata alla riapertura e dopo il riavvio.
 - Volume portato da 100% a 26% e ripristinato a 100%; mute reale controllato con probe COM esterno.
@@ -224,11 +278,13 @@ Eseguite sulla build pubblicata in `dist/`:
 - **Rete:** lettura dello stato e apertura delle impostazioni funzionano; attivare/disattivare un adattatore richiede privilegi amministrativi e non è implementato.
 - **Media precedente/successivo:** i tasti vengono inviati, ma la sessione di prova aveva una sola traccia e **Avanti** era disabilitato nel player. Il cambio traccia non è stato osservato; play/pausa sì.
 - **Ricerca:** copre menu Start e finestre visibili; non indicizza l'intero catalogo Store/UWP, file o contenuti.
-- **Aggiornatore:** il flusso automatico è stato provato end-to-end con un manifest e un pacchetto locali; l'installazione sostituisce la build in `dist/`, quindi va pubblicata solo una build valida. Il log di copia è in `%LOCALAPPDATA%\Nebula\updates\apply-update.log` se la copia fallisce.
+- **Aggiornatore:** il flusso automatico è stato provato end-to-end con un manifest e un pacchetto locali su loopback; il canale GitHub `latest` non è stato usato perché non è stata creata una Release. Fuori dal loopback il codice richiede HTTPS. Lo SHA-256 verifica l'integrità, non autentica l'autore, e lo ZIP non è firmato. Se la nuova build si avvia ma poi va in crash non c'è un rollback automatico: il rollback copre gli errori prima e durante lo swap. Il log è in `%LOCALAPPDATA%\Nebula\updates\apply-update.log` se la copia fallisce.
+- **Avvio e self-test:** una sola istanza possiede taskbar, AppBar e watchdog. Un secondo avvio normale cede e termina con codice 0; se `--selftest` trova un'istanza già proprietaria, cede nello stesso modo senza eseguire la diagnosi e senza toccare la taskbar. Da un avvio pulito il self-test esegue tutti i controlli e passa. La build di prova 1.5.1 non è stata pubblicata e la versione sorgente resta 1.5.0.
 - **Icone personalizzate:** il selettore per-app e la persistenza dello stile sono verificati; il dialog di scelta file `.ico/.png/.jpg` e la riscrittura di un collegamento `.lnk` reale non sono stati automatizzati in questa sessione.
 - Il secondo monitor fisico e i DPI misti non sono disponibili su questa macchina.
 - Il test fullscreen è una finestra WinForms borderless, non un gioco esclusivo o un'app UWP protetta.
 - Le finestre UWP protette o elevate non sono state osservate: il rifiuto è implementato nel selettore schede, ma il caso non è stato riprodotto.
+- **Firma del setup:** il pacchetto non è firmato con un certificato di code signing, quindi SmartScreen può mostrare un avviso al primo avvio.
 
 ## Documentazione
 

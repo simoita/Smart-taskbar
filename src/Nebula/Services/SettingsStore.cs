@@ -84,11 +84,14 @@ public sealed class SettingsStore : IDisposable
         s.DockHeight = Math.Clamp(s.DockHeight, 44, 92);
         s.ItemSpacing = Math.Clamp(s.ItemSpacing, -4, 12);
         s.EdgeMargin = Math.Clamp(s.EdgeMargin, 0, 48);
+        s.MonitorIndex = Math.Max(0, s.MonitorIndex);
         s.AnimationSpeed = Math.Clamp(s.AnimationSpeed, 0.5, 2.0);
         s.IslandScale = Math.Clamp(s.IslandScale, 0.8, 1.3);
         s.IslandTopMargin = Math.Clamp(s.IslandTopMargin, 0, 36);
         if (s.IslandStyle is not ("capsule" or "pill" or "minimal"))
             s.IslandStyle = "capsule";
+        if (s.IslandPlacement is not ("floating" or "taskbar"))
+            s.IslandPlacement = "floating";
         s.SearchCardWidth = Math.Clamp(s.SearchCardWidth, 560, 900);
         s.TabsBarHeight = Math.Clamp(s.TabsBarHeight, 34, 64);
         if (s.TabsStyle is not ("glass" or "minimal" or "neon" or "soft" or "mono" or "liquid"))

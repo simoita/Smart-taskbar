@@ -26,8 +26,17 @@ public sealed class NativeTaskbarController
     private NativeMethods.WinEventDelegate? _showCallback;
     private IntPtr _showHook;
 
+    private const int FullSweepTicks = 4;
+    private int _protectionTicks;
+
     public bool IsApplied { get; private set; }
     public int OriginalState { get; private set; }
+
+    /// <summary>
+    /// Raised when the watchdog can no longer guarantee a restore. The app must
+    /// stop the replacement instead of keeping the shell bar hidden.
+    /// </summary>
+    public event Action? ProtectionLost;
 
     public bool Apply(bool replace, int? watchdogTimeoutSeconds = null)
     {
@@ -98,27 +107,37 @@ public sealed class NativeTaskbarController
         if (!IsApplied || !_canHide)
             return;
 
-        if (_watchdog is { HasExited: false })
+        if (_watchdog is not { HasExited: false })
         {
-            InstallHideHook();
+            Log.Write("Taskbar watchdog is no longer running; restarting it.");
+            if (!WritePending() || !StartWatchdog())
+            {
+                Log.Write("Taskbar watchdog could not be restarted; restoring the native taskbar.");
+                Restore();
+                ProtectionLost?.Invoke();
+                return;
+            }
+        }
+
+        InstallHideHook();
+
+        // The WinEvent hook hides a bar as soon as Explorer shows it. The timer is
+        // only the safety net, so most ticks do one cheap lookup; the full sweep
+        // that covers secondary monitors runs every four seconds.
+        _protectionTicks++;
+        if (_protectionTicks % FullSweepTicks == 0)
+        {
             HideTray();
+            if (!TrayHidden())
+            {
+                Log.Write("Taskbar guard could not keep every shell bar hidden; restoring.");
+                Restore();
+                ProtectionLost?.Invoke();
+            }
             return;
         }
 
-        Log.Write("Taskbar watchdog is no longer running; restarting it.");
-        if (!WritePending() || !StartWatchdog())
-        {
-            Log.Write("Taskbar watchdog could not be restarted; restoring the native taskbar.");
-            Restore();
-            return;
-        }
-
-        HideTray();
-        if (!TrayHidden())
-        {
-            Log.Write("Taskbar guard could not keep every shell bar hidden; restoring.");
-            Restore();
-        }
+        HidePrimaryTrayIfVisible();
     }
 
     public void Restore()
@@ -367,6 +386,17 @@ public sealed class NativeTaskbarController
             if (_watchdog is null)
                 return false;
 
+            // A watchdog that dies immediately (missing runtime, unreadable
+            // binary) must abort the replacement instead of leaving the shell
+            // bar hidden without a way back.
+            if (_watchdog.WaitForExit(400))
+            {
+                Log.Write($"Taskbar watchdog exited during startup (code {_watchdog.ExitCode}).");
+                _watchdog.Dispose();
+                _watchdog = null;
+                return false;
+            }
+
             Log.Write("Taskbar watchdog started.");
             return true;
         }
@@ -413,6 +443,20 @@ public sealed class NativeTaskbarController
             cbSize = Marshal.SizeOf<NativeMethods.APPBARDATA>(),
             hWnd = NativeMethods.FindWindow("Shell_TrayWnd", null)
         };
+    }
+
+    private static void HidePrimaryTrayIfVisible()
+    {
+        try
+        {
+            IntPtr primary = NativeMethods.FindWindow("Shell_TrayWnd", null);
+            if (primary != IntPtr.Zero && NativeMethods.IsWindowVisible(primary))
+                NativeMethods.ShowWindow(primary, NativeMethods.SW_HIDE);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Taskbar hide failed: " + ex.Message);
+        }
     }
 
     private static void HideTray()

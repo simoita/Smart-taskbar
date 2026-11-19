@@ -120,24 +120,34 @@ internal static class IconExtractor
         {
             Guid iid = typeof(IShellItemImageFactory).GUID;
             SHCreateItemFromParsingName(path, IntPtr.Zero, iid, out object item);
-            if (item is not IShellItemImageFactory factory)
-                return null;
-
-            var size = new SIZE { cx = 64, cy = 64 };
-            int hr = factory.GetImage(size, SIIGBF.IconOnly | SIIGBF.BiggerSizeOk, out IntPtr hBitmap);
-            if (hr != 0 || hBitmap == IntPtr.Zero)
-                return null;
-
             try
             {
-                BitmapSource bitmap = Imaging.CreateBitmapSourceFromHBitmap(
-                    hBitmap, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-                bitmap.Freeze();
-                return bitmap;
+                if (item is not IShellItemImageFactory factory)
+                    return null;
+
+                var size = new SIZE { cx = 64, cy = 64 };
+                int hr = factory.GetImage(size, SIIGBF.IconOnly | SIIGBF.BiggerSizeOk, out IntPtr hBitmap);
+                if (hr != 0 || hBitmap == IntPtr.Zero)
+                    return null;
+
+                try
+                {
+                    BitmapSource bitmap = Imaging.CreateBitmapSourceFromHBitmap(
+                        hBitmap, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                    bitmap.Freeze();
+                    return bitmap;
+                }
+                finally
+                {
+                    DeleteObject(hBitmap);
+                }
             }
             finally
             {
-                DeleteObject(hBitmap);
+                // The shell item is a COM object: without an explicit release
+                // every extracted icon keeps it alive for the whole session.
+                if (Marshal.IsComObject(item))
+                    Marshal.ReleaseComObject(item);
             }
         }
         catch

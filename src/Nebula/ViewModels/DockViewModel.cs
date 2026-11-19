@@ -20,6 +20,11 @@ public sealed class DockViewModel : ObservableObject
     private readonly DispatcherTimer _monitorTimer;
     private readonly Dictionary<string, ImageSource> _iconCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _iconsLoading = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _iconMisses = new(StringComparer.OrdinalIgnoreCase);
+    // Running apps keep the order in which they first appeared. EnumWindows
+    // returns windows in Z-order, which used to reshuffle the dock whenever an
+    // app was opened or focused.
+    private readonly List<string> _runningOrder = new();
     private string _timeText = "";
     private string _dateText = "";
     private ImageBrush? _backdrop;
@@ -108,6 +113,50 @@ public sealed class DockViewModel : ObservableObject
 
     public Visibility BackdropVisibility => _backdrop is null ? Visibility.Collapsed : Visibility.Visible;
 
+    /// <summary>glass, flat or outline.</summary>
+    public string DockFinish =>
+        Settings.DockFinish is "flat" or "outline" ? Settings.DockFinish : "glass";
+
+    public bool IsSimpleFinish => DockFinish != "glass";
+
+    /// <summary>Flat monochrome fill used by the simple finishes.</summary>
+    public Brush FlatFillBrush
+    {
+        get
+        {
+            try
+            {
+                Color color = (Color)ColorConverter.ConvertFromString(Theme.Preset.GlassBottom);
+                color.A = 0xFF;
+                var brush = new SolidColorBrush(color);
+                brush.Freeze();
+                return brush;
+            }
+            catch
+            {
+                return Brushes.Black;
+            }
+        }
+    }
+
+    public Visibility FlatFillVisibility => IsSimpleFinish ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility ChromeGlowVisibility =>
+        !IsSimpleFinish && Settings.ShowGlow ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility ChromeGrainVisibility =>
+        !IsSimpleFinish && Settings.ShowGrain ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility ChromeShimmerVisibility =>
+        !IsSimpleFinish && Settings.ShowShimmer ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility ChromeSheenVisibility =>
+        !IsSimpleFinish && Settings.LiquidSheen ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Only the outline finish keeps a border; flat is a clean solid bar.</summary>
+    public Visibility ChromeBorderVisibility =>
+        DockFinish == "flat" ? Visibility.Collapsed : Visibility.Visible;
+
     public double ItemSize => Math.Max(28, Settings.DockHeight - 14);
     public double IconSize => Settings.IconSize;
     public Thickness ItemMargin => new(Settings.ItemSpacing / 2, 0, Settings.ItemSpacing / 2, 0);
@@ -141,6 +190,7 @@ public sealed class DockViewModel : ObservableObject
         TintBrush = Theme.TintBrush;
         StrokeBrush = Theme.DockStrokeBrush;
         GlowBrush = Theme.GlowBrush;
+        OnPropertyChanged(nameof(FlatFillBrush));
         OnPropertyChanged(nameof(ShellRadius));
         OnPropertyChanged(nameof(ItemRadius));
         OnPropertyChanged(nameof(ItemSize));
@@ -234,12 +284,36 @@ public sealed class DockViewModel : ObservableObject
 
         if (Settings.ShowRunning)
         {
-            foreach (AppGroup group in groups)
+            var byPath = groups.ToDictionary(group => group.ExePath, StringComparer.OrdinalIgnoreCase);
+            var ordered = new List<AppGroup>();
+
+            // Existing running entries keep their position even if Windows
+            // reports the windows in a different Z-order now.
+            foreach (string key in _runningOrder.ToList())
+            {
+                if (byPath.TryGetValue(key, out AppGroup? group) && !usedGroups.Contains(group))
+                {
+                    ordered.Add(group);
+                    usedGroups.Add(group);
+                }
+            }
+
+            // Brand-new apps append to the right instead of reordering the bar.
+            foreach (AppGroup group in groups.OrderBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase))
             {
                 if (usedGroups.Contains(group))
                     continue;
-                specs.Add(("run:" + group.ExePath, Items.FirstOrDefault(i => i.Key == "run:" + group.ExePath), null, group));
+
+                ordered.Add(group);
+                usedGroups.Add(group);
+                _runningOrder.Add(group.ExePath);
             }
+
+            var live = new HashSet<string>(groups.Select(group => group.ExePath), StringComparer.OrdinalIgnoreCase);
+            _runningOrder.RemoveAll(path => !live.Contains(path));
+
+            foreach (AppGroup group in ordered)
+                specs.Add(("run:" + group.ExePath, Items.FirstOrDefault(i => i.Key == "run:" + group.ExePath), null, group));
         }
 
         bool rebuild = specs.Count != Items.Count;
@@ -294,7 +368,9 @@ public sealed class DockViewModel : ObservableObject
         if (item.Icon is not null)
             return;
 
-        List<string> candidates = IconCandidates(item);
+        List<string> candidates = IconCandidates(item)
+            .Where(path => !_iconMisses.Contains(path))
+            .ToList();
         if (candidates.Count == 0)
             return;
 
@@ -308,6 +384,9 @@ public sealed class DockViewModel : ObservableObject
                 ImageSource? icon = await Task.Run(() => IconExtractor.FromPath(path)).ConfigureAwait(true);
                 if (icon is null)
                 {
+                    // The shell cannot resolve this icon: remember the miss so
+                    // the next tracker tick does not retry it forever.
+                    _iconMisses.Add(path);
                     Log.Write("Icon unavailable: " + path);
                     continue;
                 }
@@ -368,6 +447,7 @@ public sealed class DockViewModel : ObservableObject
     {
         _iconCache.Clear();
         _iconsLoading.Clear();
+        _iconMisses.Clear();
         foreach (DockItemViewModel item in Items)
             item.Icon = null;
         RefreshItems();
@@ -388,6 +468,19 @@ public sealed class DockViewModel : ObservableObject
         }
 
         return pins;
+    }
+
+    public void RefreshFinish()
+    {
+        OnPropertyChanged(nameof(DockFinish));
+        OnPropertyChanged(nameof(IsSimpleFinish));
+        OnPropertyChanged(nameof(FlatFillBrush));
+        OnPropertyChanged(nameof(FlatFillVisibility));
+        OnPropertyChanged(nameof(ChromeGlowVisibility));
+        OnPropertyChanged(nameof(ChromeGrainVisibility));
+        OnPropertyChanged(nameof(ChromeShimmerVisibility));
+        OnPropertyChanged(nameof(ChromeSheenVisibility));
+        OnPropertyChanged(nameof(ChromeBorderVisibility));
     }
 
     private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
@@ -445,6 +538,12 @@ public sealed class DockViewModel : ObservableObject
             case nameof(AppSettings.ShowGlow):
             case nameof(AppSettings.ShowGrain):
                 OnPropertyChanged(nameof(Settings));
+                RefreshFinish();
+                break;
+            case nameof(AppSettings.ShowShimmer):
+            case nameof(AppSettings.LiquidSheen):
+            case nameof(AppSettings.DockFinish):
+                RefreshFinish();
                 break;
         }
     }

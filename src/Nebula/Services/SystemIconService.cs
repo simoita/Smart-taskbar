@@ -168,6 +168,13 @@ public sealed class SystemIconService
                 if (string.IsNullOrWhiteSpace(source))
                     continue;
 
+                // %1 (exefile, icofile, ...) means "the icon of the file itself".
+                // Styling that class would give every executable on the PC the
+                // same plate instead of its own artwork, so those types are not
+                // offered at all. The same applies to an unresolvable source.
+                if (operation is null && (IsIndirectIconSource(source) || !SourceExists(source)))
+                    continue;
+
                 seen.Add("file:" + extension);
                 targets.Add(new SystemIconTarget
                 {
@@ -206,6 +213,9 @@ public sealed class SystemIconService
                         continue;
 
                     SystemIconOperation? operation = FindOperation(backup, "file:" + name);
+                    if (operation is null && (IsIndirectIconSource(value) || !SourceExists(value)))
+                        continue;
+
                     seen.Add("file:" + name);
                     targets.Add(new SystemIconTarget
                     {
@@ -244,7 +254,11 @@ public sealed class SystemIconService
                 DisplayName = "Cartella " + label,
                 Detail = "Cartella utente · desktop.ini",
                 FolderPath = path,
+                // Start from the folder's own icon when desktop.ini already
+                // names one (Desktop, Documenti, Download...), not from a
+                // generic shell folder, so the artwork stays recognisable.
                 SourceIcon = operation?.SourceIcon
+                              ?? ReadDesktopIniIconResource(path)
                               ?? Path.Combine(Environment.SystemDirectory, "shell32.dll") + ",3"
             });
         }
@@ -304,18 +318,44 @@ public sealed class SystemIconService
                 }
 
                 var batch = new List<SystemIconOperation>();
+                var sources = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                int skipped = 0;
                 foreach (SystemIconTarget target in targets)
                 {
                     SystemIconOperation? existing = backup.Operations.FirstOrDefault(
                         o => string.Equals(o.Id, target.Id, StringComparison.OrdinalIgnoreCase));
+
+                    string source = custom ?? existing?.SourceIcon ?? target.SourceIcon ?? "";
+                    if (!string.IsNullOrWhiteSpace(source) && IsIndirectIconSource(source))
+                    {
+                        // Per-file source: writing a generated image here would
+                        // replace the icon of every file of that type.
+                        skipped++;
+                        continue;
+                    }
+
+                    if (!SourceExists(source))
+                    {
+                        // Never substitute a generic fallback: it silently
+                        // destroys the original icon of the entry.
+                        skipped++;
+                        continue;
+                    }
+
                     if (existing is null)
                     {
                         existing = Capture(target);
+                        existing.SourceIcon = source;
                         backup.Operations.Add(existing);
                     }
 
                     batch.Add(existing);
+                    sources[existing.Id] = source;
                 }
+
+                if (batch.Count == 0)
+                    return new SystemIconApplyOutcome(false, 0,
+                        "Nessuna voce ha un'icona di partenza utilizzabile: le icone originali non sono state toccate.");
 
                 // The journal is durable before the first icon, shortcut or
                 // registry value is touched.
@@ -327,13 +367,7 @@ public sealed class SystemIconService
                 foreach (SystemIconOperation operation in batch)
                 {
                     progress?.Invoke("Genero " + operation.DisplayName + "…");
-                    string source = custom ?? operation.SourceIcon ?? "";
-                    if (!SourceExists(source))
-                    {
-                        source = Path.Combine(Environment.SystemDirectory, "shell32.dll") + ",3";
-                        operation.SourceIcon ??= source;
-                    }
-
+                    string source = sources[operation.Id];
                     string ico = GetOrBuildIcon(source, style, choice.Shape, accent);
                     string applied = ico + ",0";
                     ApplyOperation(operation, applied);
@@ -357,8 +391,11 @@ public sealed class SystemIconService
                 CleanupUnreferencedIcons(backup);
                 NotifyShell();
                 progress?.Invoke("Icone applicate: " + changed);
+                string skippedNote = skipped == 0
+                    ? ""
+                    : $" {skipped} voci saltate: usano l'icona del file stesso o una sorgente non disponibile.";
                 return new SystemIconApplyOutcome(true, changed,
-                    $"Applicate {changed} icone. Backup salvato in {BackupPath}.");
+                    $"Applicate {changed} icone.{skippedNote} Backup salvato in {BackupPath}.");
             }
             catch (Exception ex)
             {
@@ -399,6 +436,193 @@ public sealed class SystemIconService
         {
             return RestoreCore(targets, progress);
         }
+    }
+
+    /// <summary>
+    /// Removes references that point inside Nebula's generated icon folder.
+    /// This repairs a profile whose backup is missing (for example because it
+    /// was already consumed): only shortcuts, ProgID DefaultIcon values and
+    /// desktop.ini files that still name one of our own .ico files are changed,
+    /// so every other icon keeps whatever value it has.
+    /// </summary>
+    public SystemIconApplyOutcome RemoveGeneratedReferences()
+    {
+        lock (Gate)
+        {
+            int removed = 0;
+            var failures = new List<string>();
+            string prefix = IconsDirectory.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+            bool IsGenerated(string? location)
+            {
+                string? path = ExpandIconPath(location);
+                return !string.IsNullOrWhiteSpace(path) &&
+                       path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+            }
+
+            try
+            {
+                using RegistryKey? classes = Registry.CurrentUser.OpenSubKey(@"Software\Classes");
+                if (classes is not null)
+                {
+                    foreach (string name in classes.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using RegistryKey? iconKey = classes.OpenSubKey(name + @"\DefaultIcon", true);
+                            string? value = iconKey?.GetValue("", null, RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
+                            if (iconKey is null || !IsGenerated(value))
+                                continue;
+
+                            iconKey.DeleteValue("", false);
+                            removed++;
+                        }
+                        catch (Exception ex)
+                        {
+                            failures.Add("DefaultIcon " + name + ": " + ex.Message);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                failures.Add("Scansione HKCU: " + ex.Message);
+            }
+
+            foreach (string shortcut in EnumerateShortcutFiles())
+            {
+                try
+                {
+                    if (!IsGenerated(ShortcutResolver.ReadRawIconLocation(shortcut)))
+                        continue;
+
+                    ShortcutResolver.WriteRawIconLocation(shortcut, "");
+                    NotifyShortcut(shortcut);
+                    removed++;
+                }
+                catch (Exception ex)
+                {
+                    failures.Add(Path.GetFileName(shortcut) + ": " + ex.Message);
+                }
+            }
+
+            foreach (string folder in UserShellFolders())
+            {
+                try
+                {
+                    if (!IsGenerated(ReadDesktopIniIconResource(folder)))
+                        continue;
+
+                    RemoveFolderIconResource(folder);
+                    removed++;
+                }
+                catch (Exception ex)
+                {
+                    failures.Add(Path.GetFileName(folder) + ": " + ex.Message);
+                }
+            }
+
+            if (removed > 0)
+                NotifyShell();
+
+            return new SystemIconApplyOutcome(
+                failures.Count == 0,
+                removed,
+                removed == 0
+                    ? "Nessun riferimento alle icone generate da Nebula: le icone erano già originali."
+                    : $"Rimossi {removed} riferimenti alle icone generate da Nebula. Le icone di Windows tornano quelle originali.",
+                failures.Count == 0 ? null : failures);
+        }
+    }
+
+    private static IEnumerable<string> EnumerateShortcutFiles()
+    {
+        var roots = new List<(string Folder, bool Recursive)>
+        {
+            (Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), false),
+            (Environment.GetFolderPath(Environment.SpecialFolder.Programs), true),
+            (Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                @"Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"), false)
+        };
+
+        foreach ((string folder, bool recursive) in roots)
+        {
+            if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+                continue;
+
+            var options = new EnumerationOptions
+            {
+                RecurseSubdirectories = recursive,
+                IgnoreInaccessible = true,
+                AttributesToSkip = FileAttributes.System
+            };
+
+            List<string> files;
+            try
+            {
+                files = Directory.EnumerateFiles(folder, "*.lnk", options).ToList();
+            }
+            catch
+            {
+                continue;
+            }
+
+            foreach (string file in files)
+                yield return file;
+        }
+    }
+
+    private static IEnumerable<string> UserShellFolders()
+    {
+        string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string?[] folders =
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            Path.Combine(profile, "Downloads"),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
+            Environment.GetFolderPath(Environment.SpecialFolder.MyVideos)
+        };
+
+        foreach (string? folder in folders)
+        {
+            if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder))
+                yield return folder;
+        }
+    }
+
+    /// <summary>Removes only the IconResource line Nebula wrote, keeping the rest of desktop.ini.</summary>
+    private static void RemoveFolderIconResource(string folder)
+    {
+        string ini = Path.Combine(folder, "desktop.ini");
+        if (!File.Exists(ini))
+            return;
+
+        string text = File.ReadAllText(ini);
+        var result = new List<string>();
+        bool inShellClass = false;
+        foreach (string line in text.Replace("\r\n", "\n").Split('\n'))
+        {
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith("[", StringComparison.Ordinal))
+            {
+                inShellClass = trimmed.Equals("[.ShellClassInfo]", StringComparison.OrdinalIgnoreCase);
+                result.Add(line);
+                continue;
+            }
+
+            if (inShellClass && trimmed.StartsWith("IconResource=", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            result.Add(line);
+        }
+
+        FileAttributes attributes = File.GetAttributes(ini);
+        File.SetAttributes(ini, attributes & ~(FileAttributes.ReadOnly | FileAttributes.Hidden | FileAttributes.System));
+        File.WriteAllText(ini, string.Join("\r\n", result).TrimEnd() + "\r\n", new UnicodeEncoding(false, true));
+        File.SetAttributes(ini, attributes);
     }
 
     private SystemIconApplyOutcome RestoreCore(IReadOnlyList<SystemIconTarget>? targets, Action<string>? progress)
@@ -815,11 +1039,62 @@ public sealed class SystemIconService
     private static bool IsSupportedImage(string path) =>
         Path.GetExtension(path).ToLowerInvariant() is ".ico" or ".png" or ".jpg" or ".jpeg" or ".exe";
 
+    /// <summary>
+    /// True for DefaultIcon values that point at the file being displayed
+    /// (%1, %L, ...). Replacing those with one generated image would give every
+    /// .exe or .ico on the PC the same icon, so they are never personalised.
+    /// </summary>
+    private static string? ReadDesktopIniIconResource(string folder)
+    {
+        try
+        {
+            string ini = Path.Combine(folder, "desktop.ini");
+            if (!File.Exists(ini))
+                return null;
+
+            bool inShellClass = false;
+            foreach (string line in File.ReadAllLines(ini))
+            {
+                string trimmed = line.Trim();
+                if (trimmed.StartsWith("[", StringComparison.Ordinal))
+                {
+                    inShellClass = trimmed.Equals("[.ShellClassInfo]", StringComparison.OrdinalIgnoreCase);
+                    continue;
+                }
+
+                if (inShellClass && trimmed.StartsWith("IconResource=", StringComparison.OrdinalIgnoreCase))
+                {
+                    string value = trimmed["IconResource=".Length..].Trim();
+                    return string.IsNullOrWhiteSpace(value) ? null : value;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Write("desktop.ini icon read failed: " + ex.Message);
+        }
+
+        return null;
+    }
+
+    private static bool IsIndirectIconSource(string? source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+            return false;
+
+        string value = source.Trim().Trim('"');
+        int comma = value.LastIndexOf(',');
+        if (comma > 0)
+            value = value[..comma].Trim().Trim('"');
+
+        return value is "%1" or "%2" or "%L" or "%l" or "%*";
+    }
+
     private static bool SourceExists(string? source)
     {
         if (string.IsNullOrWhiteSpace(source))
             return false;
-        string path = ExpandIconPath(source);
+        string? path = ExpandIconPath(source);
         return !string.IsNullOrWhiteSpace(path) && File.Exists(path);
     }
 
@@ -1073,10 +1348,13 @@ public sealed class SystemIconService
         {
             if (!Directory.Exists(IconsDirectory))
                 return;
-            var keep = new HashSet<string>(
-                backup?.Operations.Select(o => o.GeneratedIconPath)
-                    .Where(p => !string.IsNullOrWhiteSpace(p))! ?? Enumerable.Empty<string>(),
-                StringComparer.OrdinalIgnoreCase);
+            IEnumerable<string> keepPaths = backup is null
+                ? Enumerable.Empty<string>()
+                : backup.Operations
+                    .Select(o => o.GeneratedIconPath)
+                    .OfType<string>()
+                    .Where(p => !string.IsNullOrWhiteSpace(p));
+            var keep = new HashSet<string>(keepPaths, StringComparer.OrdinalIgnoreCase);
             foreach (string file in Directory.EnumerateFiles(IconsDirectory, "*.ico"))
             {
                 if (!keep.Contains(file))

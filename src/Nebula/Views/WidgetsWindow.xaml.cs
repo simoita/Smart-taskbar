@@ -141,6 +141,9 @@ public partial class WidgetsWindow : Window
 
     private void OnSettingsChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(AppSettings.MonitorIndex) && IsLoaded)
+            Dispatcher.InvokeAsync(PositionPanel, DispatcherPriority.Background);
+
         if (e.PropertyName == nameof(AppSettings.PanelWidgets))
         {
             RefreshWidgetStrip();
@@ -173,7 +176,7 @@ public partial class WidgetsWindow : Window
         WidgetPage.Visibility = _panel == WidgetsPanel.Widget ? Visibility.Visible : Visibility.Collapsed;
         ControlsPage.Visibility = _panel == WidgetsPanel.Controls ? Visibility.Visible : Visibility.Collapsed;
         PanelTitle.Text = _panel == WidgetsPanel.Widget ? "Widget" : "Controlli rapidi";
-        Width = _panel == WidgetsPanel.Controls && _dock.Settings.QuickControlsCompact ? 370 : 410;
+        Width = _panel == WidgetsPanel.Controls && _dock.Settings.QuickControlsCompact ? 400 : 445;
 
         StyleTab(WidgetTab, _panel == WidgetsPanel.Widget);
         StyleTab(ControlsTab, _panel == WidgetsPanel.Controls);
@@ -236,7 +239,10 @@ public partial class WidgetsWindow : Window
 
     private void PositionPanel()
     {
-        Rect work = ScreenGeometry.WorkAreaDip(ScreenGeometry.Target(_dock.Settings.MonitorIndex));
+        // Widgets and quick controls open on the screen the user is working on,
+        // like the Start panel.
+        Rect work = ScreenGeometry.WorkAreaDip(ScreenGeometry.PanelTarget(
+            _dock.Settings.MonitorIndex, _dock.Settings.PanelsFollowDock));
         MaxWidth = Math.Max(320, work.Width - 24);
         MaxHeight = Math.Max(360, work.Height - 40);
         Width = Math.Min(Width, MaxWidth);

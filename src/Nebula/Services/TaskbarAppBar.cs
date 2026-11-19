@@ -24,6 +24,16 @@ public sealed class TaskbarAppBar : IDisposable
 
     public bool IsRegistered => _registered;
 
+    /// <summary>
+    /// The strip Windows actually granted, in physical pixels. The shell can move
+    /// the rectangle the app asked for (the bottom edge is shared with the
+    /// native bar), so the dock must position itself on this rectangle instead
+    /// of assuming it owns the monitor edge.
+    /// </summary>
+    public System.Drawing.Rectangle AppliedBounds { get; private set; }
+
+    public bool HasAppliedBounds => AppliedBounds.Width > 0 && AppliedBounds.Height > 0;
+
     public bool Apply(Window window, bool top, double heightDip, int monitorIndex)
     {
         IntPtr handle = new WindowInteropHelper(window).Handle;
@@ -52,19 +62,30 @@ public sealed class TaskbarAppBar : IDisposable
             Bottom = top ? bounds.Top + height : bounds.Bottom
         };
 
-        // Ask the shell first, then pin the full strip back to the requested
-        // edge: the bar spans the monitor exactly like the native taskbar.
+        // Ask the shell first, then keep the full monitor width and let it
+        // decide the vertical offset it can actually grant.
         var requested = data.rc;
         NativeMethods.SHAppBarMessage(NativeMethods.ABM_QUERYPOS, ref data);
         data.rc.Left = requested.Left;
         data.rc.Right = requested.Right;
-        data.rc.Top = requested.Top;
-        data.rc.Bottom = requested.Bottom;
 
         UIntPtr setResult = NativeMethods.SHAppBarMessage(NativeMethods.ABM_SETPOS, ref data);
         if (setResult == UIntPtr.Zero)
         {
             Log.Write("AppBar reservation failed: the shell refused ABM_SETPOS.");
+            return false;
+        }
+
+        // ABM_SETPOS reports the rectangle the shell reserved. On the bottom
+        // edge it can sit above the space the native bar still claims, which is
+        // exactly why a dock drawn from the monitor edge disappeared.
+        var granted = new System.Drawing.Rectangle(
+            data.rc.Left, data.rc.Top,
+            Math.Max(0, data.rc.Right - data.rc.Left),
+            Math.Max(0, data.rc.Bottom - data.rc.Top));
+        if (granted.Width < 1 || granted.Height < 1)
+        {
+            Log.Write("AppBar reservation returned an empty rectangle.");
             return false;
         }
 
@@ -104,12 +125,18 @@ public sealed class TaskbarAppBar : IDisposable
             return false;
         }
 
+        AppliedBounds = granted;
+
         bool announce = _monitorIndex != monitorIndex || _top != top || _heightPixels != height;
         _top = top;
         _heightPixels = height;
         _monitorIndex = monitorIndex;
         if (announce)
-            Log.Write($"AppBar reserved: edge={(top ? "top" : "bottom")}, {height}px on screen {monitorIndex + 1}.");
+        {
+            Log.Write($"AppBar reserved: edge={(top ? "top" : "bottom")}, {height}px on screen {monitorIndex + 1} " +
+                      $"(granted {granted.Top}..{granted.Bottom}).");
+        }
+
         return true;
     }
 
@@ -177,6 +204,7 @@ public sealed class TaskbarAppBar : IDisposable
         _source = null;
         _handle = IntPtr.Zero;
         _registered = false;
+        AppliedBounds = System.Drawing.Rectangle.Empty;
     }
 
     public void Dispose() => Remove();

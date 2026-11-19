@@ -163,16 +163,8 @@ public sealed class SettingsViewModel : ObservableObject
 
         AccentInput = settings.AccentHex;
 
-        System.Windows.Forms.Screen[] screens = System.Windows.Forms.Screen.AllScreens;
-        for (int i = 0; i < screens.Length; i++)
-        {
-            var bounds = screens[i].Bounds;
-            string suffix = screens[i].Primary ? " · principale" : "";
-            Screens.Add(new ScreenOptionViewModel(i, $"Schermo {i + 1} · {bounds.Width}×{bounds.Height}{suffix}"));
-        }
-
-        if (Settings.MonitorIndex < 0 || Settings.MonitorIndex >= Math.Max(1, screens.Length))
-            Settings.MonitorIndex = 0;
+        RefreshScreens();
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
 
         RebuildPins();
         RebuildShortcuts();
@@ -252,6 +244,19 @@ public sealed class SettingsViewModel : ObservableObject
         new("capsule", "Capsula"),
         new("pill", "Pillola"),
         new("minimal", "Minimal")
+    };
+
+    /// <summary>Bar finishes: glass, or a simple solid monochrome bar.</summary>
+    public IReadOnlyList<TabStyleOptionViewModel> DockFinishOptions { get; } = new List<TabStyleOptionViewModel>
+    {
+        new("glass", "Vetro (bagliori e riflessi)"),
+        new("flat", "Monocolore piatto"),
+        new("outline", "Monocolore con bordo")
+    };
+    public IReadOnlyList<TabStyleOptionViewModel> IslandPlacementOptions { get; } = new List<TabStyleOptionViewModel>
+    {
+        new("floating", "Flottante in alto"),
+        new("taskbar", "Dentro la taskbar")
     };
     public IReadOnlyList<ZoneOrderOptionViewModel> ZoneOrderOptions { get; } = new List<ZoneOrderOptionViewModel>
     {
@@ -471,6 +476,42 @@ public sealed class SettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Re-reads the monitors so a display attached while Studio is open appears
+    /// in the selector; the current choice stays when that screen still exists.
+    /// </summary>
+    public void RefreshScreens()
+    {
+        System.Windows.Forms.Screen[] screens = System.Windows.Forms.Screen.AllScreens;
+        while (Screens.Count > screens.Length)
+            Screens.RemoveAt(Screens.Count - 1);
+
+        for (int i = 0; i < screens.Length; i++)
+        {
+            var bounds = screens[i].Bounds;
+            string suffix = screens[i].Primary ? " · principale" : "";
+            var option = new ScreenOptionViewModel(i,
+                $"Schermo {i + 1} · {bounds.Width}×{bounds.Height}{suffix}");
+            if (i < Screens.Count)
+                Screens[i] = option;
+            else
+                Screens.Add(option);
+        }
+
+        int clamped = ScreenGeometry.Clamp(Settings.MonitorIndex);
+        if (clamped != Settings.MonitorIndex)
+            Settings.MonitorIndex = clamped;
+
+        OnPropertyChanged(nameof(ScreenCountText));
+    }
+
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e) =>
+        Application.Current?.Dispatcher.InvokeAsync(RefreshScreens);
+
+    public string ScreenCountText => Screens.Count == 1
+        ? "1 schermo rilevato"
+        : $"{Screens.Count} schermi rilevati";
+
     public string WidgetCountText =>
         $"{Settings.PanelWidgets.Count} widget attivi · scegli dal catalogo";
 
@@ -562,6 +603,7 @@ public sealed class SettingsViewModel : ObservableObject
         Settings.PropertyChanged -= OnSettingsChanged;
         _tabs.GroupsChanged -= OnTabsChanged;
         _updates.StateChanged -= OnUpdateStateChanged;
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
     }
 }
 

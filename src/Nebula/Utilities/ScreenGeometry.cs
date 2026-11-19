@@ -19,6 +19,90 @@ public static class ScreenGeometry
         return screens[Math.Clamp(index, 0, screens.Length - 1)];
     }
 
+    public static int Count => Forms.Screen.AllScreens.Length;
+
+    public static int PrimaryIndex
+    {
+        get
+        {
+            Forms.Screen[] screens = Forms.Screen.AllScreens;
+            for (int i = 0; i < screens.Length; i++)
+            {
+                if (screens[i].Primary)
+                    return i;
+            }
+
+            return 0;
+        }
+    }
+
+    /// <summary>Returns a monitor index that exists right now, preferring the requested one.</summary>
+    public static int Clamp(int index)
+    {
+        Forms.Screen[] screens = Forms.Screen.AllScreens;
+        if (screens.Length == 0)
+            return 0;
+        if (index >= 0 && index < screens.Length)
+            return index;
+        return PrimaryIndex;
+    }
+
+    /// <summary>Monitor under a physical screen point, or -1 when none matches.</summary>
+    public static int IndexForPoint(int x, int y)
+    {
+        Forms.Screen[] screens = Forms.Screen.AllScreens;
+        for (int i = 0; i < screens.Length; i++)
+        {
+            if (screens[i].Bounds.Contains(x, y))
+                return i;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Screen under the pointer right now: the screen the user is actually
+    /// working on. Returns -1 when the pointer is not over any display (for
+    /// example on a locked or disconnected desktop).
+    /// </summary>
+    public static int ActiveIndex()
+    {
+        try
+        {
+            System.Drawing.Point cursor = Forms.Cursor.Position;
+            return IndexForPoint(cursor.X, cursor.Y);
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    public static Forms.Screen ActiveScreen(int fallbackIndex = -1)
+    {
+        int index = ActiveIndex();
+        if (index >= 0)
+            return Target(index);
+
+        return fallbackIndex >= 0
+            ? Target(fallbackIndex)
+            : Forms.Screen.PrimaryScreen ?? Target(0);
+    }
+
+    /// <summary>
+    /// Screen that should host start, search, widgets and Studio windows. With
+    /// panels following the dock the active screen wins, so a click on a bar on
+    /// a second monitor opens the panel there instead of on the primary one.
+    /// </summary>
+    public static Forms.Screen PanelTarget(int monitorIndex, bool followDock)
+    {
+        if (!followDock)
+            return Forms.Screen.PrimaryScreen ?? Target(monitorIndex);
+
+        int active = ActiveIndex();
+        return active >= 0 ? Target(active) : Target(monitorIndex);
+    }
+
     public static double Scale(Forms.Screen screen)
     {
         try

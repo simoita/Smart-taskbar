@@ -35,8 +35,10 @@ taskbar nativa viene ripristinata.
 ```
 
 Il selftest usa una directory impostazioni temporanea, non modifica il profilo
-utente e ripristina la taskbar in `finally`. Produce un report e screenshot in
-`artifacts/selftest/<timestamp>/`. Controlla, con valori reali:
+utente e ripristina la taskbar in `finally`. Usa lo stesso mutex dell'avvio
+normale: se Nebula è già attiva, il nuovo processo cede con codice 0 senza
+toccare taskbar, AppBar o watchdog. Da un avvio pulito produce un report e
+screenshot in `artifacts/selftest/<timestamp>/` e controlla, con valori reali:
 
 - `Shell_TrayWnd`/`Shell_SecondaryTrayWnd` nascoste;
 - `ABM_NEW`/`ABM_SETPOS` e area di lavoro riservata (misurata con

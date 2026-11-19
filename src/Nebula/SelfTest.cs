@@ -270,7 +270,9 @@ public partial class App
                     $"show={saved.ShowIsland}; style={saved.IslandStyle}; scale={saved.IslandScale}; margin={saved.IslandTopMargin}");
             }
 
-            island = new IslandWindow(dockVm) { ShowActivated = false };
+            using var islandActivities = new ActivityCenter(settings);
+            using var islandShelf = new FileShelf(islandActivities);
+            island = new IslandWindow(dockVm, islandActivities, islandShelf) { ShowActivated = false };
             island.Show();
             await WaitUntilAsync(() => island.IsLoaded, 4000);
             await Task.Delay(350);
@@ -281,8 +283,8 @@ public partial class App
             bool islandStyleApplied = island.AppliedStyleKey == "pill" &&
                                       island.CapsuleBackground is not null &&
                                       island.CapsuleCornerRadius > 0 &&
-                                      Math.Abs(island.CompactWidth - 242) < 1.0 &&
-                                      Math.Abs(island.ExpandedWidth - 440) < 1.0;
+                                      Math.Abs(island.CompactWidth - 275) < 1.0 &&
+                                      Math.Abs(island.ExpandedWidth - 484) < 1.0;
             Capture(island.Capsule, Path.Combine(outputDir, "island-compact.png"));
 
             island.ExpandForTest();

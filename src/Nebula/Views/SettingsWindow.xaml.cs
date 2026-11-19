@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -18,13 +19,14 @@ public partial class SettingsWindow : Window
 {
     private static readonly Dictionary<string, (string Title, string Subtitle)> PageMeta = new()
     {
+        ["simple"] = ("Semplice", "Tre preset per dimensioni e movimento; i pixel esatti solo se ti servono."),
         ["style"] = ("Stile", "Scegli un'identità visiva, poi rifinisci vetro, forma e accento."),
         ["dock"] = ("Dock", "Posizione, auto-hide, integrazione con Windows e app fissate."),
-        ["icons"] = ("Icone di sistema", "Applica uno stile a collegamenti, tipi file e cartelle del profilo."),
-        ["tabs"] = ("Schede", "Raggruppa finestre, scegli lo stile e ripristina tutto in un clic."),
         ["widgets"] = ("Widget", "Orologio, data, batteria e monitor di sistema dentro la barra."),
-        ["search"] = ("Ricerca", "App installate, finestre aperte e azioni, con apertura da tastiera."),
+        ["search"] = ("Ricerca", "App, file, impostazioni, finestre e azioni, con apertura da tastiera."),
         ["controls"] = ("Controlli rapidi", "Volume, media, rete e luminosità in un solo pannello."),
+        ["tabs"] = ("Schede", "Raggruppa finestre, scegli lo stile e ripristina tutto in un clic."),
+        ["icons"] = ("Icone di sistema", "Applica uno stile a collegamenti, tipi file e cartelle del profilo."),
         ["motion"] = ("Animazioni", "Movimento, reattività e prestazioni della dock."),
         ["behavior"] = ("Comportamento", "Avvio, scorciatoie e dati locali."),
         ["info"] = ("Info", "Nebula Taskbar Studio, comandi rapidi e ripristino.")
@@ -32,6 +34,7 @@ public partial class SettingsWindow : Window
 
     private readonly SettingsViewModel _vm;
     private readonly SettingsStore _store;
+    private bool _syncingPresets;
 
     public SettingsWindow(SettingsViewModel viewModel, SettingsStore store)
     {
@@ -48,8 +51,9 @@ public partial class SettingsWindow : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         FitToScreen();
-        NavStyle.IsChecked = true;
-        ShowPage("style");
+        SyncSimplePresets();
+        NavSimple.IsChecked = true;
+        ShowPage("simple");
         NormalizeSettingRows();
 
         if (_vm.Settings.AnimationsEnabled)
@@ -76,12 +80,15 @@ public partial class SettingsWindow : Window
     /// <summary>Clamps the Studio to the current work area instead of overflowing small screens.</summary>
     private void FitToScreen()
     {
-        Rect work = SystemParameters.WorkArea;
+        Rect work = ScreenGeometry.BoundsDip(ScreenGeometry.PanelTarget(
+            _vm.Settings.MonitorIndex, _vm.Settings.PanelsFollowDock));
         Width = Math.Min(1160, Math.Max(700, work.Width - 32));
         Height = Math.Min(780, Math.Max(320, work.Height - 32));
         Left = work.Left + Math.Max(0, (work.Width - Width) / 2);
         Top = work.Top + Math.Max(0, (work.Height - Height) / 2);
     }
+
+    private void OnRefreshScreens(object sender, RoutedEventArgs e) => _vm.RefreshScreens();
 
     /// <summary>
     /// Older rows put the label and its switch in the same grid cell. On narrow
@@ -145,6 +152,7 @@ public partial class SettingsWindow : Window
     {
         UIElement? target = key switch
         {
+            "simple" => PageSimple,
             "style" => PageStyle,
             "dock" => PageDock,
             "icons" => PageSystemIcons,
@@ -161,7 +169,7 @@ public partial class SettingsWindow : Window
         if (target is null)
             return;
 
-        foreach (UIElement page in new UIElement[] { PageStyle, PageDock, PageSystemIcons, PageTabs, PageWidget, PageSearch, PageControls, PageAnimations, PageBehavior, PageInfo })
+        foreach (UIElement page in new UIElement[] { PageSimple, PageStyle, PageDock, PageSystemIcons, PageTabs, PageWidget, PageSearch, PageControls, PageAnimations, PageBehavior, PageInfo })
             page.Visibility = Visibility.Collapsed;
 
         target.Visibility = Visibility.Visible;
@@ -194,6 +202,152 @@ public partial class SettingsWindow : Window
 
         ContentScroll.ScrollToTop();
         Dispatcher.InvokeAsync(NormalizeSettingRows, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void SyncSimplePresets()
+    {
+        if (SizeCompact is null)
+            return;
+
+        _syncingPresets = true;
+        try
+        {
+            var settings = _vm.Settings;
+            SizeCompact.IsChecked = MatchesSize(54, 22, 16, 0, 8);
+            SizeBalanced.IsChecked = MatchesSize(62, 26, 22, 2, 12);
+            SizeLarge.IsChecked = MatchesSize(74, 32, 28, 4, 16);
+
+            MotionCalm.IsChecked = settings.AnimationsEnabled && settings.AnimationSpeed >= 1.4 && !settings.LaunchPulse;
+            MotionBalanced.IsChecked = settings.AnimationsEnabled && settings.AnimationSpeed > 0.85 && settings.AnimationSpeed < 1.4;
+            MotionExpressive.IsChecked = settings.AnimationsEnabled && settings.AnimationSpeed <= 0.85;
+
+            PreciseDockHeight.Text = settings.DockHeight.ToString("0.##", CultureInfo.CurrentCulture);
+            PreciseIconSize.Text = settings.IconSize.ToString("0.##", CultureInfo.CurrentCulture);
+            PreciseCornerRadius.Text = settings.CornerRadius.ToString("0.##", CultureInfo.CurrentCulture);
+            PreciseSpacing.Text = settings.ItemSpacing.ToString("0.##", CultureInfo.CurrentCulture);
+            PreciseEdgeMargin.Text = settings.EdgeMargin.ToString("0.##", CultureInfo.CurrentCulture);
+        }
+        finally
+        {
+            _syncingPresets = false;
+        }
+    }
+
+    private bool MatchesSize(double height, double icons, double radius, double spacing, double margin)
+    {
+        var settings = _vm.Settings;
+        return Math.Abs(settings.DockHeight - height) < 0.6 &&
+               Math.Abs(settings.IconSize - icons) < 0.6 &&
+               Math.Abs(settings.CornerRadius - radius) < 0.6 &&
+               Math.Abs(settings.ItemSpacing - spacing) < 0.6 &&
+               Math.Abs(settings.EdgeMargin - margin) < 0.6;
+    }
+
+    private void OnSizePresetChecked(object sender, RoutedEventArgs e)
+    {
+        if (_syncingPresets || !IsLoaded || sender is not RadioButton { Tag: string preset })
+            return;
+
+        var settings = _vm.Settings;
+        switch (preset)
+        {
+            case "compact":
+                settings.DockHeight = 54;
+                settings.IconSize = 22;
+                settings.CornerRadius = 16;
+                settings.ItemSpacing = 0;
+                settings.EdgeMargin = 8;
+                break;
+            case "large":
+                settings.DockHeight = 74;
+                settings.IconSize = 32;
+                settings.CornerRadius = 28;
+                settings.ItemSpacing = 4;
+                settings.EdgeMargin = 16;
+                break;
+            default:
+                settings.DockHeight = 62;
+                settings.IconSize = 26;
+                settings.CornerRadius = 22;
+                settings.ItemSpacing = 2;
+                settings.EdgeMargin = 12;
+                break;
+        }
+
+        _store.MarkDirty();
+        SyncSimplePresets();
+    }
+
+    private void OnMotionPresetChecked(object sender, RoutedEventArgs e)
+    {
+        if (_syncingPresets || !IsLoaded || sender is not RadioButton { Tag: string preset })
+            return;
+
+        var settings = _vm.Settings;
+        settings.AnimationsEnabled = true;
+        switch (preset)
+        {
+            case "calm":
+                settings.AnimationSpeed = 1.65;
+                settings.HoverMagnify = false;
+                settings.LaunchPulse = false;
+                break;
+            case "expressive":
+                settings.AnimationSpeed = 0.7;
+                settings.HoverMagnify = true;
+                settings.LaunchPulse = true;
+                break;
+            default:
+                settings.AnimationSpeed = 1.0;
+                settings.HoverMagnify = true;
+                settings.LaunchPulse = false;
+                break;
+        }
+
+        _store.MarkDirty();
+        SyncSimplePresets();
+    }
+
+    private void OnTogglePreciseSizes(object sender, RoutedEventArgs e)
+    {
+        bool show = PreciseSizesPanel.Visibility != Visibility.Visible;
+        PreciseSizesPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show)
+            SyncSimplePresets();
+    }
+
+    private void OnApplyPreciseSizes(object sender, RoutedEventArgs e)
+    {
+        var settings = _vm.Settings;
+        settings.DockHeight = ClampValue(PreciseDockHeight.Text, 44, 92, settings.DockHeight);
+        settings.IconSize = ClampValue(PreciseIconSize.Text, 16, 44, settings.IconSize);
+        settings.CornerRadius = ClampValue(PreciseCornerRadius.Text, 4, 36, settings.CornerRadius);
+        settings.ItemSpacing = ClampValue(PreciseSpacing.Text, -4, 12, settings.ItemSpacing);
+        settings.EdgeMargin = ClampValue(PreciseEdgeMargin.Text, 0, 48, settings.EdgeMargin);
+
+        _store.MarkDirty();
+        SyncSimplePresets();
+    }
+
+    private static double ClampValue(string text, double min, double max, double fallback)
+    {
+        bool parsed = double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out double value) ||
+                      double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        return parsed ? Math.Round(Math.Clamp(value, min, max), 1) : fallback;
+    }
+
+    private void OnSearchWidthPresetClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string preset })
+            return;
+
+        _vm.Settings.SearchCardWidth = preset switch
+        {
+            "narrow" => 620,
+            "wide" => 840,
+            _ => 720
+        };
+        _store.MarkDirty();
     }
 
     private void OnStyleCardClick(object sender, RoutedEventArgs e)

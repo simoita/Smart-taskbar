@@ -24,20 +24,24 @@ public partial class App : Application
     private TrayService? _tray;
     private HotkeyManager? _hotkeys;
     private DockWindow? _dockWindow;
+    private readonly Dictionary<int, DockWindow> _extraDocks = new();
     private IslandWindow? _island;
     private SettingsWindow? _settingsWindow;
     private LauncherWindow? _launcher;
+    private StartPanelWindow? _startPanel;
+    private WinKeyHook? _winKeyHook;
     private WidgetsWindow? _widgets;
     private TabGroupService? _tabs;
     private readonly Dictionary<TabGroup, TabBarWindow> _tabBars = new();
     private UpdateWindow? _updatePrompt;
+    private UpdateFailureWindow? _updateFailure;
     private QuickControls? _mediaControls;
     private readonly HashSet<string> _promptedUpdateVersions = new(StringComparer.OrdinalIgnoreCase);
     private DispatcherTimer? _trackerTimer;
     private DispatcherTimer? _taskbarGuard;
     private CancellationTokenSource? _pipeCts;
 
-    public static new App Instance => (App)Current;
+    public static App Instance => (App)Current;
 
     public AppSettings Settings => _store.Settings;
     public ThemeEngine Theme { get; private set; } = null!;
@@ -45,14 +49,34 @@ public partial class App : Application
     public WindowTracker Tracker { get; private set; } = null!;
     public SystemMonitor Monitor { get; private set; } = null!;
     public AppCatalog Catalog { get; private set; } = null!;
+    public FileSearchService Files { get; private set; } = null!;
+    public ActivityCenter Activities { get; private set; } = null!;
+    public FileShelf Shelf { get; private set; } = null!;
     public NativeTaskbarController Taskbar { get; private set; } = null!;
     public TabGroupService Tabs => _tabs!;
+
+    /// <summary>Every bar currently on screen: the selected monitor plus the others.</summary>
+    private IEnumerable<DockWindow> AllDocks
+    {
+        get
+        {
+            if (_dockWindow is not null)
+                yield return _dockWindow;
+
+            foreach (DockWindow dock in _extraDocks.Values)
+                yield return dock;
+        }
+    }
     public SystemIconService SystemIcons { get; private set; } = null!;
     public UpdateCoordinator Updates { get; private set; } = null!;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Give the process a shell identity before any window exists, so
+        // Windows groups it as a program instead of an anonymous tool window.
+        ShellIntegration.RegisterProcessId();
 
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         TaskScheduler.UnobservedTaskException += (_, args) => args.SetObserved();
@@ -67,9 +91,36 @@ public partial class App : Application
             return;
         }
 
+        if (e.Args.Any(a => string.Equals(a, "--restore-icons", StringComparison.OrdinalIgnoreCase)))
+        {
+            Shutdown(RestoreSystemIconsFromBackup() ? 0 : 1);
+            return;
+        }
+
         if (e.Args.Any(a => string.Equals(a, "--selftest", StringComparison.OrdinalIgnoreCase)))
         {
+            // A self-test owns the native taskbar and AppBar while it runs. It
+            // must use the same mutex as a normal launch; otherwise a second
+            // process can hide the shell under the running instance and then
+            // report a false taskbar restoration failure.
+            _mutex = new Mutex(true, MutexName, out bool isSelfTestOwner);
+            if (!isSelfTestOwner)
+            {
+                Log.Write("Self-test yielded: another Nebula instance owns the taskbar.");
+                Shutdown(0);
+                return;
+            }
+
             _ = RunSelfTestAsync();
+            return;
+        }
+
+        // Used by the installer and uninstaller: ask the running instance to
+        // perform its normal cleanup instead of terminating it with a file lock.
+        if (e.Args.Any(a => string.Equals(a, "--exit", StringComparison.OrdinalIgnoreCase)))
+        {
+            ShutdownRunningInstance();
+            Shutdown(0);
             return;
         }
 
@@ -77,7 +128,7 @@ public partial class App : Application
         if (!isNewInstance)
         {
             TrySendShow();
-            Shutdown();
+            Shutdown(0);
             return;
         }
 
@@ -97,6 +148,7 @@ public partial class App : Application
 
     private void Boot(string[] args)
     {
+        UpdateService.CleanupConfirmedUpdateAtStartup();
         NativeTaskbarController.RecoverFromUncleanExit();
         TabRecovery.RestorePending();
 
@@ -108,7 +160,12 @@ public partial class App : Application
         Tracker = new WindowTracker();
         Monitor = new SystemMonitor();
         Catalog = new AppCatalog();
+        Files = new FileSearchService();
+        Files.StartLoadIfNeeded();
+        Activities = new ActivityCenter(_store.Settings);
+        Shelf = new FileShelf(Activities);
         Taskbar = new NativeTaskbarController();
+        Taskbar.ProtectionLost += OnTaskbarProtectionLost;
         Dock = new DockViewModel(_store.Settings, Theme, Tracker, Monitor);
         _tabs = new TabGroupService(_store.Settings);
         _tabs.GroupsChanged += SyncTabBars;
@@ -127,11 +184,19 @@ public partial class App : Application
         Settings.PropertyChanged += OnSettingChanged;
 
         Catalog.LoadAsync();
+
+        // The installer can enable autostart before the app has ever run. On the
+        // first launch that choice must become the app setting instead of being
+        // overwritten by the default (false).
+        if (_store.IsFirstRun && StartupManager.IsRegistered())
+            Settings.LaunchAtStartup = true;
+
         StartupManager.Apply(Settings.LaunchAtStartup);
+        ShellIntegration.Register();
 
         _taskbarGuard = new DispatcherTimer(DispatcherPriority.Background)
         {
-            Interval = TimeSpan.FromMilliseconds(500)
+            Interval = TimeSpan.FromMilliseconds(1000)
         };
         _taskbarGuard.Tick += (_, _) => Taskbar.EnsureProtection();
 
@@ -142,6 +207,7 @@ public partial class App : Application
         if (Settings.ReplaceWindowsTaskbar && replacementApplied)
             _dockWindow.Show();
         _dockWindow.ApplySettings();
+        SyncDockWindows();
 
         if (Settings.ShowIsland)
             ShowIsland();
@@ -150,7 +216,7 @@ public partial class App : Application
         // not reserve the work area, put the native bar back instead of leaving
         // a bar that maximized windows can cover.
         if (Settings.ReplaceWindowsTaskbar && Settings.ReserveTaskbarSpace &&
-            replacementApplied && !_dockWindow.AppBarApplySucceeded)
+            replacementApplied && !AllDocks.All(dock => dock.AppBarApplySucceeded))
         {
             Log.Write("AppBar verification failed at startup; restoring the native taskbar.");
             Taskbar.Restore();
@@ -160,9 +226,12 @@ public partial class App : Application
 
         Tracker.Refresh();
 
+        // Window and foreground changes arrive through WinEvent hooks. The
+        // timer is only a reconciliation net for events the shell did not
+        // deliver; keep it slow when the hook is available.
         _trackerTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
-            Interval = TimeSpan.FromMilliseconds(1400)
+            Interval = TimeSpan.FromMilliseconds(Tracker.EventDriven ? 5000 : 1400)
         };
         _trackerTimer.Tick += (_, _) => Tracker.Refresh();
         _trackerTimer.Start();
@@ -171,8 +240,30 @@ public partial class App : Application
         _hotkeys.LauncherRequested += () => Dispatcher.InvokeAsync(ShowLauncher);
         _hotkeys.WidgetsRequested += () => Dispatcher.InvokeAsync(ShowWidgets);
 
+        _winKeyHook = new WinKeyHook();
+        _winKeyHook.WinPressed += () => Dispatcher.InvokeAsync(ToggleStartPanel);
+        ApplyWinKeyHook();
+
         _tray = new TrayService(ShowSettings, ShowLauncher, ShowWidgets,
             ToggleDockVisibility, RestoreWindowsTaskbar, ExitApp);
+
+        // A swap that could not complete restarts this (old) build. Tell the user
+        // why the version did not change instead of leaving the failure only in
+        // a log file.
+        string? updateFailure = UpdateService.ConsumeFailureReport();
+        if (updateFailure is not null)
+        {
+            Log.Write("Previous update failed: " + updateFailure);
+            Dispatcher.InvokeAsync(() =>
+            {
+                _updateFailure?.Close();
+                var failure = new UpdateFailureWindow(updateFailure, Updates.CurrentVersion);
+                failure.Closed += (_, _) => _updateFailure = null;
+                _updateFailure = failure;
+                failure.Show();
+                failure.Activate();
+            }, DispatcherPriority.ApplicationIdle);
+        }
 
         if (Settings.ReplaceWindowsTaskbar && !replacementApplied)
         {
@@ -186,6 +277,9 @@ public partial class App : Application
         Updates.Start();
 
         StartPipeServer();
+
+        if (UpdateService.ReadPendingUpdate() is { } pendingUpdate)
+            _ = ConfirmUpdateAfterStartupAsync(pendingUpdate);
 
         bool captureDemo = args.Any(a => string.Equals(a, "--capture-demo", StringComparison.OrdinalIgnoreCase));
         bool startSilent = args.Any(a => string.Equals(a, "--startup", StringComparison.OrdinalIgnoreCase)) || captureDemo;
@@ -331,6 +425,41 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Emergency recovery for the per-user icon surfaces: puts every shortcut,
+    /// file type and user folder back to the value stored before Nebula touched
+    /// it. Runs before the single-instance mutex, like --restore-taskbar.
+    /// </summary>
+    private static bool RestoreSystemIconsFromBackup()
+    {
+        try
+        {
+            var icons = new SystemIconService();
+            icons.Recover();
+            SystemIconApplyOutcome outcome = icons.Restore(null);
+            // Also sweep references left behind when the backup is missing.
+            SystemIconApplyOutcome sweep = icons.RemoveGeneratedReferences();
+
+            var lines = new List<string>();
+            if (outcome.Changed > 0 || outcome.Failures is { Count: > 0 })
+                lines.Add(outcome.Message);
+            if (sweep.Changed > 0 || sweep.Failures is { Count: > 0 })
+                lines.Add(sweep.Message);
+            if (lines.Count == 0)
+                lines.Add("Nessuna icona personalizzata da ripristinare: le icone di Windows sono già originali.");
+
+            // This command is also run by the uninstaller: it must never open a
+            // modal dialog that would block an unattended uninstall.
+            Log.Write("Icon restore command: " + string.Join(" | ", lines));
+            return outcome.Success && sweep.Success;
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Icon restore command failed: " + ex);
+            return false;
+        }
+    }
+
     private static async Task WaitForDemoWindowAsync(Process process, int timeoutMs)
     {
         int waited = 0;
@@ -418,14 +547,28 @@ public partial class App : Application
                 bool replacementApplied = Taskbar.Apply(Settings.ReplaceWindowsTaskbar);
                 UpdateTaskbarGuard();
                 if (Settings.ReplaceWindowsTaskbar && replacementApplied)
-                    _dockWindow?.ShowForTaskbarReplace();
+                {
+                    foreach (DockWindow dock in AllDocks)
+                        dock.ShowForTaskbarReplace();
+                    SyncDockWindows();
+                }
                 else
                 {
                     HideDockAndPanels();
+                    SyncDockWindows();
                     if (Settings.ReplaceWindowsTaskbar)
                         _tray?.ShowBalloon("Taskbar non sostituita",
                             "La taskbar di Windows è rimasta visibile. Controlla app.log per il motivo.");
                 }
+                break;
+
+            case nameof(AppSettings.TaskbarAllMonitors):
+                SyncDockWindows();
+                break;
+
+            case nameof(AppSettings.DockFinish):
+                foreach (DockWindow dock in AllDocks)
+                    dock.ApplySettings();
                 break;
 
             case nameof(AppSettings.LaunchAtStartup):
@@ -480,6 +623,10 @@ public partial class App : Application
                     CloseIsland();
                 break;
 
+            case nameof(AppSettings.WinKeyOpensStart):
+                ApplyWinKeyHook();
+                break;
+
             case nameof(AppSettings.ShowWidgets):
             case nameof(AppSettings.ShowQuickControls):
                 _widgets?.ApplyAvailability();
@@ -498,9 +645,15 @@ public partial class App : Application
             or nameof(AppSettings.EdgeMargin)
             or nameof(AppSettings.DockOnTop)
             or nameof(AppSettings.AutoHideDock)
-            or nameof(AppSettings.MonitorIndex))
+            or nameof(AppSettings.MonitorIndex)
+            or nameof(AppSettings.MonitorFollowCursor)
+            or nameof(AppSettings.PanelsFollowDock))
         {
-            _dockWindow?.ApplySettings();
+            foreach (DockWindow dock in AllDocks)
+                dock.ApplySettings();
+
+            if (e.PropertyName == nameof(AppSettings.MonitorIndex) && Settings.TaskbarAllMonitors)
+                SyncDockWindows();
         }
 
         _store.MarkDirty();
@@ -520,11 +673,18 @@ public partial class App : Application
         _tabs?.ApplyEnabled();
 
         if (Settings.ReplaceWindowsTaskbar)
-            _dockWindow?.ShowForTaskbarReplace();
+        {
+            foreach (DockWindow dock in AllDocks)
+                dock.ShowForTaskbarReplace();
+        }
         else
+        {
             HideDockAndPanels();
+        }
 
-        _dockWindow?.ApplySettings();
+        SyncDockWindows();
+        foreach (DockWindow dock in AllDocks)
+            dock.ApplySettings();
 
         if (Settings.ShowIsland)
             ShowIsland();
@@ -539,7 +699,7 @@ public partial class App : Application
 
         if (_island is null)
         {
-            _island = new IslandWindow(Dock);
+            _island = new IslandWindow(Dock, Activities, Shelf);
             _island.Closed += (_, _) => _island = null;
         }
 
@@ -556,6 +716,7 @@ public partial class App : Application
 
     public void ShowSettings()
     {
+        CloseStartPanel();
         _launcher?.PrepareForStudio();
 
         if (_settingsWindow is null)
@@ -586,6 +747,8 @@ public partial class App : Application
         if (!Settings.ShowSearch)
             return;
 
+        CloseStartPanel();
+
         if (_launcher is { IsVisible: true })
         {
             _launcher.Close();
@@ -593,7 +756,7 @@ public partial class App : Application
             return;
         }
 
-        _launcher = new LauncherWindow(Catalog, Tracker, Settings, Theme);
+        _launcher = new LauncherWindow(Catalog, Tracker, Settings, Theme, files: Files);
         _launcher.Closed += (_, _) =>
         {
             _launcher = null;
@@ -603,10 +766,146 @@ public partial class App : Application
         _launcher.Activate();
     }
 
+    public void ShowStartPanel()
+    {
+        if (_startPanel is { IsVisible: true })
+        {
+            _startPanel.Activate();
+            return;
+        }
+
+        _startPanel = new StartPanelWindow();
+        _startPanel.Closed += (_, _) => _startPanel = null;
+        _startPanel.RefreshContent();
+        _startPanel.Show();
+        _startPanel.Activate();
+    }
+
+    public void ToggleStartPanel()
+    {
+        if (_startPanel is { IsVisible: true })
+        {
+            _startPanel.Close();
+            _startPanel = null;
+            return;
+        }
+
+        ShowStartPanel();
+    }
+
+    public void CloseStartPanel()
+    {
+        _startPanel?.Close();
+        _startPanel = null;
+    }
+
+    public void RecordRecent(string? path)
+    {
+        AppLauncher.RecordRecent(Settings, path);
+        _store.MarkDirty();
+    }
+
+    /// <summary>
+    /// Opens an app on the screen the user is working on. Used by the Start
+    /// panel tiles and the search results.
+    /// </summary>
+    public void LaunchPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        if (AppLauncher.LaunchOnMonitor(path, ScreenGeometry.ActiveIndex(), out string? error))
+        {
+            RecordRecent(path);
+            return;
+        }
+
+        Log.Write($"Launch failed for '{path}': {error}");
+        MessageBox.Show(error ?? "Impossibile aprire l'app.", "Nebula",
+            MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
+
+    /// <summary>Pins or unpins a path from the taskbar and refreshes every bar.</summary>
+    public void TogglePin(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        if (Settings.PinnedPaths.Any(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)))
+            Settings.PinnedPaths.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+        else
+            Settings.PinnedPaths.Add(path);
+
+        _store.MarkDirty();
+        Dock.RefreshItems();
+    }
+
+    public void RunPowerAction(string action)
+    {
+        if (string.Equals(action, "exit", StringComparison.OrdinalIgnoreCase))
+        {
+            ExitApp();
+            return;
+        }
+
+        if (action is "restart" or "shutdown" or "signout")
+        {
+            string label = action switch
+            {
+                "restart" => "Riavviare il computer?",
+                "shutdown" => "Spegnere il computer?",
+                _ => "Uscire dalla sessione?"
+            };
+
+            if (MessageBox.Show(label + "\n\nLe app aperte verranno chiuse.", "Nebula",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+        }
+
+        try
+        {
+            switch (action)
+            {
+                case "lock":
+                    NativeMethods.LockWorkStation();
+                    break;
+                case "sleep":
+                    Process.Start(new ProcessStartInfo("rundll32.exe",
+                        "powrprof.dll,SetSuspendState 0,1,0") { UseShellExecute = false });
+                    break;
+                case "restart":
+                    Process.Start(new ProcessStartInfo("shutdown.exe", "/r /t 0") { UseShellExecute = false });
+                    break;
+                case "shutdown":
+                    Process.Start(new ProcessStartInfo("shutdown.exe", "/s /t 0") { UseShellExecute = false });
+                    break;
+                case "signout":
+                    Process.Start(new ProcessStartInfo("shutdown.exe", "/l") { UseShellExecute = false });
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Power action failed: " + ex.Message);
+            _tray?.ShowBalloon("Nebula", "Comando di sistema non riuscito: " + ex.Message);
+        }
+    }
+
+    private void ApplyWinKeyHook()
+    {
+        if (_winKeyHook is null)
+            return;
+
+        if (Settings.WinKeyOpensStart)
+            _winKeyHook.Install();
+        else
+            _winKeyHook.Uninstall();
+    }
+
     public void ShowLauncherForPick(Action<string> onPicked)
     {
         _launcher?.Close();
-        _launcher = new LauncherWindow(Catalog, null, Settings, Theme, true, onPicked);
+        _launcher = new LauncherWindow(Catalog, null, Settings, Theme, true, onPicked, Files);
         _launcher.Closed += (_, _) => _launcher = null;
         _launcher.Show();
         _launcher.Activate();
@@ -699,6 +998,19 @@ public partial class App : Application
                 break;
             case "lock":
                 Interop.NativeMethods.LockWorkStation();
+                break;
+            case "start":
+                ToggleStartPanel();
+                break;
+            case "tabs":
+                ShowGroupPicker();
+                break;
+            case "sleep":
+            case "restart":
+            case "shutdown":
+            case "signout":
+            case "exit":
+                RunPowerAction(actionId);
                 break;
         }
     }
@@ -826,8 +1138,53 @@ public partial class App : Application
     private void HideDockAndPanels()
     {
         _launcher?.Close();
+        _startPanel?.Close();
+        _startPanel = null;
         _widgets?.Close();
-        _dockWindow?.HideForTaskbarRestore();
+        foreach (DockWindow dock in AllDocks)
+            dock.HideForTaskbarRestore();
+    }
+
+    /// <summary>
+    /// Creates or removes the bars on the other monitors. The bar on the
+    /// selected screen always exists; the others follow the "all monitors"
+    /// setting and are closed as soon as a screen disappears.
+    /// </summary>
+    private void SyncDockWindows()
+    {
+        if (_dockWindow is null)
+            return;
+
+        var wanted = new HashSet<int>();
+        if (Settings.TaskbarAllMonitors && Settings.ReplaceWindowsTaskbar)
+        {
+            for (int index = 0; index < ScreenGeometry.Count; index++)
+                wanted.Add(index);
+        }
+
+        // The selected monitor is owned by the primary window, which also
+        // follows cursor/settings changes.
+        wanted.Remove(ScreenGeometry.Clamp(Settings.MonitorIndex));
+
+        foreach (KeyValuePair<int, DockWindow> pair in _extraDocks.ToList())
+        {
+            if (wanted.Contains(pair.Key))
+                continue;
+
+            _extraDocks.Remove(pair.Key);
+            pair.Value.Close();
+        }
+
+        foreach (int index in wanted)
+        {
+            if (_extraDocks.ContainsKey(index) || index >= ScreenGeometry.Count)
+                continue;
+
+            var dock = new DockWindow(Dock, _store, index);
+            _extraDocks[index] = dock;
+            dock.Show();
+            dock.ApplySettings();
+        }
     }
 
     private void ToggleDockVisibility()
@@ -842,6 +1199,42 @@ public partial class App : Application
         }
 
         _dockWindow.ToggleUserHidden();
+    }
+
+    /// <summary>
+    /// The new build only marks an update successful after Boot has completed
+    /// and the taskbar/AppBar contract is healthy. The updater waits for this
+    /// receipt; if it never arrives, the old directory is restored.
+    /// </summary>
+    private async Task ConfirmUpdateAfterStartupAsync(PendingUpdate pending)
+    {
+        if (!UpdateService.VersionMatches(pending.TargetVersion, Updates.CurrentVersion))
+            return;
+
+        await Task.Delay(TimeSpan.FromSeconds(4));
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            if (IsHealthyForUpdateConfirmation())
+            {
+                if (UpdateService.ConfirmHealthyUpdate(pending.Token))
+                    Log.Write("Update health confirmation written for " + pending.TargetVersion);
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+        }
+
+        Log.Write("Update health confirmation withheld: taskbar/AppBar did not reach a healthy state.");
+    }
+
+    private bool IsHealthyForUpdateConfirmation()
+    {
+        if (!Settings.ReplaceWindowsTaskbar)
+            return true;
+
+        return Taskbar.IsApplied &&
+               AllDocks.Any(dock => dock.IsVisible) &&
+               (!Settings.ReserveTaskbarSpace || AllDocks.All(dock => dock.AppBarApplySucceeded));
     }
 
     private void OnUpdateReady()
@@ -906,11 +1299,21 @@ public partial class App : Application
 
         _widgets?.Close();
         _launcher?.Close();
+        _startPanel?.Close();
+        _startPanel = null;
+        _winKeyHook?.Dispose();
+        _winKeyHook = null;
+        Activities?.Dispose();
+        Shelf?.Dispose();
         _settingsWindow?.Close();
         _updatePrompt?.Close();
+        _updateFailure?.Close();
+        _updateFailure = null;
         _island?.Close();
         _island = null;
-        _dockWindow?.Close();
+        foreach (DockWindow dock in AllDocks.ToList())
+            dock.Close();
+        _extraDocks.Clear();
 
         _hotkeys?.Dispose();
         _hotkeys = null;
@@ -931,9 +1334,15 @@ public partial class App : Application
         SystemIcons?.CleanupOnExit();
         Updates?.Dispose();
         _mediaControls?.Dispose();
+        _updateFailure?.Close();
+        _updateFailure = null;
         _island?.Close();
         _island = null;
         _tabs?.Dispose();
+        Tracker?.Dispose();
+        _winKeyHook?.Dispose();
+        _winKeyHook = null;
+        Activities?.Dispose();
         _store?.Dispose();
         _trackerTimer?.Stop();
 
@@ -960,6 +1369,21 @@ public partial class App : Application
         e.Handled = true;
     }
 
+    /// <summary>
+    /// The watchdog is the only guarantee that the native bar comes back after a
+    /// forced termination. If it dies and cannot be restarted, the replacement is
+    /// disabled instead of leaving the user with a hidden shell bar.
+    /// </summary>
+    private void OnTaskbarProtectionLost()
+    {
+        Log.Write("Taskbar protection lost; hiding the dock and disabling replacement.");
+        _dockWindow?.HideForTaskbarRestore();
+        Settings.ReplaceWindowsTaskbar = false;
+        _store.SaveNow();
+        _tray?.ShowBalloon("Taskbar ripristinata",
+            "Nebula non è riuscita a mantenere attivo il watchdog. La taskbar di Windows è di nuovo visibile.");
+    }
+
     private void StartPipeServer()
     {
         _pipeCts = new CancellationTokenSource();
@@ -979,7 +1403,9 @@ public partial class App : Application
                     string? message = await reader.ReadLineAsync().ConfigureAwait(false);
 
                     if (string.Equals(message, "show", StringComparison.OrdinalIgnoreCase))
-                        Dispatcher.InvokeAsync(ShowSettings);
+                        _ = Dispatcher.InvokeAsync(ShowSettings);
+                    else if (string.Equals(message, "exit", StringComparison.OrdinalIgnoreCase))
+                        _ = Dispatcher.InvokeAsync(ExitApp);
                 }
                 catch (OperationCanceledException)
                 {
@@ -1000,18 +1426,94 @@ public partial class App : Application
         }, token);
     }
 
-    private static void TrySendShow()
+    private static void TrySendShow() => TrySendPipe("show");
+
+    private static bool TrySendPipe(string message, int connectTimeoutMs = 800, int retryForMs = 0)
+    {
+        DateTime deadline = DateTime.UtcNow.AddMilliseconds(retryForMs);
+        while (true)
+        {
+            try
+            {
+                using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
+                client.Connect(connectTimeoutMs);
+                using var writer = new StreamWriter(client) { AutoFlush = true };
+                writer.WriteLine(message);
+                return true;
+            }
+            catch
+            {
+                // The primary may still be bringing its pipe server up. Keep
+                // trying for the caller-provided window instead of reporting
+                // success when the command was never delivered.
+                if (DateTime.UtcNow >= deadline)
+                    return false;
+                Thread.Sleep(200);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Asks the primary instance to shut down and waits until it releases the
+    /// single-instance mutex, so an installer can replace the files safely.
+    /// </summary>
+    private static void ShutdownRunningInstance()
     {
         try
         {
-            using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
-            client.Connect(800);
-            using var writer = new StreamWriter(client) { AutoFlush = true };
-            writer.WriteLine("show");
+            // Check the process first: the installer calls --exit even when the
+            // app is not running, and that must stay instant. If the app is
+            // starting, the pipe server can appear a moment after the process.
+            bool anotherInstance = Process.GetProcessesByName("Nebula")
+                .Any(process => process.Id != Environment.ProcessId);
+            if (!anotherInstance)
+                return;
+
+            if (!TrySendPipe("exit", 500, 6_000))
+            {
+                // A modal dialog (for example the update-failure report) keeps
+                // the WPF dispatcher from handling the pipe message. Close the
+                // main window once, then retry; this keeps uninstall silent.
+                foreach (Process other in Process.GetProcessesByName("Nebula"))
+                {
+                    if (other.Id == Environment.ProcessId)
+                        continue;
+                    try
+                    {
+                        other.CloseMainWindow();
+                    }
+                    catch
+                    {
+                        // The process may have exited between enumeration and close.
+                    }
+                }
+
+                if (!TrySendPipe("exit", 500, 3_000))
+                {
+                    Log.Write("Could not deliver the exit request to the running instance.");
+                    return;
+                }
+            }
+
+            using var probe = new Mutex(false, MutexName);
+            bool released;
+            try
+            {
+                released = probe.WaitOne(TimeSpan.FromSeconds(12));
+            }
+            catch (AbandonedMutexException)
+            {
+                released = true;
+            }
+
+            if (released)
+                probe.ReleaseMutex();
+            else
+                Log.Write("The running instance did not exit within 12 seconds.");
         }
-        catch
+        catch (Exception ex)
         {
-            // Another instance may still be starting; nothing else to do.
+            Log.Write("Waiting for the running instance failed: " + ex.Message);
         }
     }
 }

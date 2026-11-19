@@ -5,7 +5,7 @@
         Title="Nebula Taskbar Studio" Width="1160" Height="780"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
-        ShowInTaskbar="False" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        ShowInTaskbar="True" UseLayoutRounding="True" SnapsToDevicePixels="True"
         FontFamily="Segoe UI Variable Text, Segoe UI">
 
     <Grid Margin="12">
@@ -82,21 +82,24 @@
                                 <TextBlock Text="PERSONALIZZA" Style="{StaticResource T.Section}"
                                            Margin="12,0,0,10" />
 
+                                <RadioButton x:Name="NavSimple" Style="{StaticResource NavItem}" Uid="simple"
+                                             Tag="&#xE80F;" Content="Semplice" GroupName="NebulaNav"
+                                             Checked="OnNavChecked" />
                                 <RadioButton x:Name="NavStyle" Style="{StaticResource NavItem}" Uid="style"
                                              Tag="&#xE790;" Content="Stile" GroupName="NebulaNav"
                                              Checked="OnNavChecked" />
                                 <RadioButton Style="{StaticResource NavItem}" Uid="dock" Tag="&#xE700;"
                                              Content="Dock" GroupName="NebulaNav" Checked="OnNavChecked" />
-                                <RadioButton Style="{StaticResource NavItem}" Uid="icons" Tag="&#xE71B;"
-                                             Content="Icone" GroupName="NebulaNav" Checked="OnNavChecked" />
-                                <RadioButton Style="{StaticResource NavItem}" Uid="tabs" Tag="&#xE7C4;"
-                                             Content="Schede" GroupName="NebulaNav" Checked="OnNavChecked" />
                                 <RadioButton Style="{StaticResource NavItem}" Uid="widgets" Tag="&#xE787;"
                                              Content="Widget" GroupName="NebulaNav" Checked="OnNavChecked" />
                                 <RadioButton Style="{StaticResource NavItem}" Uid="search" Tag="&#xE721;"
                                              Content="Ricerca" GroupName="NebulaNav" Checked="OnNavChecked" />
                                 <RadioButton Style="{StaticResource NavItem}" Uid="controls" Tag="&#xE9E9;"
                                              Content="Controlli" GroupName="NebulaNav" Checked="OnNavChecked" />
+                                <RadioButton Style="{StaticResource NavItem}" Uid="tabs" Tag="&#xE7C4;"
+                                             Content="Schede" GroupName="NebulaNav" Checked="OnNavChecked" />
+                                <RadioButton Style="{StaticResource NavItem}" Uid="icons" Tag="&#xE71B;"
+                                             Content="Icone" GroupName="NebulaNav" Checked="OnNavChecked" />
                                 <RadioButton Style="{StaticResource NavItem}" Uid="motion" Tag="&#xE768;"
                                              Content="Animazioni" GroupName="NebulaNav" Checked="OnNavChecked" />
                                 <RadioButton Style="{StaticResource NavItem}" Uid="behavior" Tag="&#xE713;"
@@ -128,14 +131,253 @@
                         </Grid.RowDefinitions>
 
                         <StackPanel Margin="34,24,34,12">
-                            <TextBlock x:Name="PageTitle" Style="{StaticResource T.H1}" Text="Stile" />
+                            <TextBlock x:Name="PageTitle" Style="{StaticResource T.H1}" Text="Semplice" />
                             <TextBlock x:Name="PageSubtitle" Style="{StaticResource T.Caption}" Margin="0,4,0,0"
-                                       Text="Scegli un'identità visiva, poi rifinisci vetro, forma e accento." />
+                                       Text="Scegli un preset, poi al massimo rifinisci i pixel se ti serve." />
                         </StackPanel>
 
                         <ScrollViewer x:Name="ContentScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"
                                       Padding="34,0,24,26" HorizontalScrollBarVisibility="Disabled">
                             <Grid x:Name="PageHost" Margin="0,0,20,0">
+
+                                <!-- SEMPLICE -->
+                                <Grid x:Name="PageSimple" VerticalAlignment="Top">
+                                    <StackPanel>
+                                        <Border Style="{StaticResource Card}" Margin="0,0,0,20">
+                                            <StackPanel>
+                                                <TextBlock Text="DIMENSIONI" Style="{StaticResource T.Section}" />
+                                                <TextBlock Text="Scegli come deve apparire la barra. Tre preset coprono quasi tutto; i pixel esatti restano disponibili con un pulsante, non come primo passo."
+                                                           Style="{StaticResource T.Caption}" Margin="0,0,0,12" TextWrapping="Wrap" />
+
+                                                <UniformGrid Columns="3">
+                                                    <RadioButton x:Name="SizeCompact" Style="{StaticResource StyleCard}"
+                                                                 GroupName="NebulaSizePreset" Tag="compact"
+                                                                 Margin="0,0,9,0" Checked="OnSizePresetChecked">
+                                                        <StackPanel Margin="11">
+                                                            <Border Height="38" CornerRadius="10" Background="{DynamicResource C.Hover}">
+                                                                <Border Height="17" Width="92" CornerRadius="9"
+                                                                        Background="{DynamicResource C.AccentGrad}"
+                                                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            </Border>
+                                                            <TextBlock Text="Compatto" FontSize="12.5" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource C.Text}" Margin="0,9,0,0" />
+                                                            <TextBlock Text="Barra sottile, icone piccole" FontSize="9.5"
+                                                                       Foreground="{DynamicResource C.TextMuted}" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </RadioButton>
+                                                    <RadioButton x:Name="SizeBalanced" Style="{StaticResource StyleCard}"
+                                                                 GroupName="NebulaSizePreset" Tag="balanced"
+                                                                 Margin="0,0,9,0" Checked="OnSizePresetChecked">
+                                                        <StackPanel Margin="11">
+                                                            <Border Height="38" CornerRadius="10" Background="{DynamicResource C.Hover}">
+                                                                <Border Height="23" Width="104" CornerRadius="11"
+                                                                        Background="{DynamicResource C.AccentGrad}"
+                                                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            </Border>
+                                                            <TextBlock Text="Equilibrato" FontSize="12.5" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource C.Text}" Margin="0,9,0,0" />
+                                                            <TextBlock Text="Il punto di partenza consigliato" FontSize="9.5"
+                                                                       Foreground="{DynamicResource C.TextMuted}" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </RadioButton>
+                                                    <RadioButton x:Name="SizeLarge" Style="{StaticResource StyleCard}"
+                                                                 GroupName="NebulaSizePreset" Tag="large"
+                                                                 Checked="OnSizePresetChecked">
+                                                        <StackPanel Margin="11">
+                                                            <Border Height="38" CornerRadius="10" Background="{DynamicResource C.Hover}">
+                                                                <Border Height="29" Width="116" CornerRadius="13"
+                                                                        Background="{DynamicResource C.AccentGrad}"
+                                                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            </Border>
+                                                            <TextBlock Text="Ampio" FontSize="12.5" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource C.Text}" Margin="0,9,0,0" />
+                                                            <TextBlock Text="Icone grandi e più respiro" FontSize="9.5"
+                                                                       Foreground="{DynamicResource C.TextMuted}" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </RadioButton>
+                                                </UniformGrid>
+
+                                                <Button Content="Imposta i pixel precisi" Style="{StaticResource GhostButton}"
+                                                        Padding="12,7" HorizontalAlignment="Left" Margin="0,14,0,0"
+                                                        Click="OnTogglePreciseSizes" />
+
+                                                <Border x:Name="PreciseSizesPanel" Visibility="Collapsed"
+                                                        Background="{DynamicResource S.InnerBg}"
+                                                        BorderBrush="{DynamicResource S.InnerBorder}"
+                                                        BorderThickness="1" CornerRadius="11"
+                                                        Padding="12" Margin="0,10,0,0">
+                                                    <StackPanel>
+                                                        <TextBlock Text="Valori esatti in pixel" FontSize="11.5"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource C.Text}" />
+                                                        <WrapPanel Margin="0,8,0,0">
+                                                            <StackPanel Width="118" Margin="0,0,10,10">
+                                                                <TextBlock Text="Altezza barra" FontSize="9.5"
+                                                                           Foreground="{DynamicResource C.TextMuted}" />
+                                                                <TextBox x:Name="PreciseDockHeight" Style="{StaticResource Input}"
+                                                                         Height="30" Margin="0,4,0,0" />
+                                                            </StackPanel>
+                                                            <StackPanel Width="118" Margin="0,0,10,10">
+                                                                <TextBlock Text="Icone" FontSize="9.5"
+                                                                           Foreground="{DynamicResource C.TextMuted}" />
+                                                                <TextBox x:Name="PreciseIconSize" Style="{StaticResource Input}"
+                                                                         Height="30" Margin="0,4,0,0" />
+                                                            </StackPanel>
+                                                            <StackPanel Width="118" Margin="0,0,10,10">
+                                                                <TextBlock Text="Angoli" FontSize="9.5"
+                                                                           Foreground="{DynamicResource C.TextMuted}" />
+                                                                <TextBox x:Name="PreciseCornerRadius" Style="{StaticResource Input}"
+                                                                         Height="30" Margin="0,4,0,0" />
+                                                            </StackPanel>
+                                                            <StackPanel Width="118" Margin="0,0,10,10">
+                                                                <TextBlock Text="Spaziatura" FontSize="9.5"
+                                                                           Foreground="{DynamicResource C.TextMuted}" />
+                                                                <TextBox x:Name="PreciseSpacing" Style="{StaticResource Input}"
+                                                                         Height="30" Margin="0,4,0,0" />
+                                                            </StackPanel>
+                                                            <StackPanel Width="118" Margin="0,0,10,10">
+                                                                <TextBlock Text="Margine bordo" FontSize="9.5"
+                                                                           Foreground="{DynamicResource C.TextMuted}" />
+                                                                <TextBox x:Name="PreciseEdgeMargin" Style="{StaticResource Input}"
+                                                                         Height="30" Margin="0,4,0,0" />
+                                                            </StackPanel>
+                                                        </WrapPanel>
+                                                        <Button Content="Applica valori" Style="{StaticResource PrimaryButton}"
+                                                                Padding="12,7" HorizontalAlignment="Left"
+                                                                Click="OnApplyPreciseSizes" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}" Margin="0,0,0,20">
+                                            <StackPanel>
+                                                <TextBlock Text="MOVIMENTO" Style="{StaticResource T.Section}" />
+                                                <TextBlock Text="Tre modi per vivere le animazioni, senza dover regolare decine di valori."
+                                                           Style="{StaticResource T.Caption}" Margin="0,0,0,12" TextWrapping="Wrap" />
+                                                <UniformGrid Columns="3">
+                                                    <RadioButton x:Name="MotionCalm" Style="{StaticResource StyleCard}"
+                                                                 GroupName="NebulaMotionPreset" Tag="calm"
+                                                                 Margin="0,0,9,0" Checked="OnMotionPresetChecked">
+                                                        <StackPanel Margin="11">
+                                                            <TextBlock Text="&#xE823;" FontFamily="Segoe Fluent Icons" FontSize="20"
+                                                                       Foreground="{DynamicResource C.AccentText}" />
+                                                            <TextBlock Text="Discrete" FontSize="12.5" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource C.Text}" Margin="0,7,0,0" />
+                                                            <TextBlock Text="Rapide e sobrie" FontSize="9.5"
+                                                                       Foreground="{DynamicResource C.TextMuted}" />
+                                                        </StackPanel>
+                                                    </RadioButton>
+                                                    <RadioButton x:Name="MotionBalanced" Style="{StaticResource StyleCard}"
+                                                                 GroupName="NebulaMotionPreset" Tag="balanced"
+                                                                 Margin="0,0,9,0" Checked="OnMotionPresetChecked">
+                                                        <StackPanel Margin="11">
+                                                            <TextBlock Text="&#xE768;" FontFamily="Segoe Fluent Icons" FontSize="20"
+                                                                       Foreground="{DynamicResource C.AccentText}" />
+                                                            <TextBlock Text="Bilanciate" FontSize="12.5" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource C.Text}" Margin="0,7,0,0" />
+                                                            <TextBlock Text="Fluide, senza esagerare" FontSize="9.5"
+                                                                       Foreground="{DynamicResource C.TextMuted}" />
+                                                        </StackPanel>
+                                                    </RadioButton>
+                                                    <RadioButton x:Name="MotionExpressive" Style="{StaticResource StyleCard}"
+                                                                 GroupName="NebulaMotionPreset" Tag="expressive"
+                                                                 Checked="OnMotionPresetChecked">
+                                                        <StackPanel Margin="11">
+                                                            <TextBlock Text="&#xE945;" FontFamily="Segoe Fluent Icons" FontSize="20"
+                                                                       Foreground="{DynamicResource C.AccentText}" />
+                                                            <TextBlock Text="Espressive" FontSize="12.5" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource C.Text}" Margin="0,7,0,0" />
+                                                            <TextBlock Text="Molle e rimbalzi visibili" FontSize="9.5"
+                                                                       Foreground="{DynamicResource C.TextMuted}" />
+                                                        </StackPanel>
+                                                    </RadioButton>
+                                                </UniformGrid>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}" Margin="0,0,0,20">
+                                            <StackPanel>
+                                                <TextBlock Text="TASTO WINDOWS E SUPERFICI" Style="{StaticResource T.Section}" />
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="520">
+                                                            <TextBlock Text="Il tasto Windows apre Nebula" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Un tocco singolo apre il pannello Start di Nebula; Win+E, Win+D e le altre scorciatoie restano di Windows."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                                                  VerticalAlignment="Center"
+                                                                  AutomationProperties.Name="Tasto Windows apre Nebula"
+                                                                  IsChecked="{Binding Settings.WinKeyOpensStart, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="520">
+                                                            <TextBlock Text="Dynamic Island" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Capsula flottante con attività e controlli rapidi."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                                                  VerticalAlignment="Center"
+                                                                  IsChecked="{Binding Settings.ShowIsland, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="520">
+                                                            <TextBlock Text="Attività nell'isola" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Download, copie, archivi, spostamenti e riproduzione media."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                                                  VerticalAlignment="Center"
+                                                                  IsChecked="{Binding Settings.IslandShowActivities, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+                                                <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="520">
+                                                            <TextBlock Text="Cassetto file nell'isola" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Trascina un file sull'isola: resta lì finché non lo sposti o lo rimuovi."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                                                  VerticalAlignment="Center"
+                                                                  IsChecked="{Binding Settings.IslandShowShelf, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Text="RICERCA" Style="{StaticResource T.Section}" />
+                                                <TextBlock Text="Tre larghezze, niente slider da interpretare."
+                                                           Style="{StaticResource T.Caption}" Margin="0,0,0,10" />
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Button Content="Stretta" Style="{StaticResource GhostButton}"
+                                                            Tag="narrow" Padding="15,7" Margin="0,0,8,0"
+                                                            Click="OnSearchWidthPresetClick" />
+                                                    <Button Content="Normale" Style="{StaticResource GhostButton}"
+                                                            Tag="normal" Padding="15,7" Margin="0,0,8,0"
+                                                            Click="OnSearchWidthPresetClick" />
+                                                    <Button Content="Ampia" Style="{StaticResource GhostButton}"
+                                                            Tag="wide" Padding="15,7"
+                                                            Click="OnSearchWidthPresetClick" />
+                                                    <TextBlock VerticalAlignment="Center" Margin="14,0,0,0"
+                                                               FontSize="10.5" Foreground="{DynamicResource C.TextMuted}"
+                                                               Text="{Binding Settings.SearchCardWidth, StringFormat='{}{0:0} px'}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
 
                                 <!-- STILE -->
                                 <Grid x:Name="PageStyle" VerticalAlignment="Top">
@@ -414,81 +656,9 @@
                                                     </Grid>
                                                 </Border>
 
-                                                <Border Style="{StaticResource Row}">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <StackPanel>
-                                                            <TextBlock Text="Raggio degli angoli" FontSize="13"
-                                                                       Foreground="{DynamicResource C.Text}" />
-                                                            <Slider Style="{StaticResource SlimSlider}" Minimum="4"
-                                                                    Maximum="36" Value="{Binding Settings.CornerRadius, Mode=TwoWay}"
-                                                                    Margin="0,8,24,0" />
-                                                        </StackPanel>
-                                                        <TextBlock Grid.Column="1" VerticalAlignment="Center"
-                                                                   Text="{Binding Settings.CornerRadius, StringFormat='{}{0:0} px'}"
-                                                                   FontSize="12" Foreground="{DynamicResource C.TextMuted}" />
-                                                    </Grid>
-                                                </Border>
 
-                                                <Border Style="{StaticResource Row}">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <StackPanel>
-                                                            <TextBlock Text="Altezza della dock" FontSize="13"
-                                                                       Foreground="{DynamicResource C.Text}" />
-                                                            <Slider Style="{StaticResource SlimSlider}" Minimum="44"
-                                                                    Maximum="92" Value="{Binding Settings.DockHeight, Mode=TwoWay}"
-                                                                    Margin="0,8,24,0" />
-                                                        </StackPanel>
-                                                        <TextBlock Grid.Column="1" VerticalAlignment="Center"
-                                                                   Text="{Binding Settings.DockHeight, StringFormat='{}{0:0} px'}"
-                                                                   FontSize="12" Foreground="{DynamicResource C.TextMuted}" />
-                                                    </Grid>
-                                                </Border>
 
-                                                <Border Style="{StaticResource Row}">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <StackPanel>
-                                                            <TextBlock Text="Dimensione icone" FontSize="13"
-                                                                       Foreground="{DynamicResource C.Text}" />
-                                                            <Slider Style="{StaticResource SlimSlider}" Minimum="16"
-                                                                    Maximum="44" Value="{Binding Settings.IconSize, Mode=TwoWay}"
-                                                                    Margin="0,8,24,0" />
-                                                        </StackPanel>
-                                                        <TextBlock Grid.Column="1" VerticalAlignment="Center"
-                                                                   Text="{Binding Settings.IconSize, StringFormat='{}{0:0} px'}"
-                                                                   FontSize="12" Foreground="{DynamicResource C.TextMuted}" />
-                                                    </Grid>
-                                                </Border>
 
-                                                <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <StackPanel>
-                                                            <TextBlock Text="Spaziatura tra le icone" FontSize="13"
-                                                                       Foreground="{DynamicResource C.Text}" />
-                                                            <Slider Style="{StaticResource SlimSlider}" Minimum="-4"
-                                                                    Maximum="12" Value="{Binding Settings.ItemSpacing, Mode=TwoWay}"
-                                                                    Margin="0,8,24,0" />
-                                                        </StackPanel>
-                                                        <TextBlock Grid.Column="1" VerticalAlignment="Center"
-                                                                   Text="{Binding Settings.ItemSpacing, StringFormat='{}{0:0.0}'}"
-                                                                   FontSize="12" Foreground="{DynamicResource C.TextMuted}" />
-                                                    </Grid>
-                                                </Border>
                                             </StackPanel>
                                         </Border>
 
@@ -534,7 +704,7 @@
                                                                   IsChecked="{Binding Settings.ShowShimmer, Mode=TwoWay}" />
                                                     </Grid>
                                                 </Border>
-                                                <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
+                                                <Border Style="{StaticResource Row}">
                                                     <Grid>
                                                         <StackPanel MaxWidth="500" HorizontalAlignment="Left">
                                                             <TextBlock Text="Riflesso liquido" FontSize="13"
@@ -546,6 +716,28 @@
                                                                   HorizontalAlignment="Right" VerticalAlignment="Center"
                                                                   AutomationProperties.Name="Riflesso liquido"
                                                                   IsChecked="{Binding Settings.LiquidSheen, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+                                                <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Finitura della barra" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Vetro con bagliori, oppure un monocolore piatto senza ombre, grana e riflessi."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <ComboBox Width="238" Height="32" HorizontalAlignment="Right"
+                                                                  VerticalAlignment="Center"
+                                                                  ItemsSource="{Binding DockFinishOptions}"
+                                                                  SelectedValuePath="Id"
+                                                                  SelectedValue="{Binding Settings.DockFinish, Mode=TwoWay}"
+                                                                  AutomationProperties.Name="Finitura della barra">
+                                                            <ComboBox.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <TextBlock Text="{Binding Name}" />
+                                                                </DataTemplate>
+                                                            </ComboBox.ItemTemplate>
+                                                        </ComboBox>
                                                     </Grid>
                                                 </Border>
                                             </StackPanel>
@@ -608,12 +800,11 @@
                                                 </Border>
                                                 <Border Style="{StaticResource Row}">
                                                     <Grid>
-                                                        <StackPanel>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
                                                             <TextBlock Text="Distanza dal bordo" FontSize="13"
                                                                        Foreground="{DynamicResource C.Text}" />
-                                                            <Slider Style="{StaticResource SlimSlider}" Minimum="0"
-                                                                    Maximum="48" Value="{Binding Settings.EdgeMargin, Mode=TwoWay}"
-                                                                    Margin="0,8,120,0" />
+                                                            <TextBlock Text="Si regola con il preset in Semplice o con i pixel precisi."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
                                                         </StackPanel>
                                                         <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
                                                                    Text="{Binding Settings.EdgeMargin, StringFormat='{}{0:0} px'}"
@@ -638,8 +829,81 @@
 
                                         <Border Style="{StaticResource Card}" Margin="0,0,0,20">
                                             <StackPanel>
+                                                <TextBlock Text="MULTISCHERMO" Style="{StaticResource T.Section}" />
+                                                <TextBlock Text="La barra, l'isola e i pannelli rispettano DPI e area di lavoro del monitor scelto. Se scolleghi un display, Nebula riporta la barra su uno schermo disponibile senza perdere le impostazioni."
+                                                           Style="{StaticResource T.Caption}" Margin="0,0,0,10" TextWrapping="Wrap" />
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Dock sullo schermo attivo" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="La barra passa allo schermo dove si trova il puntatore, con un breve ritardo per non spostarla mentre attraversi il bordo."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}"
+                                                                  HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                  AutomationProperties.Name="Dock sullo schermo attivo"
+                                                                  IsChecked="{Binding Settings.MonitorFollowCursor, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Taskbar su tutti gli schermi" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Una barra per ogni monitor, sempre visibile. Le app aperte da un'icona compaiono sullo schermo di quella barra."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}"
+                                                                  HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                  AutomationProperties.Name="Taskbar su tutti gli schermi"
+                                                                  IsChecked="{Binding Settings.TaskbarAllMonitors, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Pannelli sullo schermo della dock" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Start, ricerca, widget e Studio si aprono sul monitor della barra invece che sempre sul principale."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}"
+                                                                  HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                  AutomationProperties.Name="Pannelli sullo schermo della dock"
+                                                                  IsChecked="{Binding Settings.PanelsFollowDock, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+                                                <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Schermi rilevati" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Aggiorna l'elenco dopo aver collegato o disconnesso un monitor."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                                    HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding ScreenCountText}" FontSize="12"
+                                                                       Foreground="{DynamicResource C.TextMuted}"
+                                                                       VerticalAlignment="Center" Margin="0,0,12,0" />
+                                                            <Button Content="Aggiorna elenco" Style="{StaticResource GhostButton}"
+                                                                    Click="OnRefreshScreens"
+                                                                    AutomationProperties.Name="Aggiorna elenco schermi" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}" Margin="0,0,0,20">
+                                            <StackPanel>
                                                 <TextBlock Text="DYNAMIC ISLAND" Style="{StaticResource T.Section}" />
-                                                <TextBlock Text="Una capsula flottante in alto al centro: compatta a riposo, si espande con una molla fluida su hover o clic e mostra orologio, CPU/RAM, batteria, media e volume. Fuori dalla capsula i clic passano al desktop."
+                                                <TextBlock Text="Flottante in alto al centro oppure dentro la barra di Nebula: compatta a riposo, si espande con una molla fluida su hover o clic e mostra orologio, CPU/RAM, batteria, media, volume e spegnimento. Fuori dalla capsula i clic passano al desktop."
                                                            Style="{StaticResource T.Caption}" Margin="0,0,0,10" TextWrapping="Wrap" />
 
                                                 <Border Style="{StaticResource Row}">
@@ -667,6 +931,28 @@
                                                                   SelectedValuePath="Id"
                                                                   SelectedValue="{Binding Settings.IslandStyle, Mode=TwoWay}"
                                                                   AutomationProperties.Name="Stile Dynamic Island">
+                                                            <ComboBox.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                                </DataTemplate>
+                                                            </ComboBox.ItemTemplate>
+                                                        </ComboBox>
+                                                    </Grid>
+                                                </Border>
+
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Posizione dell'isola" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Dentro la taskbar la capsula sta al centro della barra e si espande verso il desktop; serve la barra a tutta larghezza."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <ComboBox Width="226" Height="32" HorizontalAlignment="Right"
+                                                                  ItemsSource="{Binding IslandPlacementOptions}"
+                                                                  SelectedValuePath="Id"
+                                                                  SelectedValue="{Binding Settings.IslandPlacement, Mode=TwoWay}"
+                                                                  AutomationProperties.Name="Posizione Dynamic Island">
                                                             <ComboBox.ItemTemplate>
                                                                 <DataTemplate>
                                                                     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
@@ -783,7 +1069,7 @@
                                         <Border Style="{StaticResource Card}" Margin="0,0,0,20">
                                             <StackPanel>
                                                 <TextBlock Text="ZONE DELLA DOCK" Style="{StaticResource T.Section}" />
-                                                <TextBlock Text="Icone, sistema e azioni sono tre spazi indipendenti: puoi nasconderli, riordinarli, scalarli e separarli."
+                                                <TextBlock Text="Icone, sistema e azioni sono tre spazi indipendenti: puoi nasconderli, riordinarli, scalarli, separarli o farli vivere in capsule grafiche distinte."
                                                            Style="{StaticResource T.Caption}" Margin="0,0,0,10" TextWrapping="Wrap" />
                                                 <Border Style="{StaticResource Row}">
                                                     <Grid>
@@ -836,6 +1122,19 @@
                                                                    HorizontalAlignment="Right" FontSize="11" Foreground="{DynamicResource C.TextMuted}" />
                                                         <Slider Style="{StaticResource SlimSlider}" Minimum="0" Maximum="24"
                                                                 Margin="0,22,0,0" Value="{Binding Settings.DockZoneSpacing, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="480">
+                                                            <TextBlock Text="Zone separate graficamente" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Ogni zona diventa una capsula indipendente con il proprio sfondo e bordo, invece di condividere un'unica barra."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                  AutomationProperties.Name="Zone separate graficamente"
+                                                                  IsChecked="{Binding Settings.DockZonesSeparate, Mode=TwoWay}" />
                                                     </Grid>
                                                 </Border>
                                                 <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
@@ -1487,21 +1786,13 @@
                                                 </Border>
                                                 <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
                                                     <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <StackPanel>
+                                                        <StackPanel MaxWidth="520" HorizontalAlignment="Left">
                                                             <TextBlock Text="Larghezza del pannello" FontSize="13"
                                                                        Foreground="{DynamicResource C.Text}" />
-                                                            <TextBlock Text="Regola grafica applicata alla ricerca."
+                                                            <TextBlock Text="Tre preset disponibili in Semplice: Stretta, Normale, Ampia."
                                                                        Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
-                                                            <Slider Style="{StaticResource SlimSlider}" Minimum="560" Maximum="900"
-                                                                    Value="{Binding Settings.SearchCardWidth, Mode=TwoWay}"
-                                                                    AutomationProperties.Name="Larghezza ricerca"
-                                                                    Margin="0,8,120,0" />
                                                         </StackPanel>
-                                                        <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                                        <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center"
                                                                    Text="{Binding Settings.SearchCardWidth, StringFormat='{}{0:0} px'}"
                                                                    FontSize="12" Foreground="{DynamicResource C.TextMuted}" />
                                                     </Grid>
@@ -1844,13 +2135,19 @@
                                                 </Border>
                                                 <Border Style="{StaticResource Row}">
                                                     <Grid>
-                                                        <TextBlock Text="Manifest aggiornamenti" FontSize="13" Foreground="{DynamicResource C.Text}"
-                                                                   VerticalAlignment="Center" />
-                                                        <TextBox Style="{StaticResource Input}" Width="440" Height="32"
+                                                        <StackPanel MaxWidth="390" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Manifest aggiornamenti" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Configurato automaticamente all'installazione. Non serve inserirlo a mano."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <TextBox Style="{StaticResource Input}" Width="400" Height="32"
                                                                  HorizontalAlignment="Right"
+                                                                 IsReadOnly="True" IsTabStop="False"
+                                                                 Foreground="{DynamicResource C.TextMuted}"
                                                                  AutomationProperties.Name="Manifest aggiornamenti"
                                                                  AutomationProperties.AutomationId="UpdateManifestUrl"
-                                                                 Text="{Binding Settings.UpdateManifestUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                                 Text="{Binding Settings.UpdateManifestUrl, Mode=OneWay}" />
                                                     </Grid>
                                                 </Border>
                                                 <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">

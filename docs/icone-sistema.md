@@ -59,7 +59,13 @@ In questo modo l'icona non si sgrana né si deforma quando Explorer la mostra a 
 3. Per una voce premi **Scegli icona**; per tutte premi **Applica a tutte**.
 4. Per tornare indietro premi **Ripristina voce** accanto a una riga, oppure **Ripristina originali**.
 
-Il ripristino non è una "rigenerazione": usa il backup salvato prima della modifica.
+Il ripristino non è una "rigenerazione": usa il backup salvato prima della modifica. Funziona anche da riga di comando, senza aprire lo Studio:
+
+```powershell
+.\dist\Nebula.exe --restore-icons
+```
+
+Il comando usa lo stesso backup, riporta ogni voce al valore originale e mostra il risultato. Se il backup non esiste più, rimuove solo i riferimenti che puntano alle icone generate da Nebula (valori `DefaultIcon`, `IconLocation` e `IconResource`): ogni altra icona resta com'è.
 
 - **Collegamenti:** confronta la stringa `IconLocation` esatta, compreso indice e variabili d'ambiente, e la riscrive.
 - **Registro:** salva esistenza della chiave, esistenza del valore, tipo (`String`, `ExpandString`, `DWord`, `QWord`, `Binary`, `MultiString`) e dati. Dopo il ripristino rilegge il valore e lo confronta con l'originale.
@@ -90,7 +96,8 @@ Non esiste un ripristino automatico all'uscita normale: sarebbe incompatibile co
 - **Nessuna patch dei binari di sistema.** Non viene modificato `shell32.dll`, `imageres.dll` o un eseguibile in `System32`. Sarebbe una modifica globale, fragile e non reversibile per profilo.
 - **Nessuna scrittura in `HKLM`.** Le associazioni sono per-utente. Un'altra utenza del PC non vede le icone.
 - **App UWP/Store, app protette o elevate:** la shell può ignorare l'icona del collegamento o gestire l'icona tramite il pacchetto dell'app. Nebula non forza il processo.
-- **Associazioni senza `DefaultIcon` risolvibile:** vengono saltate. Alcune app registrano l'icona solo nel proprio eseguibile o in una chiave che Windows non usa per il tipo file.
+- **Associazioni senza `DefaultIcon` risolvibile:** vengono saltate. Alcune app registrano l'icona solo nel proprio eseguibile o in una chiave che Windows non usa per il tipo file. Nebula non sostituisce mai una sorgente mancante con un'icona generica: la voce resta originale.
+- **Tipi file con icona per-file (`%1`):** `.exe`, `.ico` e le altre classi il cui `DefaultIcon` è `%1` non compaiono nell'elenco e non vengono modificati. Scrivere un'immagine generata su quella classe darebbe a ogni eseguibile del PC la stessa icona al posto della propria.
 - **Tutte le cartelle del disco:** Windows 11 non ha un override globale per-utente dell'icona delle cartelle; `Folder\DefaultIcon` e `Shell Icons` vengono ignorati. Nebula copre le sei cartelle shell del profilo con `desktop.ini`; ogni altra cartella si personalizza singolarmente da Windows. Non viene toccato `desktop.ini` di cartelle fuori da quelle sei.
 - **Associazioni UWP/Store:** se Windows usa un ProgID `AppX...` per l'apertura, l'icona visibile può essere quella del pacchetto e non quella classica. Nebula modifica il ProgID classico quando esiste; per le associazioni puramente UWP l'icona può restare invariata. Questo limite è mostrato dal ProgID nella riga e non viene nascosto.
 - **Cache di Explorer:** dopo una modifica Nebula invia `SHChangeNotify` per la voce e le associazioni. In alcuni casi Explorer tiene in cache l'icona fino a un refresh (`F5`), alla riapertura della finestra o al riavvio di Explorer. Il file su disco, il registro e `desktop.ini` sono già cambiati.

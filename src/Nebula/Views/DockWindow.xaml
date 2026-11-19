@@ -7,25 +7,31 @@
         ResizeMode="NoResize" UseLayoutRounding="True" SnapsToDevicePixels="True"
         FontFamily="Segoe UI Variable Text, Segoe UI">
 
+    <Window.Resources>
+        <SolidColorBrush x:Key="DockShellBackground" Color="#E60B0716" />
+    </Window.Resources>
+
     <Grid x:Name="Root" Margin="26,22,26,26" Opacity="0">
         <Grid.RenderTransform>
             <TranslateTransform x:Name="DockSlide" Y="24" />
         </Grid.RenderTransform>
 
-        <Border x:Name="Shell" CornerRadius="{Binding ShellRadius}" Background="#E60B0716"
+        <Border x:Name="Shell" CornerRadius="{Binding ShellRadius}"
+                Background="{StaticResource DockShellBackground}"
                 BorderBrush="{Binding StrokeBrush}" BorderThickness="1"
                 MinHeight="{Binding Settings.DockHeight}"
                 MouseMove="OnShellMouseMove" MouseLeave="OnShellMouseLeave"
                 MouseRightButtonUp="OnDockBackgroundRightClick">
 
             <Grid ClipToBounds="True">
+                <Grid x:Name="ShellChrome">
                 <Border CornerRadius="{Binding ShellRadius}" Background="{Binding Backdrop}"
                         Visibility="{Binding BackdropVisibility}" Opacity="0.55" />
 
                 <Border CornerRadius="{Binding ShellRadius}" Background="{Binding TintBrush}" />
 
                 <Border CornerRadius="{Binding ShellRadius}" IsHitTestVisible="False"
-                        Visibility="{Binding Settings.ShowGlow, Converter={StaticResource BoolVis}}">
+                        Visibility="{Binding ChromeGlowVisibility}">
                     <Border.Background>
                         <RadialGradientBrush Center="0.14,0.35" GradientOrigin="0.14,0.35"
                                              RadiusX="0.45" RadiusY="1.25">
@@ -37,7 +43,7 @@
                 </Border>
 
                 <Border CornerRadius="{Binding ShellRadius}" IsHitTestVisible="False"
-                        Visibility="{Binding Settings.ShowGlow, Converter={StaticResource BoolVis}}">
+                        Visibility="{Binding ChromeGlowVisibility}">
                     <Border.Background>
                         <RadialGradientBrush Center="0.88,0.5" GradientOrigin="0.88,0.5"
                                              RadiusX="0.4" RadiusY="1.2">
@@ -50,7 +56,7 @@
 
                 <Border CornerRadius="{Binding ShellRadius}" Background="{StaticResource GrainBrush}"
                         IsHitTestVisible="False"
-                        Visibility="{Binding Settings.ShowGrain, Converter={StaticResource BoolVis}}" />
+                        Visibility="{Binding ChromeGrainVisibility}" />
 
                 <Border Height="1" VerticalAlignment="Top" Margin="20,0,20,0"
                         Background="#26FFFFFF" IsHitTestVisible="False" />
@@ -58,11 +64,11 @@
                 <Border Height="1" VerticalAlignment="Bottom" Margin="26,0,26,0"
                         Background="{DynamicResource C.AccentGrad}" Opacity="0.28"
                         IsHitTestVisible="False"
-                        Visibility="{Binding Settings.ShowShimmer, Converter={StaticResource BoolVis}}" />
+                        Visibility="{Binding ChromeShimmerVisibility}" />
 
                 <Border x:Name="LiquidSheen" Width="280" HorizontalAlignment="Left"
                         IsHitTestVisible="False" Opacity="0.16"
-                        Visibility="{Binding Settings.LiquidSheen, Converter={StaticResource BoolVis}}">
+                        Visibility="{Binding ChromeSheenVisibility}">
                     <Border.Background>
                         <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5"
                                              RadiusX="0.5" RadiusY="1.35">
@@ -75,11 +81,18 @@
                     </Border.RenderTransform>
                 </Border>
 
+                <!-- Finiture semplici: un unico colore pieno, senza bagliori,
+                     grana, riflessi o ombre. -->
+                <Border x:Name="FlatFill" CornerRadius="{Binding ShellRadius}"
+                        Background="{Binding FlatFillBrush}" IsHitTestVisible="False"
+                        Visibility="{Binding FlatFillVisibility}" />
+                </Grid>
+
                 <Grid x:Name="ZoneHost" VerticalAlignment="Center" Margin="10,0">
                     <StackPanel x:Name="AppsZone" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="StartButton" Width="{Binding ItemSize}" Height="{Binding ItemSize}"
                             Style="{StaticResource DockOrbButton}" Click="OnStartClick"
-                            ToolTip="Cerca app e finestre  ·  Ctrl+Alt+Spazio">
+                            ToolTip="Start di Nebula  ·  tasto Windows">
                         <UniformGrid Rows="2" Columns="2" Width="15" Height="15">
                             <Ellipse Width="4.5" Height="4.5" Fill="{DynamicResource C.OnAccent}" Margin="1.3" />
                             <Ellipse Width="4.5" Height="4.5" Fill="{DynamicResource C.OnAccent}" Margin="1.3" />

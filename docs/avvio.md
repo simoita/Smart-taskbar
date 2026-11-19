@@ -2,11 +2,15 @@
 
 ## Installazione
 
-1. Copia l'intera cartella `dist/` in una posizione stabile, ad esempio `C:\Program Files\Nebula\` o una cartella personale.
-2. Non separare `Nebula.exe` da `Nebula.Watchdog.exe`: il watchdog è il meccanismo che rimette la taskbar se Nebula viene terminata forzatamente.
-3. Verifica che sia installato il **.NET 8 Desktop Runtime**.
+1. Scarica `Nebula-Setup-<versione>-x64.exe` dalla Release e avvialo.
+2. Scegli le opzioni desiderate. Il setup crea il collegamento nel menu Start, un collegamento sul Desktop (opzionale) e l'avvio con Windows (opzionale).
+3. Al termine puoi avviare Nebula direttamente dalla pagina finale.
 
-Non serve eseguire come amministratore: l'app usa solo risorse dell'utente e la chiave di avvio in `HKCU`.
+Il setup installa solo per l'utente corrente in `%LOCALAPPDATA%\Programs\Nebula` e non richiede privilegi di amministratore: l'app usa solo risorse del profilo e la chiave di avvio in `HKCU`. La build è **self-contained**, quindi non serve installare .NET.
+
+La disinstallazione si avvia da **Impostazioni → App → App installate → Nebula Taskbar Studio**. Prima di rimuovere i file, il disinstallatore chiede a Nebula di uscire in modo pulito, ripristina la taskbar di Windows, i gruppi di schede e le icone di sistema, e cancella collegamenti e voci di avvio. Le impostazioni e i backup restano in `%APPDATA%\Nebula`: elimina quella cartella per rimuovere anche quelli.
+
+In alternativa, la versione portatile si ottiene estraendo `Nebula-win-x64.zip`. Non separare `Nebula.exe` da `Nebula.Watchdog.exe`: il watchdog è il meccanismo che rimette la taskbar se Nebula viene terminata forzatamente. Anche la versione portatile è self-contained.
 
 ## Primo avvio
 
@@ -22,7 +26,7 @@ Per aprire lo studio senza passare dalla dock:
 .\dist\Nebula.exe --settings
 ```
 
-Se Nebula è già in esecuzione, il comando riapre la finestra dello studio dell'istanza esistente.
+Se Nebula è già in esecuzione, il comando riapre la finestra dello studio dell'istanza esistente. Una sola istanza possiede la taskbar, l'AppBar e il watchdog; un secondo avvio cede all'istanza attiva e termina con codice 0. Lo stesso vale per `--selftest`, che non tocca la taskbar se un'altra istanza la possiede.
 
 ## Comandi e scorciatoie
 

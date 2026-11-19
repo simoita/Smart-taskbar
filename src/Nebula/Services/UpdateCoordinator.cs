@@ -102,10 +102,18 @@ public sealed class UpdateCoordinator : IDisposable
                 return false;
             }
 
-            _pendingUpdate = result.Manifest;
+            _pendingUpdate = result.HasUpdate ? result.Manifest : null;
             if (!result.HasUpdate || result.Manifest is null)
             {
-                SetState($"Nebula è aggiornata ({CurrentVersion}).", "", false);
+                if (result.Suppressed)
+                {
+                    SetState($"La versione {result.Version} è stata bloccata dopo un avvio non riuscito; serve un pacchetto corretto.", "", false);
+                    Log.Write("Update suppressed after a failed start: " + result.Version);
+                }
+                else
+                {
+                    SetState($"Nebula è aggiornata ({CurrentVersion}).", "", false);
+                }
                 return false;
             }
 

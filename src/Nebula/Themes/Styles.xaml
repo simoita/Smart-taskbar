@@ -258,7 +258,10 @@
                 <ControlTemplate TargetType="Button">
                     <Grid Background="Transparent" RenderTransformOrigin="0.5,1">
                         <Grid.RenderTransform>
-                            <ScaleTransform x:Name="ItemScale" ScaleX="1" ScaleY="1" />
+                            <TransformGroup>
+                                <ScaleTransform x:Name="ItemScale" ScaleX="1" ScaleY="1" />
+                                <TranslateTransform x:Name="ItemLift" Y="0" />
+                            </TransformGroup>
                         </Grid.RenderTransform>
                         <Border x:Name="HoverBg" CornerRadius="13" Background="{DynamicResource C.ItemHover}" Opacity="0" />
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />

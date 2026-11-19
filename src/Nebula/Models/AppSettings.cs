@@ -31,7 +31,12 @@ public sealed class AppSettings : ObservableObject
     private double _islandScale = 1.0;
     private double _islandTopMargin = 8;
     private bool _islandShowControls = true;
+    private bool _islandShowActivities = true;
+    private bool _islandShowShelf = true;
+    private string _islandPlacement = "floating";
+    private bool _winKeyOpensStart = true;
     private bool _searchIncludeWindows = true;
+    private bool _searchIncludeFiles = true;
     private double _searchCardWidth = 720;
     private bool _showWidgets = true;
     private bool _showQuickControls = true;
@@ -48,6 +53,10 @@ public sealed class AppSettings : ObservableObject
     private bool _launchAtStartup;
     private bool _clock24Hour = true;
     private int _monitorIndex;
+    private bool _monitorFollowCursor;
+    private bool _taskbarAllMonitors;
+    private string _dockFinish = "glass";
+    private bool _panelsFollowDock = true;
     private bool _compactMode;
     private bool _enableTabs = true;
     private string _tabsStyle = "glass";
@@ -63,6 +72,7 @@ public sealed class AppSettings : ObservableObject
     private double _dockSystemScale = 1;
     private double _dockActionsScale = 1;
     private bool _dockZoneDividers = true;
+    private bool _dockZonesSeparate;
     private bool _showOpenIndicator = true;
     private bool _showMinimizedIndicator = true;
     private bool _showClosedIndicator;
@@ -251,6 +261,34 @@ public sealed class AppSettings : ObservableObject
         set => SetProperty(ref _islandShowControls, value);
     }
 
+    /// <summary>Shows live downloads, copies, archives and media in the island.</summary>
+    public bool IslandShowActivities
+    {
+        get => _islandShowActivities;
+        set => SetProperty(ref _islandShowActivities, value);
+    }
+
+    /// <summary>Shows the temporary file drawer in the expanded island.</summary>
+    public bool IslandShowShelf
+    {
+        get => _islandShowShelf;
+        set => SetProperty(ref _islandShowShelf, value);
+    }
+
+    /// <summary>floating (top centre of the screen) or taskbar (inside the Nebula bar).</summary>
+    public string IslandPlacement
+    {
+        get => _islandPlacement;
+        set => SetProperty(ref _islandPlacement, value);
+    }
+
+    /// <summary>The Windows key opens the Nebula Start panel instead of the native menu.</summary>
+    public bool WinKeyOpensStart
+    {
+        get => _winKeyOpensStart;
+        set => SetProperty(ref _winKeyOpensStart, value);
+    }
+
     public bool ShowWidgets
     {
         get => _showWidgets;
@@ -273,6 +311,13 @@ public sealed class AppSettings : ObservableObject
     {
         get => _searchIncludeWindows;
         set => SetProperty(ref _searchIncludeWindows, value);
+    }
+
+    /// <summary>Includes the indexed user files in launcher and Start search.</summary>
+    public bool SearchIncludeFiles
+    {
+        get => _searchIncludeFiles;
+        set => SetProperty(ref _searchIncludeFiles, value);
     }
 
     /// <summary>Width of the launcher card in DIPs; the Studio exposes it as a live graphic rule.</summary>
@@ -353,6 +398,41 @@ public sealed class AppSettings : ObservableObject
     {
         get => _monitorIndex;
         set => SetProperty(ref _monitorIndex, value);
+    }
+
+    /// <summary>Moves the bar to the monitor that currently holds the pointer.</summary>
+    public bool MonitorFollowCursor
+    {
+        get => _monitorFollowCursor;
+        set => SetProperty(ref _monitorFollowCursor, value);
+    }
+
+    /// <summary>
+    /// Draws a Nebula bar on every connected monitor at the same time. The bar
+    /// on the selected screen keeps the full widget set; the others show apps
+    /// and actions and launch new windows on their own monitor.
+    /// </summary>
+    public bool TaskbarAllMonitors
+    {
+        get => _taskbarAllMonitors;
+        set => SetProperty(ref _taskbarAllMonitors, value);
+    }
+
+    /// <summary>
+    /// Bar finish: glass (vetro con bagliori), flat (monocolore piatto, nessun
+    /// bagliore o ombra) or outline (monocolore con bordo sottile).
+    /// </summary>
+    public string DockFinish
+    {
+        get => _dockFinish;
+        set => SetProperty(ref _dockFinish, value);
+    }
+
+    /// <summary>Start, search, widgets and Studio open on the dock's monitor.</summary>
+    public bool PanelsFollowDock
+    {
+        get => _panelsFollowDock;
+        set => SetProperty(ref _panelsFollowDock, value);
     }
 
     public bool CompactMode
@@ -447,6 +527,13 @@ public sealed class AppSettings : ObservableObject
     {
         get => _dockZoneDividers;
         set => SetProperty(ref _dockZoneDividers, value);
+    }
+
+    /// <summary>Each zone gets its own rounded shell instead of sharing the bar.</summary>
+    public bool DockZonesSeparate
+    {
+        get => _dockZonesSeparate;
+        set => SetProperty(ref _dockZonesSeparate, value);
     }
 
     public bool ShowOpenIndicator
@@ -557,6 +644,11 @@ public sealed class AppSettings : ObservableObject
         get => _customIconStyles;
         set => SetProperty(ref _customIconStyles, value);
     }
+
+    /// <summary>Simple monochrome finishes: glass, flat or outline.</summary>
+    public bool IsSimpleFinish =>
+        string.Equals(DockFinish, "flat", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(DockFinish, "outline", StringComparison.OrdinalIgnoreCase);
 
     public List<string> PinnedPaths { get; set; } = new();
 

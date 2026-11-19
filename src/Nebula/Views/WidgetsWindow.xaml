@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Nebula.Controls"
-        Title="Nebula Widgets" Width="410" SizeToContent="Height"
+        Title="Nebula Widgets" Width="440" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
         WindowStartupLocation="Manual" UseLayoutRounding="True" SnapsToDevicePixels="True"
@@ -20,236 +20,312 @@
 
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
-        <StackPanel>
-            <Grid Margin="2,0,2,8">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE71D;" FontFamily="Segoe Fluent Icons" FontSize="14"
-                               Foreground="{DynamicResource C.AccentText}" VerticalAlignment="Center" />
-                    <TextBlock x:Name="PanelTitle" Text="Widget" FontSize="12"
-                               FontWeight="{DynamicResource S.TitleWeight}"
-                               Margin="8,0,0,0" Foreground="{DynamicResource C.Text}"
-                               VerticalAlignment="Center" />
-                </StackPanel>
-                <Button Style="{StaticResource IconButton}" Width="28" Height="28"
-                        HorizontalAlignment="Right" Click="OnCloseClick" ToolTip="Chiudi"
-                        AutomationProperties.Name="Chiudi pannello">
-                    <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" />
-                </Button>
-            </Grid>
-
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                <Button x:Name="WidgetTab" Content="Widget" Style="{StaticResource GhostButton}"
-                        Padding="10,5" FontSize="11" Click="OnWidgetTab"
-                        AutomationProperties.Name="Scheda Widget" />
-                <Button x:Name="ControlsTab" Content="Controlli" Style="{StaticResource GhostButton}"
-                        Padding="10,5" FontSize="11" Margin="5,0,0,0" Click="OnControlsTab"
-                        AutomationProperties.Name="Scheda controlli rapidi" />
-            </StackPanel>
-
-            <!-- WIDGET -->
-            <Grid x:Name="WidgetPage">
-                <StackPanel>
-                    <WrapPanel x:Name="WidgetStrip" Margin="0,0,0,10" Visibility="Collapsed" />
-                    <TextBlock x:Name="TimeTextBlock" Text="{Binding TimeText}" FontSize="44" FontWeight="SemiBold"
-                               Foreground="{DynamicResource C.Text}" Typography.NumeralAlignment="Tabular"
-                               Margin="0,-6,0,0"
-                               Visibility="{Binding Settings.ShowClock, Converter={StaticResource BoolVis}}" />
-                    <TextBlock x:Name="DateTextBlock" Text="{Binding DateText}" FontSize="12"
-                               Foreground="{DynamicResource C.TextMuted}"
-                               Visibility="{Binding Settings.ShowClock, Converter={StaticResource BoolVis}}" />
-
-                    <Border Height="1" Background="{DynamicResource C.StrokeSoft}" Margin="0,16,0,14" />
-
-                    <Grid Margin="2,0,2,6">
-                        <TextBlock x:Name="MonthLabel" FontSize="12" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource C.Text}" VerticalAlignment="Center" />
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Style="{StaticResource IconButton}" Width="26" Height="26"
-                                    Click="OnPreviousMonth" ToolTip="Mese precedente">
-                                <TextBlock Text="&#xE76B;" FontFamily="Segoe Fluent Icons" FontSize="11" />
-                            </Button>
-                            <Button Style="{StaticResource IconButton}" Width="26" Height="26"
-                                    Click="OnNextMonth" ToolTip="Mese successivo">
-                                <TextBlock Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="11" />
-                            </Button>
+            <StackPanel>
+                <Grid Margin="2,0,2,10">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="28" Height="28" CornerRadius="9"
+                                Background="{DynamicResource C.AccentSoft}">
+                            <TextBlock Text="&#xE71D;" FontFamily="Segoe Fluent Icons" FontSize="13"
+                                       Foreground="{DynamicResource C.AccentText}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Margin="9,0,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="PanelTitle" Text="Widget" FontSize="14"
+                                       FontWeight="{DynamicResource S.TitleWeight}"
+                                       Foreground="{DynamicResource C.Text}" />
+                            <TextBlock Text="Calendario, sistema e controlli"
+                                       FontSize="9.5" Foreground="{DynamicResource C.TextMuted}" />
                         </StackPanel>
-                    </Grid>
+                    </StackPanel>
+                    <Button Style="{StaticResource IconButton}" Width="28" Height="28"
+                            HorizontalAlignment="Right" Click="OnCloseClick" ToolTip="Chiudi"
+                            AutomationProperties.Name="Chiudi pannello">
+                        <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" />
+                    </Button>
+                </Grid>
 
-                    <UniformGrid x:Name="CalendarGrid" Columns="7" HorizontalAlignment="Stretch" />
+                <Border Background="{DynamicResource S.InnerBg}"
+                        BorderBrush="{DynamicResource S.InnerBorder}"
+                        BorderThickness="{DynamicResource S.BorderThickness}"
+                        CornerRadius="11" Padding="4" Margin="0,0,0,12">
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="WidgetTab" Content="Widget" Style="{StaticResource GhostButton}"
+                                Padding="14,6" FontSize="11" BorderThickness="0"
+                                Click="OnWidgetTab" AutomationProperties.Name="Scheda Widget" />
+                        <Button x:Name="ControlsTab" Content="Controlli" Style="{StaticResource GhostButton}"
+                                Padding="14,6" FontSize="11" BorderThickness="0" Margin="3,0,0,0"
+                                Click="OnControlsTab" AutomationProperties.Name="Scheda controlli rapidi" />
+                    </StackPanel>
+                </Border>
 
-                    <Border Height="1" Background="{DynamicResource C.StrokeSoft}" Margin="0,14,0,14" />
+                <!-- WIDGET -->
+                <Grid x:Name="WidgetPage">
+                    <StackPanel>
+                        <WrapPanel x:Name="WidgetStrip" Margin="0,0,0,10" Visibility="Collapsed" />
 
-                    <Grid x:Name="SystemStats"
-                          Visibility="{Binding Settings.ShowStats, Converter={StaticResource BoolVis}}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Sistema" FontSize="11" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource C.TextMuted}" />
-                            <TextBlock Text="{Binding Monitor.RamDetail}" FontSize="12"
-                                       Foreground="{DynamicResource C.Text}" Margin="0,6,0,2" />
-                            <TextBlock Text="{Binding Monitor.DiskText}" FontSize="10.5"
-                                       Foreground="{DynamicResource C.TextMuted}" TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding Monitor.Uptime, StringFormat='Attivo da {0}'}" FontSize="10.5"
-                                       Foreground="{DynamicResource C.TextMuted}" Margin="0,2,0,0" />
-                        </StackPanel>
-
-                        <controls:RingGauge Grid.Column="1" Width="82" Height="82" Margin="8,0,0,0"
-                                            Value="{Binding Monitor.Cpu, Mode=OneWay}"
-                                            Caption="CPU" ValueText="{Binding Monitor.CpuText}"
-                                            Fill="{DynamicResource C.Accent}" Track="{DynamicResource C.Track}"
-                                            TextBrush="{DynamicResource C.Text}"
-                                            MutedBrush="{DynamicResource C.TextMuted}" Thickness="5" />
-
-                        <controls:RingGauge Grid.Column="2" Width="82" Height="82" Margin="4,0,0,0"
-                                            Value="{Binding Monitor.Ram, Mode=OneWay}"
-                                            Caption="RAM" ValueText="{Binding Monitor.RamText}"
-                                            Fill="{DynamicResource C.Accent2}" Track="{DynamicResource C.Track}"
-                                            TextBrush="{DynamicResource C.Text}"
-                                            MutedBrush="{DynamicResource C.TextMuted}" Thickness="5" />
-                    </Grid>
-
-                    <controls:Sparkline x:Name="CpuSpark" Height="46" Margin="0,14,0,0"
-                                        Visibility="{Binding Settings.ShowStats, Converter={StaticResource BoolVis}}" />
-
-                    <Grid x:Name="BatteryRow" Margin="0,14,0,2"
-                          Visibility="{Binding Settings.ShowBattery, Converter={StaticResource BoolVis}}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE7E8;" FontFamily="Segoe Fluent Icons" FontSize="12"
-                                       Foreground="{DynamicResource C.TextMuted}" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding Monitor.BatteryText}" FontSize="11.5" Margin="6,0,0,0"
-                                       Foreground="{DynamicResource C.Text}" VerticalAlignment="Center" />
-                            <TextBlock Text="batteria" FontSize="10.5" Margin="5,0,0,0"
-                                       Foreground="{DynamicResource C.TextMuted}" VerticalAlignment="Center" />
-                        </StackPanel>
-                        <TextBlock Text="Sistema in tempo reale" HorizontalAlignment="Right" FontSize="10"
-                                   Foreground="{DynamicResource C.TextFaint}" VerticalAlignment="Center" />
-                    </Grid>
-
-                    <Border Background="{DynamicResource S.InnerBg}"
-                            BorderBrush="{DynamicResource S.InnerBorder}"
-                            BorderThickness="{DynamicResource S.BorderThickness}"
-                            CornerRadius="{DynamicResource S.InnerRadius}"
-                            Padding="12,10" Margin="0,12,0,0">
-                        <TextBlock Text="Ctrl+Alt+Spazio per la ricerca rapida. I controlli rapidi sono nella scheda accanto."
-                                   FontSize="10.5" TextWrapping="Wrap" Foreground="{DynamicResource C.TextMuted}" />
-                    </Border>
-                </StackPanel>
-            </Grid>
-
-            <!-- QUICK CONTROLS -->
-            <Grid x:Name="ControlsPage" Visibility="Collapsed">
-                <StackPanel>
-                    <TextBlock Text="Tutto a portata di mano" Style="{StaticResource T.H2}" FontSize="18" />
-                    <TextBlock Text="Comandi di sistema senza aprire altre app."
-                               Style="{StaticResource T.Caption}" Margin="0,3,0,14" />
-
-                    <Border Background="{DynamicResource S.InnerBg}"
-                            BorderBrush="{DynamicResource S.InnerBorder}"
-                            BorderThickness="{DynamicResource S.BorderThickness}"
-                            CornerRadius="{DynamicResource S.InnerRadius}"
-                            Padding="13,11" Margin="0,0,0,10">
-                        <StackPanel>
+                        <Border Background="{DynamicResource S.InnerBg}"
+                                BorderBrush="{DynamicResource S.InnerBorder}"
+                                BorderThickness="{DynamicResource S.BorderThickness}"
+                                CornerRadius="{DynamicResource S.InnerRadius}"
+                                Padding="16,13" Margin="0,0,0,12">
                             <Grid>
-                                <TextBlock Text="AUDIO" Style="{StaticResource T.Section}" />
-                                <TextBlock x:Name="VolumeValue" Text="—" HorizontalAlignment="Right"
-                                           FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource C.Text}" />
-                            </Grid>
-                            <Slider x:Name="VolumeSlider" Style="{StaticResource SlimSlider}" Minimum="0" Maximum="100"
-                                    Margin="0,8,0,0" ValueChanged="OnVolumeChanged"
-                                    AutomationProperties.Name="Volume" />
-                            <Grid Margin="0,7,0,0">
-                                <Button x:Name="MuteButton" Content="Muto" Style="{StaticResource GhostButton}"
-                                        Padding="10,5" HorizontalAlignment="Left" Click="OnMuteClick"
-                                        AutomationProperties.Name="Muto audio" />
-                                <TextBlock x:Name="VolumeHint" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                           FontSize="10" Foreground="{DynamicResource C.TextFaint}" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
+                                <StackPanel>
+                                    <TextBlock Text="&#xE823;  OGGI" FontFamily="Segoe Fluent Icons"
+                                               FontSize="9" Foreground="{DynamicResource C.TextFaint}" />
+                                    <TextBlock x:Name="TimeTextBlock" Text="{Binding TimeText}"
+                                               FontSize="42" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource C.Text}"
+                                               Typography.NumeralAlignment="Tabular"
+                                               Margin="0,3,0,0"
+                                               Visibility="{Binding Settings.ShowClock, Converter={StaticResource BoolVis}}" />
+                                    <TextBlock x:Name="DateTextBlock" Text="{Binding DateText}" FontSize="11.5"
+                                               Foreground="{DynamicResource C.TextMuted}"
+                                               Visibility="{Binding Settings.ShowClock, Converter={StaticResource BoolVis}}" />
+                                </StackPanel>
 
-                    <Border Background="{DynamicResource S.InnerBg}"
-                            BorderBrush="{DynamicResource S.InnerBorder}"
-                            BorderThickness="{DynamicResource S.BorderThickness}"
-                            CornerRadius="{DynamicResource S.InnerRadius}"
-                            Padding="13,11" Margin="0,0,0,10">
-                        <StackPanel>
-                            <TextBlock Text="MEDIA" Style="{StaticResource T.Section}" />
-                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                <Button Style="{StaticResource IconButton}" Width="42" Height="38"
-                                        ToolTip="Precedente" Click="OnPreviousMedia"
-                                        AutomationProperties.Name="Media precedente">
-                                    <TextBlock Text="&#xE892;" FontFamily="Segoe Fluent Icons" FontSize="15" />
-                                </Button>
-                                <Button Style="{StaticResource IconButton}" Width="54" Height="38" Margin="4,0"
-                                        ToolTip="Play / Pausa" Click="OnPlayPauseMedia"
-                                        AutomationProperties.Name="Media play pausa">
-                                    <TextBlock Text="&#xE768;" FontFamily="Segoe Fluent Icons" FontSize="18" />
-                                </Button>
-                                <Button Style="{StaticResource IconButton}" Width="42" Height="38"
-                                        ToolTip="Successiva" Click="OnNextMedia"
-                                        AutomationProperties.Name="Media successiva">
-                                    <TextBlock Text="&#xE893;" FontFamily="Segoe Fluent Icons" FontSize="15" />
-                                </Button>
-                                <TextBlock x:Name="MediaHint" VerticalAlignment="Center" Margin="10,0,0,0"
-                                           FontSize="10" TextWrapping="Wrap" MaxWidth="190"
-                                           Foreground="{DynamicResource C.TextMuted}" />
+                                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Monitor.CpuText}" FontSize="20"
+                                               FontWeight="SemiBold" HorizontalAlignment="Right"
+                                               Foreground="{DynamicResource C.Text}" />
+                                    <TextBlock Text="CPU" FontSize="8.5" HorizontalAlignment="Right"
+                                               Foreground="{DynamicResource C.TextFaint}" />
+                                    <ProgressBar Style="{StaticResource MiniBar}" Width="92" Maximum="100"
+                                                 Value="{Binding Monitor.Cpu, Mode=OneWay}"
+                                                 Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border Background="{DynamicResource S.InnerBg}"
+                                BorderBrush="{DynamicResource S.InnerBorder}"
+                                BorderThickness="{DynamicResource S.BorderThickness}"
+                                CornerRadius="{DynamicResource S.InnerRadius}"
+                                Padding="13,11" Margin="0,0,0,12">
+                            <StackPanel>
+                                <Grid Margin="1,0,1,7">
+                                    <TextBlock x:Name="MonthLabel" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource C.Text}" VerticalAlignment="Center" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Style="{StaticResource IconButton}" Width="24" Height="24"
+                                                Click="OnPreviousMonth" ToolTip="Mese precedente">
+                                            <TextBlock Text="&#xE76B;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+                                        </Button>
+                                        <Button Style="{StaticResource IconButton}" Width="24" Height="24"
+                                                Click="OnNextMonth" ToolTip="Mese successivo">
+                                            <TextBlock Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                                <UniformGrid x:Name="CalendarGrid" Columns="7" HorizontalAlignment="Stretch" />
                             </StackPanel>
-                        </StackPanel>
-                    </Border>
+                        </Border>
 
-                    <Border Background="{DynamicResource S.InnerBg}"
-                            BorderBrush="{DynamicResource S.InnerBorder}"
-                            BorderThickness="{DynamicResource S.BorderThickness}"
-                            CornerRadius="{DynamicResource S.InnerRadius}"
-                            Padding="13,11" Margin="0,0,0,10">
-                        <StackPanel>
-                            <TextBlock Text="RETE" Style="{StaticResource T.Section}" />
-                            <Grid Margin="0,7,0,0">
-                                <Ellipse x:Name="NetworkDot" Width="7" Height="7" Fill="{DynamicResource C.Success}"
-                                         VerticalAlignment="Center" HorizontalAlignment="Left" />
-                                <TextBlock x:Name="NetworkText" Text="Rilevatore rete…" Margin="14,0,0,0"
-                                           FontSize="11.5" Foreground="{DynamicResource C.Text}"
-                                           TextTrimming="CharacterEllipsis" />
-                            </Grid>
-                            <Button Content="Apri impostazioni di rete" Style="{StaticResource GhostButton}"
-                                    Padding="10,5" HorizontalAlignment="Left" Margin="0,8,0,0"
-                                    Click="OnOpenNetwork"
-                                    AutomationProperties.Name="Apri impostazioni di rete" />
-                            <TextBlock Text="Nebula può leggere lo stato e aprire i controlli di Windows; il cambio rete non è disponibile senza privilegi di amministratore."
-                                       Style="{StaticResource T.Caption}" FontSize="9.5" Margin="0,6,0,0"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
+                        <Border Background="{DynamicResource S.InnerBg}"
+                                BorderBrush="{DynamicResource S.InnerBorder}"
+                                BorderThickness="{DynamicResource S.BorderThickness}"
+                                CornerRadius="{DynamicResource S.InnerRadius}"
+                                Padding="13,11" Margin="0,0,0,12">
+                            <StackPanel>
+                                <Grid x:Name="SystemStats"
+                                      Visibility="{Binding Settings.ShowStats, Converter={StaticResource BoolVis}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
-                    <Border Background="{DynamicResource S.InnerBg}"
-                            BorderBrush="{DynamicResource S.InnerBorder}"
-                            BorderThickness="{DynamicResource S.BorderThickness}"
-                            CornerRadius="{DynamicResource S.InnerRadius}"
-                            Padding="13,11" Margin="0,0,0,10">
-                        <StackPanel>
-                            <Grid>
-                                <TextBlock Text="LUMINOSITÀ" Style="{StaticResource T.Section}" />
-                                <TextBlock x:Name="BrightnessValue" HorizontalAlignment="Right" FontSize="15"
-                                           FontWeight="SemiBold" Foreground="{DynamicResource C.Text}" Text="—" />
-                            </Grid>
-                            <Slider x:Name="BrightnessSlider" Style="{StaticResource SlimSlider}" Minimum="0" Maximum="100"
-                                    Margin="0,8,0,0" ValueChanged="OnBrightnessChanged"
-                                    AutomationProperties.Name="Luminosità" />
-                            <TextBlock x:Name="BrightnessHint" Style="{StaticResource T.Caption}" FontSize="9.5"
-                                       Margin="0,5,0,0" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Sistema" FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource C.TextMuted}" />
+                                        <TextBlock Text="{Binding Monitor.RamDetail}" FontSize="11.5"
+                                                   Foreground="{DynamicResource C.Text}" Margin="0,5,0,2" />
+                                        <TextBlock Text="{Binding Monitor.DiskText}" FontSize="10"
+                                                   Foreground="{DynamicResource C.TextMuted}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Monitor.Uptime, StringFormat='Attivo da {0}'}"
+                                                   FontSize="10" Foreground="{DynamicResource C.TextMuted}"
+                                                   Margin="0,2,0,0" />
+                                    </StackPanel>
 
-                    <TextBlock x:Name="ControlStatus" Style="{StaticResource T.Caption}" FontSize="10"
-                               Margin="2,0,2,0" TextWrapping="Wrap" />
-                </StackPanel>
-            </Grid>
-        </StackPanel>
+                                    <controls:RingGauge Grid.Column="1" Width="72" Height="72" Margin="8,0,0,0"
+                                                        Value="{Binding Monitor.Cpu, Mode=OneWay}"
+                                                        Caption="CPU" ValueText="{Binding Monitor.CpuText}"
+                                                        Fill="{DynamicResource C.Accent}" Track="{DynamicResource C.Track}"
+                                                        TextBrush="{DynamicResource C.Text}"
+                                                        MutedBrush="{DynamicResource C.TextMuted}" Thickness="4.5" />
+
+                                    <controls:RingGauge Grid.Column="2" Width="72" Height="72" Margin="4,0,0,0"
+                                                        Value="{Binding Monitor.Ram, Mode=OneWay}"
+                                                        Caption="RAM" ValueText="{Binding Monitor.RamText}"
+                                                        Fill="{DynamicResource C.Accent2}" Track="{DynamicResource C.Track}"
+                                                        TextBrush="{DynamicResource C.Text}"
+                                                        MutedBrush="{DynamicResource C.TextMuted}" Thickness="4.5" />
+                                </Grid>
+
+                                <controls:Sparkline x:Name="CpuSpark" Height="38" Margin="0,10,0,0"
+                                                    Visibility="{Binding Settings.ShowStats, Converter={StaticResource BoolVis}}" />
+
+                                <Grid x:Name="BatteryRow" Margin="0,10,0,0"
+                                      Visibility="{Binding Settings.ShowBattery, Converter={StaticResource BoolVis}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE7E8;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                   Foreground="{DynamicResource C.TextMuted}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding Monitor.BatteryText}" FontSize="11"
+                                                   Margin="6,0,0,0" Foreground="{DynamicResource C.Text}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Text="batteria" FontSize="9.5" Margin="5,0,0,0"
+                                                   Foreground="{DynamicResource C.TextFaint}"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Text="Aggiornato in tempo reale" HorizontalAlignment="Right"
+                                               FontSize="9" Foreground="{DynamicResource C.TextFaint}"
+                                               VerticalAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource C.AccentFaint}"
+                                BorderBrush="{DynamicResource C.AccentSoft}"
+                                BorderThickness="1" CornerRadius="11" Padding="12,9">
+                            <TextBlock Text="Ctrl+Alt+Spazio apre la ricerca globale. I controlli rapidi sono nella scheda accanto."
+                                       FontSize="9.5" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource C.TextMuted}" />
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <!-- QUICK CONTROLS -->
+                <Grid x:Name="ControlsPage" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="Tutto a portata di mano" Style="{StaticResource T.H2}" FontSize="18" />
+                        <TextBlock Text="Comandi di sistema senza aprire altre app."
+                                   Style="{StaticResource T.Caption}" Margin="0,3,0,12" />
+
+                        <Border Background="{DynamicResource S.InnerBg}"
+                                BorderBrush="{DynamicResource S.InnerBorder}"
+                                BorderThickness="{DynamicResource S.BorderThickness}"
+                                CornerRadius="13" Padding="13,11" Margin="0,0,0,9">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE767;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                   Foreground="{DynamicResource C.AccentText}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Text="AUDIO" Style="{StaticResource T.Section}"
+                                                   Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="VolumeValue" Text="—" HorizontalAlignment="Right"
+                                               FontSize="16" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource C.Text}" />
+                                </Grid>
+                                <Slider x:Name="VolumeSlider" Style="{StaticResource SlimSlider}"
+                                        Minimum="0" Maximum="100" Margin="0,8,0,0"
+                                        ValueChanged="OnVolumeChanged" AutomationProperties.Name="Volume" />
+                                <Grid Margin="0,6,0,0">
+                                    <Button x:Name="MuteButton" Content="Muto" Style="{StaticResource GhostButton}"
+                                            Padding="10,5" HorizontalAlignment="Left" Click="OnMuteClick"
+                                            AutomationProperties.Name="Muto audio" />
+                                    <TextBlock x:Name="VolumeHint" HorizontalAlignment="Right"
+                                               VerticalAlignment="Center" FontSize="9.5"
+                                               Foreground="{DynamicResource C.TextFaint}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource S.InnerBg}"
+                                BorderBrush="{DynamicResource S.InnerBorder}"
+                                BorderThickness="{DynamicResource S.BorderThickness}"
+                                CornerRadius="13" Padding="13,11" Margin="0,0,0,9">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE768;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                               Foreground="{DynamicResource C.AccentText}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="MEDIA" Style="{StaticResource T.Section}"
+                                               Margin="7,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                    <Button Style="{StaticResource IconButton}" Width="42" Height="36"
+                                            ToolTip="Precedente" Click="OnPreviousMedia"
+                                            AutomationProperties.Name="Media precedente">
+                                        <TextBlock Text="&#xE892;" FontFamily="Segoe Fluent Icons" FontSize="14" />
+                                    </Button>
+                                    <Button Style="{StaticResource IconButton}" Width="54" Height="36" Margin="4,0"
+                                            ToolTip="Play / Pausa" Click="OnPlayPauseMedia"
+                                            AutomationProperties.Name="Media play pausa">
+                                        <TextBlock Text="&#xE768;" FontFamily="Segoe Fluent Icons" FontSize="17" />
+                                    </Button>
+                                    <Button Style="{StaticResource IconButton}" Width="42" Height="36"
+                                            ToolTip="Successiva" Click="OnNextMedia"
+                                            AutomationProperties.Name="Media successiva">
+                                        <TextBlock Text="&#xE893;" FontFamily="Segoe Fluent Icons" FontSize="14" />
+                                    </Button>
+                                    <TextBlock x:Name="MediaHint" VerticalAlignment="Center" Margin="10,0,0,0"
+                                               FontSize="9.5" TextWrapping="Wrap" MaxWidth="210"
+                                               Foreground="{DynamicResource C.TextMuted}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource S.InnerBg}"
+                                BorderBrush="{DynamicResource S.InnerBorder}"
+                                BorderThickness="{DynamicResource S.BorderThickness}"
+                                CornerRadius="13" Padding="13,11" Margin="0,0,0,9">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE774;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                               Foreground="{DynamicResource C.AccentText}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="RETE" Style="{StaticResource T.Section}"
+                                               Margin="7,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <Grid Margin="0,7,0,0">
+                                    <Ellipse x:Name="NetworkDot" Width="7" Height="7"
+                                             Fill="{DynamicResource C.Success}"
+                                             VerticalAlignment="Center" HorizontalAlignment="Left" />
+                                    <TextBlock x:Name="NetworkText" Text="Rilevatore rete…" Margin="14,0,0,0"
+                                               FontSize="11.5" Foreground="{DynamicResource C.Text}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                                <Button Content="Apri impostazioni di rete" Style="{StaticResource GhostButton}"
+                                        Padding="10,5" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                        Click="OnOpenNetwork" AutomationProperties.Name="Apri impostazioni di rete" />
+                                <TextBlock Text="Nebula legge lo stato e apre i controlli di Windows; il cambio rete richiede privilegi di amministratore."
+                                           Style="{StaticResource T.Caption}" FontSize="9" Margin="0,6,0,0"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource S.InnerBg}"
+                                BorderBrush="{DynamicResource S.InnerBorder}"
+                                BorderThickness="{DynamicResource S.BorderThickness}"
+                                CornerRadius="13" Padding="13,11" Margin="0,0,0,9">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE706;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                   Foreground="{DynamicResource C.AccentText}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Text="LUMINOSITÀ" Style="{StaticResource T.Section}"
+                                                   Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="BrightnessValue" HorizontalAlignment="Right"
+                                               FontSize="16" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource C.Text}" Text="—" />
+                                </Grid>
+                                <Slider x:Name="BrightnessSlider" Style="{StaticResource SlimSlider}"
+                                        Minimum="0" Maximum="100" Margin="0,8,0,0"
+                                        ValueChanged="OnBrightnessChanged"
+                                        AutomationProperties.Name="Luminosità" />
+                                <TextBlock x:Name="BrightnessHint" Style="{StaticResource T.Caption}"
+                                           FontSize="9" Margin="0,5,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock x:Name="ControlStatus" Style="{StaticResource T.Caption}" FontSize="9.5"
+                                   Margin="2,0,2,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
         </ScrollViewer>
     </Border>
 </Window>
