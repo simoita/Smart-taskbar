@@ -17,17 +17,53 @@ public sealed class TrayService : IDisposable
             Visible = true
         };
 
-        var menu = new ContextMenuStrip();
-        menu.Items.Add("Apri Nebula", null, (_, _) => openSettings());
-        menu.Items.Add("Cerca app e finestre   Ctrl+Alt+Spazio", null, (_, _) => search());
-        menu.Items.Add("Pannello widget   Ctrl+Alt+W", null, (_, _) => widgets());
+        var menu = new ContextMenuStrip
+        {
+            Renderer = new NebulaMenuRenderer(),
+            ShowImageMargin = false,
+            ShowCheckMargin = false,
+            Padding = new Padding(5, 7, 5, 7),
+            Font = new Font("Segoe UI Variable Text", 9.75f),
+            BackColor = System.Drawing.Color.FromArgb(26, 22, 38),
+            ForeColor = System.Drawing.Color.FromArgb(242, 242, 255)
+        };
+
+        ToolStripMenuItem Add(string text, Action action, string? shortcut = null)
+        {
+            var item = new ToolStripMenuItem(text, null, (_, _) => action())
+            {
+                Padding = new Padding(10, 7, 12, 7),
+                ShortcutKeyDisplayString = shortcut
+            };
+            menu.Items.Add(item);
+            return item;
+        }
+
+        Add("Apri Nebula", openSettings);
+        Add("Cerca app e finestre", search, "Ctrl+Alt+Spazio");
+        Add("Pannello widget", widgets, "Ctrl+Alt+W");
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Mostra / nascondi la dock", null, (_, _) => showDock());
-        menu.Items.Add("Ripristina la taskbar di Windows", null, (_, _) => restoreTaskbar());
+        Add("Mostra / nascondi la dock", showDock);
+        Add("Ripristina la taskbar di Windows", restoreTaskbar);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Esci da Nebula", null, (_, _) => exit());
+        Add("Esci da Nebula", exit);
+
+        menu.Opened += (_, _) => RoundMenu(menu);
         _icon.ContextMenuStrip = menu;
         _icon.DoubleClick += (_, _) => openSettings();
+    }
+
+    private static void RoundMenu(ContextMenuStrip menu)
+    {
+        var bounds = new Rectangle(0, 0, menu.Width, menu.Height);
+        const int radius = 12;
+        using var path = new GraphicsPath();
+        path.AddArc(bounds.X, bounds.Y, radius, radius, 180, 90);
+        path.AddArc(bounds.Right - radius, bounds.Y, radius, radius, 270, 90);
+        path.AddArc(bounds.Right - radius, bounds.Bottom - radius, radius, radius, 0, 90);
+        path.AddArc(bounds.X, bounds.Bottom - radius, radius, radius, 90, 90);
+        path.CloseFigure();
+        menu.Region = new Region(path);
     }
 
     public void ShowBalloon(string title, string text)

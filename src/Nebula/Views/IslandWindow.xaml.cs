@@ -846,20 +846,19 @@ public partial class IslandWindow : Window
     {
         var menu = new ContextMenu();
 
-        void Add(string header, string action)
+        void Add(string header, string glyph, string action)
         {
-            var item = new MenuItem { Header = header };
-            item.Click += (_, _) => App.Instance?.RunPowerAction(action);
-            menu.Items.Add(item);
+            menu.Items.Add(MenuFactory.Item(header, glyph,
+                () => App.Instance?.RunPowerAction(action)));
         }
 
-        Add("Blocca", "lock");
-        Add("Sospendi", "sleep");
+        Add("Blocca", "\uE72E", "lock");
+        Add("Sospendi", "\uE708", "sleep");
         menu.Items.Add(new Separator());
-        Add("Riavvia il PC", "restart");
-        Add("Spegni il PC", "shutdown");
+        Add("Riavvia il PC", "\uE777", "restart");
+        Add("Spegni il PC", "\uE7E8", "shutdown");
         menu.Items.Add(new Separator());
-        Add("Esci da Nebula", "exit");
+        Add("Esci da Nebula", "\uE711", "exit");
 
         menu.PlacementTarget = sender as Button;
         menu.Placement = PlacementMode.Bottom;

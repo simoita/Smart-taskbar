@@ -851,20 +851,8 @@ public partial class App : Application
             return;
         }
 
-        if (action is "restart" or "shutdown" or "signout")
-        {
-            string label = action switch
-            {
-                "restart" => "Riavviare il computer?",
-                "shutdown" => "Spegnere il computer?",
-                _ => "Uscire dalla sessione?"
-            };
-
-            if (MessageBox.Show(label + "\n\nLe app aperte verranno chiuse.", "Nebula",
-                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                return;
-        }
-
+        // Power commands run immediately: the panel already asked for the
+        // action, so a system confirmation dialog would only interrupt it.
         try
         {
             switch (action)

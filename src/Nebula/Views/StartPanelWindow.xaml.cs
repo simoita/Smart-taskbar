@@ -693,25 +693,23 @@ public partial class StartPanelWindow : Window
         var menu = new ContextMenu();
         bool actionPicked = false;
 
-        void Add(string header, string action)
+        void Add(string header, string glyph, string action)
         {
-            var item = new MenuItem { Header = header };
-            item.Click += (_, _) =>
+            menu.Items.Add(MenuFactory.Item(header, glyph, () =>
             {
                 actionPicked = true;
                 Dismiss();
                 App.Instance?.RunPowerAction(action);
-            };
-            menu.Items.Add(item);
+            }));
         }
 
-        Add("Blocca", "lock");
-        Add("Sospendi", "sleep");
+        Add("Blocca", "\uE72E", "lock");
+        Add("Sospendi", "\uE708", "sleep");
         menu.Items.Add(new Separator());
-        Add("Riavvia", "restart");
-        Add("Spegni", "shutdown");
+        Add("Riavvia", "\uE777", "restart");
+        Add("Spegni", "\uE7E8", "shutdown");
         menu.Items.Add(new Separator());
-        Add("Esci da Nebula", "exit");
+        Add("Esci da Nebula", "\uE711", "exit");
 
         _suppressDeactivate = true;
         menu.Closed += (_, _) =>

@@ -1036,27 +1036,19 @@ public partial class DockWindow : Window
         e.Handled = true;
         var menu = new ContextMenu();
 
-        var group = new MenuItem { Header = "Raggruppa finestre in schede…" };
-        group.Click += (_, _) => App.Instance?.ShowGroupPicker();
-        menu.Items.Add(group);
-
-        var search = new MenuItem { Header = "Cerca app e finestre…" };
-        search.Click += (_, _) => App.Instance?.ShowLauncher();
-        menu.Items.Add(search);
-
-        var widgets = new MenuItem { Header = "Apri widget" };
-        widgets.Click += (_, _) => App.Instance?.ShowWidgets();
-        menu.Items.Add(widgets);
-
-        var controls = new MenuItem { Header = "Apri controlli rapidi" };
-        controls.Click += (_, _) => App.Instance?.ShowControls();
-        menu.Items.Add(controls);
+        menu.Items.Add(MenuFactory.Item("Raggruppa finestre in schede…", "\uE7C4",
+            () => App.Instance?.ShowGroupPicker()));
+        menu.Items.Add(MenuFactory.Item("Cerca app e finestre…", "\uE721",
+            () => App.Instance?.ShowLauncher()));
+        menu.Items.Add(MenuFactory.Item("Apri widget", "\uE71D",
+            () => App.Instance?.ShowWidgets()));
+        menu.Items.Add(MenuFactory.Item("Apri controlli rapidi", "\uE945",
+            () => App.Instance?.ShowControls()));
 
         menu.Items.Add(new Separator());
 
-        var settings = new MenuItem { Header = "Impostazioni Nebula" };
-        settings.Click += (_, _) => App.Instance?.ShowSettings();
-        menu.Items.Add(settings);
+        menu.Items.Add(MenuFactory.Item("Impostazioni Nebula", "\uE713",
+            () => App.Instance?.ShowSettings()));
 
         menu.PlacementTarget = Shell;
         menu.IsOpen = true;
