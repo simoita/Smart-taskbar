@@ -20,6 +20,7 @@ public sealed class MediaSessionMonitor : IDisposable
     private MediaSessionInfo? _current;
     private bool _started;
     private bool _disposed;
+    private bool _failureLogged;
 
     public MediaSessionInfo? Current => _current;
 
@@ -62,12 +63,20 @@ public sealed class MediaSessionMonitor : IDisposable
                             session.SourceAppUserModelId ?? "");
                     }
                 }
+
+                _failureLogged = false;
             }
             catch (Exception ex)
             {
                 // No session, a player that does not implement SMTC, or a shell
                 // restart: all of them simply leave the widget without a track.
-                Log.Write("Media session query failed: " + ex.Message);
+                // Only the first failure is logged so a machine without SMTC
+                // does not write a line every few seconds.
+                if (!_failureLogged)
+                {
+                    _failureLogged = true;
+                    Log.Write("Media session query failed: " + ex.Message);
+                }
             }
 
             bool changed = !Equals(_current, info);
