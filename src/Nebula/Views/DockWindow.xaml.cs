@@ -830,6 +830,10 @@ public partial class DockWindow : Window
         _hidden = false;
         Reposition();
         UpdateBackdrop();
+
+        // Showing the bar puts it at the top of the topmost band, above the
+        // island that is docked inside it. Restore the island above the bar.
+        App.Instance?.RaiseIslandAboveDock();
     }
 
     private void CloseOpenTooltips()

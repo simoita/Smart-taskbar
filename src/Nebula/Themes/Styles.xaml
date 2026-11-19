@@ -342,30 +342,30 @@
                         <Grid.RenderTransform>
                             <ScaleTransform x:Name="OrbScale" ScaleX="1" ScaleY="1" />
                         </Grid.RenderTransform>
-                        <Border CornerRadius="13" Background="{DynamicResource C.AccentGrad}">
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="16" ShadowDepth="0" Opacity="0.55"
-                                                  Color="{DynamicResource C.AccentColor}" />
-                            </Border.Effect>
-                        </Border>
-                        <Border CornerRadius="12" Margin="0" Background="{DynamicResource S.Sheen}" />
+                        <Border x:Name="OrbRing" CornerRadius="12"
+                                Background="{DynamicResource C.Hover}"
+                                BorderBrush="{DynamicResource C.StrokeSoft}" BorderThickness="1" />
+                        <Border x:Name="OrbGlow" CornerRadius="12"
+                                Background="{DynamicResource C.AccentSoft}" Opacity="0" />
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="OrbGlow" Property="Opacity" Value="0.95" />
+                            <Setter TargetName="OrbRing" Property="BorderBrush" Value="{DynamicResource C.Accent}" />
                             <Trigger.EnterActions>
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetName="OrbScale" Storyboard.TargetProperty="ScaleX"
-                                                         To="1.07" Duration="0:0:0.16">
+                                                         To="1.05" Duration="0:0:0.16">
                                             <DoubleAnimation.EasingFunction>
-                                                <BackEase Amplitude="0.4" EasingMode="EaseOut" />
+                                                <BackEase Amplitude="0.35" EasingMode="EaseOut" />
                                             </DoubleAnimation.EasingFunction>
                                         </DoubleAnimation>
                                         <DoubleAnimation Storyboard.TargetName="OrbScale" Storyboard.TargetProperty="ScaleY"
-                                                         To="1.07" Duration="0:0:0.16">
+                                                         To="1.05" Duration="0:0:0.16">
                                             <DoubleAnimation.EasingFunction>
-                                                <BackEase Amplitude="0.4" EasingMode="EaseOut" />
+                                                <BackEase Amplitude="0.35" EasingMode="EaseOut" />
                                             </DoubleAnimation.EasingFunction>
                                         </DoubleAnimation>
                                     </Storyboard>
@@ -381,7 +381,8 @@
                             </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter Property="Opacity" Value="0.88" />
+                            <Setter TargetName="OrbGlow" Property="Opacity" Value="1" />
+                            <Setter Property="Opacity" Value="0.9" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

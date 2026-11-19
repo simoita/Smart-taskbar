@@ -293,7 +293,7 @@
                                             BorderThickness="1" CornerRadius="12" Padding="8">
                                         <StackPanel>
                                             <TextBlock x:Name="ShelfDropHint"
-                                                       Text="Trascina qui i file per conservarli temporaneamente."
+                                                       Text="Trascina qui file o cartelle per conservarli temporaneamente."
                                                        FontSize="8.8"
                                                        Foreground="{DynamicResource C.TextFaint}"
                                                        TextWrapping="Wrap" Margin="1,0,1,6" />
@@ -323,7 +323,7 @@
                                                                 <Border Width="22" Height="22" CornerRadius="6"
                                                                         Background="{DynamicResource C.Hover}">
                                                                     <Grid>
-                                                                        <TextBlock Text="&#xE8A5;"
+                                                                        <TextBlock Text="{Binding Glyph}"
                                                                                    FontFamily="Segoe Fluent Icons"
                                                                                    FontSize="10"
                                                                                    Foreground="{DynamicResource C.TextMuted}"

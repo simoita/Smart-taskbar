@@ -314,6 +314,18 @@ public sealed class AppCatalog
             Environment.GetFolderPath(Environment.SpecialFolder.StartMenu)
         };
 
+        // Localized Windows installs keep a "Programmi" junction inside the
+        // Start Menu that denies directory reads. Recursing blindly threw there
+        // and dropped every shortcut of that root from the catalog, leaving the
+        // panel and the search without the installed apps. Ignore inaccessible
+        // folders and never follow junctions/symlinks.
+        var startMenuOptions = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.ReparsePoint
+        };
+
         foreach (string root in roots)
         {
             try
@@ -321,7 +333,7 @@ public sealed class AppCatalog
                 if (!Directory.Exists(root))
                     continue;
 
-                foreach (string file in Directory.EnumerateFiles(root, "*.lnk", SearchOption.AllDirectories))
+                foreach (string file in Directory.EnumerateFiles(root, "*.lnk", startMenuOptions))
                 {
                     string name = Path.GetFileNameWithoutExtension(file);
                     if (ShouldSkip(name))

@@ -39,6 +39,7 @@ public sealed class DockViewModel : ObservableObject
         Theme = theme;
         Tracker = tracker;
         Monitor = monitor;
+        Media = new MediaSessionMonitor();
 
         _clockTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
         _clockTimer.Tick += (_, _) => UpdateClock();
@@ -57,6 +58,8 @@ public sealed class DockViewModel : ObservableObject
         RefreshTheme();
         UpdateClock();
         RefreshTaskbarWidgets();
+        Media.Changed += UpdateTaskbarWidgetValues;
+        Media.Start();
         _clockTimer.Start();
         _monitorTimer.Start();
     }
@@ -65,6 +68,7 @@ public sealed class DockViewModel : ObservableObject
     public ThemeEngine Theme { get; }
     public WindowTracker Tracker { get; }
     public SystemMonitor Monitor { get; }
+    public MediaSessionMonitor Media { get; }
 
     public ObservableCollection<DockItemViewModel> Items { get; } = new();
 
@@ -157,8 +161,10 @@ public sealed class DockViewModel : ObservableObject
     public Visibility ChromeBorderVisibility =>
         DockFinish == "flat" ? Visibility.Collapsed : Visibility.Visible;
 
-    public double ItemSize => Math.Max(28, Settings.DockHeight - 14);
-    public double IconSize => Settings.IconSize;
+    // Icons fill more of the bar than before: a slim margin keeps them off the
+    // bar edges while the artwork stays large and readable.
+    public double ItemSize => Math.Max(30, Settings.DockHeight - 8);
+    public double IconSize => Math.Min(Settings.IconSize, Math.Max(18, ItemSize - 6));
     public Thickness ItemMargin => new(Settings.ItemSpacing / 2, 0, Settings.ItemSpacing / 2, 0);
 
     public CornerRadius ShellRadius

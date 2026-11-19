@@ -457,6 +457,10 @@ public partial class IslandWindow : Window
                 Top = capsuleBottom - Height;
             }
 
+            // The bar and the island are both topmost windows: moving the
+            // capsule into the bar does not raise it, so without this it stays
+            // hidden behind the bar.
+            BringAboveDock();
             return;
         }
 
@@ -464,6 +468,31 @@ public partial class IslandWindow : Window
         if (settings.ReplaceWindowsTaskbar && settings.DockOnTop)
             top = bounds.Top + settings.DockHeight + 20 + settings.IslandTopMargin;
         Top = top;
+    }
+
+    /// <summary>
+    /// Keeps the capsule above the Nebula bar while it is docked inside it.
+    /// Both windows are topmost, so a bar that was raised later would otherwise
+    /// cover the island completely.
+    /// </summary>
+    public void BringAboveDock()
+    {
+        if (!InTaskbar || !IsVisible)
+            return;
+
+        try
+        {
+            IntPtr handle = new WindowInteropHelper(this).Handle;
+            if (handle == IntPtr.Zero)
+                return;
+
+            NativeMethods.SetWindowPos(handle, (IntPtr)NativeMethods.HWND_TOPMOST, 0, 0, 0, 0,
+                NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Island topmost failed: " + ex.Message);
+        }
     }
 
     private void RefreshControls()
@@ -523,8 +552,10 @@ public partial class IslandWindow : Window
         ShelfCountText.Text = _shelf.Items.Count switch
         {
             0 => "",
-            1 => "1 file",
-            _ => $"{_shelf.Items.Count} file"
+            1 => _shelf.Items[0].IsFolder ? "1 cartella" : "1 file",
+            _ => _shelf.Items.Any(item => item.IsFolder)
+                ? $"{_shelf.Items.Count} elementi"
+                : $"{_shelf.Items.Count} file"
         };
 
         UpdateSections();
@@ -643,9 +674,9 @@ public partial class IslandWindow : Window
         (int added, int skipped, string? error) = await _shelf.AddFilesAsync(files);
         IslandStatus.Text = added switch
         {
-            0 => error ?? "Nessun file aggiunto",
-            1 => "File conservato nel cassetto",
-            _ => $"{added} file conservati"
+            0 => error ?? "Nessun elemento aggiunto",
+            1 => "Aggiunto al cassetto",
+            _ => $"{added} elementi nel cassetto"
         };
 
         if (skipped > 0)
@@ -701,14 +732,14 @@ public partial class IslandWindow : Window
     {
         ShelfZone.BorderBrush = FindBrush("C.Accent", Brushes.MediumPurple);
         ShelfZone.BorderThickness = new Thickness(1.5);
-        ShelfDropHint.Text = "Rilascia qui: il file resterà nel cassetto finché non lo sposti.";
+        ShelfDropHint.Text = "Rilascia qui: resterà nel cassetto finché non lo sposti.";
     }
 
     private void ResetShelfHighlight()
     {
         ShelfZone.BorderBrush = FindBrush("S.InnerBorder", Brushes.Transparent);
         ShelfZone.BorderThickness = new Thickness(1);
-        ShelfDropHint.Text = "Trascina qui i file per conservarli temporaneamente.";
+        ShelfDropHint.Text = "Trascina qui file o cartelle per conservarli temporaneamente.";
     }
 
     private void OnShelfItemMouseDown(object sender, MouseButtonEventArgs e)
@@ -742,12 +773,12 @@ public partial class IslandWindow : Window
         {
             // Explorer moved the stored copy: the drawer no longer owns it.
             _shelf.Remove(item);
-            IslandStatus.Text = "File spostato fuori dal cassetto";
+            IslandStatus.Text = "Spostato fuori dal cassetto";
             RefreshShelfSummary();
         }
         else if (effect == DragDropEffects.Copy)
         {
-            IslandStatus.Text = "Copia del file lasciata fuori dal cassetto";
+            IslandStatus.Text = "Copia lasciata fuori dal cassetto";
         }
     }
 
@@ -758,7 +789,7 @@ public partial class IslandWindow : Window
 
         var dialog = new OpenFolderDialog
         {
-            Title = "Sposta il file dal cassetto",
+            Title = "Sposta dal cassetto",
             Multiselect = false
         };
 
@@ -767,7 +798,7 @@ public partial class IslandWindow : Window
 
         if (_shelf.MoveTo(item, dialog.FolderName))
         {
-            IslandStatus.Text = "File spostato";
+            IslandStatus.Text = "Elemento spostato";
             RefreshShelfSummary();
         }
         else
@@ -782,8 +813,8 @@ public partial class IslandWindow : Window
             return;
 
         IslandStatus.Text = _shelf.Remove(item)
-            ? "File rimosso dal cassetto"
-            : "Impossibile rimuovere il file";
+            ? "Rimosso dal cassetto"
+            : "Impossibile rimuovere l'elemento";
         RefreshShelfSummary();
     }
 
@@ -849,7 +880,9 @@ public partial class IslandWindow : Window
             or nameof(AppSettings.IslandPlacement)
             or nameof(AppSettings.IslandShowActivities)
             or nameof(AppSettings.IslandShowShelf)
-            or nameof(AppSettings.IslandShowControls))
+            or nameof(AppSettings.IslandShowControls)
+            or nameof(AppSettings.ReplaceWindowsTaskbar)
+            or nameof(AppSettings.TaskbarFullWidth))
         {
             ApplyAppearance();
             if (IsLoaded)

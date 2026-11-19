@@ -714,6 +714,9 @@ public partial class App : Application
         _island = null;
     }
 
+    /// <summary>Raises the island above the bar when it is docked inside it.</summary>
+    internal void RaiseIslandAboveDock() => _island?.BringAboveDock();
+
     public void ShowSettings()
     {
         CloseStartPanel();

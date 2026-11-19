@@ -8,10 +8,10 @@ public sealed class AppSettings : ObservableObject
     private string _accentHex = "";
     private double _glassOpacity = 0.78;
     private double _cornerRadius = 22;
-    private double _iconSize = 26;
+    private double _iconSize = 34;
     private double _dockHeight = 62;
     private double _itemSpacing = 2;
-    private double _edgeMargin = 12;
+    private double _edgeMargin = 0;
     private bool _dockOnTop;
     private bool _autoHideDock;
     private bool _hideInFullscreen = true;

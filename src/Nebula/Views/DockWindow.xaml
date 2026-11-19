@@ -88,16 +88,24 @@
                         Visibility="{Binding FlatFillVisibility}" />
                 </Grid>
 
-                <Grid x:Name="ZoneHost" VerticalAlignment="Center" Margin="10,0">
+                <Grid x:Name="ZoneHost" VerticalAlignment="Center" Margin="6,0">
                     <StackPanel x:Name="AppsZone" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="StartButton" Width="{Binding ItemSize}" Height="{Binding ItemSize}"
                             Style="{StaticResource DockOrbButton}" Click="OnStartClick"
                             ToolTip="Start di Nebula  ·  tasto Windows">
-                        <UniformGrid Rows="2" Columns="2" Width="15" Height="15">
-                            <Ellipse Width="4.5" Height="4.5" Fill="{DynamicResource C.OnAccent}" Margin="1.3" />
-                            <Ellipse Width="4.5" Height="4.5" Fill="{DynamicResource C.OnAccent}" Margin="1.3" />
-                            <Ellipse Width="4.5" Height="4.5" Fill="{DynamicResource C.OnAccent}" Margin="1.3" />
-                            <Ellipse Width="4.5" Height="4.5" Fill="{DynamicResource C.OnAccent}" Margin="1.3" />
+                        <UniformGrid Rows="2" Columns="2" Width="16" Height="16">
+                            <Border Width="6.4" Height="6.4" CornerRadius="2"
+                                    Background="{DynamicResource C.AccentGrad}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Width="6.4" Height="6.4" CornerRadius="2"
+                                    Background="{DynamicResource C.AccentGrad}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Width="6.4" Height="6.4" CornerRadius="2"
+                                    Background="{DynamicResource C.AccentGrad}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Width="6.4" Height="6.4" CornerRadius="2"
+                                    Background="{DynamicResource C.AccentGrad}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </UniformGrid>
                     </Button>
 
@@ -295,6 +303,30 @@
                                                            TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
 
+                                            <StackPanel x:Name="MediaPart" Orientation="Horizontal"
+                                                        VerticalAlignment="Center"
+                                                        Visibility="Collapsed">
+                                                <Border Width="24" Height="24" CornerRadius="12"
+                                                        Background="{DynamicResource C.AccentSoft}">
+                                                    <TextBlock Text="{Binding MediaGlyph}"
+                                                               FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                               Foreground="{DynamicResource C.AccentText}"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                                <StackPanel Margin="8,0,2,0" VerticalAlignment="Center"
+                                                            Visibility="{Binding MediaTextVisibility}">
+                                                    <TextBlock Text="{Binding MediaTitle}" FontSize="10.5"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource C.Text}"
+                                                               MaxWidth="190" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding MediaArtist}" FontSize="8.5"
+                                                               Foreground="{DynamicResource C.TextMuted}"
+                                                               MaxWidth="190" TextTrimming="CharacterEllipsis"
+                                                               Visibility="{Binding HasMediaArtist, Converter={StaticResource BoolVis}}" />
+                                                </StackPanel>
+                                            </StackPanel>
+
                                             <TextBlock x:Name="IconPart" Text="{Binding Glyph}"
                                                        FontFamily="Segoe Fluent Icons" FontSize="13.5"
                                                        Foreground="{DynamicResource C.TextMuted}"
@@ -314,6 +346,9 @@
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding KindKey}" Value="Icon">
                                             <Setter TargetName="IconPart" Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding KindKey}" Value="Media">
+                                            <Setter TargetName="MediaPart" Property="Visibility" Value="Visible" />
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding KindKey}" Value="Separator">
                                             <Setter TargetName="SeparatorPart" Property="Visibility" Value="Visible" />

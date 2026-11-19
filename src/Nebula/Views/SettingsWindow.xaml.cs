@@ -213,9 +213,9 @@ public partial class SettingsWindow : Window
         try
         {
             var settings = _vm.Settings;
-            SizeCompact.IsChecked = MatchesSize(54, 22, 16, 0, 8);
-            SizeBalanced.IsChecked = MatchesSize(62, 26, 22, 2, 12);
-            SizeLarge.IsChecked = MatchesSize(74, 32, 28, 4, 16);
+            SizeCompact.IsChecked = MatchesSize(54, 28, 16, 0, 0);
+            SizeBalanced.IsChecked = MatchesSize(62, 34, 22, 2, 0);
+            SizeLarge.IsChecked = MatchesSize(74, 42, 28, 4, 0);
 
             MotionCalm.IsChecked = settings.AnimationsEnabled && settings.AnimationSpeed >= 1.4 && !settings.LaunchPulse;
             MotionBalanced.IsChecked = settings.AnimationsEnabled && settings.AnimationSpeed > 0.85 && settings.AnimationSpeed < 1.4;
@@ -253,24 +253,24 @@ public partial class SettingsWindow : Window
         {
             case "compact":
                 settings.DockHeight = 54;
-                settings.IconSize = 22;
+                settings.IconSize = 28;
                 settings.CornerRadius = 16;
                 settings.ItemSpacing = 0;
-                settings.EdgeMargin = 8;
+                settings.EdgeMargin = 0;
                 break;
             case "large":
                 settings.DockHeight = 74;
-                settings.IconSize = 32;
+                settings.IconSize = 42;
                 settings.CornerRadius = 28;
                 settings.ItemSpacing = 4;
-                settings.EdgeMargin = 16;
+                settings.EdgeMargin = 0;
                 break;
             default:
                 settings.DockHeight = 62;
-                settings.IconSize = 26;
+                settings.IconSize = 34;
                 settings.CornerRadius = 22;
                 settings.ItemSpacing = 2;
-                settings.EdgeMargin = 12;
+                settings.EdgeMargin = 0;
                 break;
         }
 

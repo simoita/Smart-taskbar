@@ -118,13 +118,11 @@ public sealed class UpdateCoordinator : IDisposable
             }
 
             SetState($"Disponibile {result.Version} (installata {CurrentVersion}).", result.Notes, true);
-            if (!automatic || !_settings.AutoUpdate)
-                return true;
 
             // The package is downloaded and applied only after the user confirms
-            // in the update window. This keeps the automatic flow visible and
-            // avoids restarting the app while the user is working.
-            Log.Write("Automatic update available: " + result.Version);
+            // in the update window. The popup appears for automatic checks and
+            // for manual ones, so a new release is never only a line in Studio.
+            Log.Write((automatic ? "Automatic" : "Manual") + " update available: " + result.Version);
             UpdateAvailable?.Invoke(result.Manifest);
             return true;
         }

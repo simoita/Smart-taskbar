@@ -2,7 +2,10 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- The Windows 10 1809 target unlocks the WinRT media-session API used by
+         the taskbar media widget; the desktop runtime is still .NET 8. -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
@@ -15,7 +18,7 @@
     <ApplicationIcon>Assets\nebula.ico</ApplicationIcon>
     <Product>Nebula Taskbar Studio</Product>
     <AssemblyTitle>Nebula</AssemblyTitle>
-    <Version>1.6.2</Version>
+    <Version>1.6.3</Version>
     <DebugType>embedded</DebugType>
     <SatelliteResourceLanguages>it;en</SatelliteResourceLanguages>
     <!-- WPF owns DPI awareness through app.manifest; WFAC010 is a WinForms-only suggestion. -->
