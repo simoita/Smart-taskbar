@@ -25,7 +25,7 @@ public sealed class TrayService : IDisposable
             Padding = new Padding(5, 7, 5, 7),
             // Reuse the shell font family so the menu still looks native on
             // Windows 10, where Segoe UI Variable is not installed.
-            Font = new Font(SystemFonts.MenuFont.FontFamily, 9.75f),
+            Font = new Font(SystemFonts.MenuFont?.FontFamily ?? new FontFamily("Segoe UI"), 9.75f),
             BackColor = System.Drawing.Color.FromArgb(26, 22, 38),
             ForeColor = System.Drawing.Color.FromArgb(242, 242, 255)
         };
