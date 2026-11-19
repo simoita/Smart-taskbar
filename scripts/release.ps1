@@ -50,7 +50,12 @@ if ((& git tag --list $tag)) {
     throw "Il tag $tag esiste già."
 }
 
-$updated = [regex]::Replace($project, '(<Version>)\s*[0-9]+\.[0-9]+\.[0-9]+\s*(</Version>)', "`$1$Version`$2", 1)
+# Braces keep the group reference apart from the version that follows:
+# "$1" + "1.6.2" would be read as the nonexistent group "$11".
+$updated = [regex]::Replace($project, '(<Version>)\s*[0-9]+\.[0-9]+\.[0-9]+\s*(</Version>)', "`${1}$Version`${2}", 1)
+if ($updated -notmatch "<Version>\s*$([regex]::Escape($Version))\s*</Version>") {
+    throw "La versione non è stata scritta correttamente in src/Nebula/Nebula.csproj."
+}
 [System.IO.File]::WriteAllText($projectPath, $updated, [System.Text.UTF8Encoding]::new($false))
 
 & git add "src/Nebula/Nebula.csproj"
