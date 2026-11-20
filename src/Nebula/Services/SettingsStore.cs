@@ -244,8 +244,18 @@ public sealed class SettingsStore : IDisposable
 internal static class Log
 {
     private static readonly object Gate = new();
-    private static readonly string FilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Nebula", "app.log");
+    private static readonly string FilePath = BuildPath();
+
+    // NEBULA_LOG_DIR exists so a diagnostic run can keep its log inside the
+    // repository instead of the real profile, next to NEBULA_DATA_DIR.
+    private static string BuildPath()
+    {
+        string? overrideDir = Environment.GetEnvironmentVariable("NEBULA_LOG_DIR");
+        string dir = string.IsNullOrWhiteSpace(overrideDir)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Nebula")
+            : Path.GetFullPath(overrideDir);
+        return Path.Combine(dir, "app.log");
+    }
 
     public static void Write(string message)
     {

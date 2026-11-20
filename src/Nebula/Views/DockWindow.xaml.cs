@@ -557,11 +557,10 @@ public partial class DockWindow : Window
             return;
         }
 
-        Grid.SetColumn(blocks[0], 0);
-        ZoneHost.Children.Add(blocks[0]);
-
         if (blocks.Count == 2)
         {
+            Grid.SetColumn(blocks[0], 0);
+            ZoneHost.Children.Add(blocks[0]);
             Grid.SetColumn(blocks[1], 2);
             blocks[1].HorizontalAlignment = HorizontalAlignment.Right;
             ZoneHost.Children.Add(blocks[1]);
@@ -603,6 +602,9 @@ public partial class DockWindow : Window
             ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
+            // The apps block was never added before this branch: adding it here
+            // is what used to crash the startup with "element already a child"
+            // when the island lived inside the bar.
             Grid.SetColumn(appsBlock, 1);
             ZoneHost.Children.Add(appsBlock);
 
@@ -610,6 +612,9 @@ public partial class DockWindow : Window
             ZoneHost.Children.Add(right);
             return;
         }
+
+        Grid.SetColumn(blocks[0], 0);
+        ZoneHost.Children.Add(blocks[0]);
 
         Grid.SetColumn(blocks[1], 1);
         blocks[1].HorizontalAlignment = HorizontalAlignment.Center;
