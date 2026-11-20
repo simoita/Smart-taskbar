@@ -214,7 +214,7 @@ public partial class SettingsWindow : Window
         {
             var settings = _vm.Settings;
             SizeCompact.IsChecked = MatchesSize(54, 36, 16, 0, 0);
-            SizeBalanced.IsChecked = MatchesSize(62, 40, 22, 2, 0);
+            SizeBalanced.IsChecked = MatchesSize(62, 42, 22, 2, 0);
             SizeLarge.IsChecked = MatchesSize(74, 48, 28, 4, 0);
 
             MotionCalm.IsChecked = settings.AnimationsEnabled && settings.AnimationSpeed >= 1.4 && !settings.LaunchPulse;
@@ -267,7 +267,7 @@ public partial class SettingsWindow : Window
                 break;
             default:
                 settings.DockHeight = 62;
-                settings.IconSize = 40;
+                settings.IconSize = 42;
                 settings.CornerRadius = 22;
                 settings.ItemSpacing = 2;
                 settings.EdgeMargin = 0;

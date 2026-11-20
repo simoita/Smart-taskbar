@@ -197,6 +197,30 @@
                                                     </RadioButton>
                                                 </UniformGrid>
 
+                                                <Border Style="{StaticResource Row}" Margin="0,14,0,0">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="420" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Dimensione delle icone" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Piccole, medie o grandi: cambiano subito, senza toccare l'altezza della barra."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0"
+                                                                       TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                        <ComboBox Width="190" Height="32" HorizontalAlignment="Right"
+                                                                  VerticalAlignment="Center"
+                                                                  AutomationProperties.Name="Dimensione delle icone"
+                                                                  ItemsSource="{Binding IconSizeOptions}"
+                                                                  SelectedValuePath="Id"
+                                                                  SelectedValue="{Binding IconSizePreset, Mode=TwoWay}">
+                                                            <ComboBox.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                                </DataTemplate>
+                                                            </ComboBox.ItemTemplate>
+                                                        </ComboBox>
+                                                    </Grid>
+                                                </Border>
+
                                                 <Button Content="Imposta i pixel precisi" Style="{StaticResource GhostButton}"
                                                         Padding="12,7" HorizontalAlignment="Left" Margin="0,14,0,0"
                                                         Click="OnTogglePreciseSizes" />

@@ -1063,8 +1063,10 @@ public partial class DockWindow : Window
         if (!_vm.Settings.HoverMagnify || sender is not Button button)
             return;
 
-        Panel.SetZIndex(button, 1);
-        AnimateItem(button, 1.13, 0.16, true);
+        // The icon grows above its neighbours; the bar no longer clips it and
+        // the higher Z-order keeps it in front of the other buttons.
+        Panel.SetZIndex(button, 10);
+        AnimateItem(button, 1.35, 0.18, true);
     }
 
     private void OnDockItemLeave(object sender, MouseEventArgs e)
@@ -1087,7 +1089,7 @@ public partial class DockWindow : Window
             scale.ScaleX = to;
             scale.ScaleY = to;
             if (lift is not null)
-                lift.Y = to > 1 ? -4 : 0;
+                lift.Y = to > 1 ? -10 : 0;
             return;
         }
 
@@ -1103,7 +1105,7 @@ public partial class DockWindow : Window
         if (lift is not null)
         {
             lift.BeginAnimation(TranslateTransform.YProperty,
-                new DoubleAnimation(to > 1 ? -4 : 0, TimeSpan.FromSeconds(adjusted))
+                new DoubleAnimation(to > 1 ? -10 : 0, TimeSpan.FromSeconds(adjusted))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 });

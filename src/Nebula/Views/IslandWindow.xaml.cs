@@ -44,6 +44,7 @@ public partial class IslandWindow : Window
 
     private Point _shelfDragStart;
     private ShelfItem? _shelfDragItem;
+    private string _lastBarPlacement = "";
 
     public IslandWindow(DockViewModel dock, ActivityCenter activities, FileShelf shelf)
     {
@@ -429,6 +430,35 @@ public partial class IslandWindow : Window
         // Floating keeps the screen centre; docked inside the bar the capsule
         // sits in the slot the bar reserves next to the Start button.
         DockWindow? hostingBar = inBar ? App.Instance?.DockForMonitor(settings.MonitorIndex) : null;
+
+        // An owned window is always drawn above its owner, so the capsule cannot
+        // disappear behind the bar even though both windows are topmost.
+        if (inBar && hostingBar is { IsVisible: true })
+        {
+            if (!ReferenceEquals(Owner, hostingBar))
+            {
+                try
+                {
+                    Owner = hostingBar;
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("Island owner failed: " + ex.Message);
+                }
+            }
+        }
+        else if (Owner is not null)
+        {
+            try
+            {
+                Owner = null;
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Island owner reset failed: " + ex.Message);
+            }
+        }
+
         double centerX = bounds.Left + bounds.Width / 2;
         if (hostingBar is not null && hostingBar.TryGetIslandSlotCenter(out double slotCenter))
             centerX = slotCenter;
@@ -470,6 +500,17 @@ public partial class IslandWindow : Window
             Top = settings.DockOnTop
                 ? capsuleCenterY - _compactHeight / 2
                 : capsuleCenterY + _compactHeight / 2 - Height;
+
+            // One line per distinct placement, so app.log shows where the bar and
+            // the capsule ended up if it ever looks empty again.
+            string placement = $"{barTop:0}/{barHeight:0}/{Top:0}/{Left:0}";
+            if (!string.Equals(placement, _lastBarPlacement, StringComparison.Ordinal))
+            {
+                _lastBarPlacement = placement;
+                Log.Write("Island in bar: bar=" + $"{barTop:0}..{barTop + barHeight:0}" +
+                          $", capsule={Top + Height - _compactHeight:0}..{Top + Height:0}" +
+                          $", left={Left:0}, owner={(Owner is null ? "none" : "bar")}");
+            }
 
             // The bar and the island are both topmost windows: moving the
             // capsule into the bar does not raise it, so without this it stays

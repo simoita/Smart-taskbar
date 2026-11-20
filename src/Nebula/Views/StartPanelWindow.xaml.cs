@@ -86,6 +86,29 @@ public partial class StartPanelWindow : Window
             app.Catalog.Loaded += OnCatalogLoaded;
             app.Files.IndexReady += OnFilesReady;
         }
+
+        // The panel is already full-screen and correctly sized before it is
+        // shown, so it does not appear small and then jump into place.
+        ApplyScreenGeometry();
+    }
+
+    private void ApplyScreenGeometry()
+    {
+        var appSettings = App.Instance?.Settings;
+        Rect work = ScreenGeometry.BoundsDip(ScreenGeometry.PanelTarget(
+            appSettings?.MonitorIndex ?? 0,
+            appSettings?.PanelsFollowDock ?? true));
+        Left = work.Left;
+        Top = work.Top;
+        Width = work.Width;
+        Height = work.Height;
+
+        double bottom = appSettings is { ReplaceWindowsTaskbar: true, DockOnTop: false } settings
+            ? settings.DockHeight + 18
+            : 24;
+
+        Panel.Margin = new Thickness(0, 0, 0, bottom);
+        Panel.Height = Math.Clamp(work.Height - bottom - 54, 420, 680);
     }
 
     private void OnClosed(object? sender, EventArgs e)
@@ -276,21 +299,7 @@ public partial class StartPanelWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        var appSettings = App.Instance?.Settings;
-        Rect work = ScreenGeometry.BoundsDip(ScreenGeometry.PanelTarget(
-            appSettings?.MonitorIndex ?? 0,
-            appSettings?.PanelsFollowDock ?? true));
-        Left = work.Left;
-        Top = work.Top;
-        Width = work.Width;
-        Height = work.Height;
-
-        double bottom = App.Instance?.Settings is { ReplaceWindowsTaskbar: true, DockOnTop: false } settings
-            ? settings.DockHeight + 18
-            : 24;
-
-        Panel.Margin = new Thickness(0, 0, 0, bottom);
-        Panel.Height = Math.Clamp(work.Height - bottom - 54, 420, 680);
+        ApplyScreenGeometry();
 
         // Un programma installato durante la sessione compare senza riavvio.
         App.Instance?.Catalog.LoadAsync();

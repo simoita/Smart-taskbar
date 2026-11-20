@@ -202,6 +202,10 @@ public sealed class SettingsViewModel : ObservableObject
         {
             SyncTaskbarWidgets();
         }
+        else if (e.PropertyName == nameof(AppSettings.IconSize))
+        {
+            OnPropertyChanged(nameof(IconSizePreset));
+        }
     }
 
     public AppSettings Settings { get; }
@@ -258,6 +262,29 @@ public sealed class SettingsViewModel : ObservableObject
         new("floating", "Flottante in alto"),
         new("taskbar", "Dentro la taskbar")
     };
+    public IReadOnlyList<IconSizeOptionViewModel> IconSizeOptions { get; } = new List<IconSizeOptionViewModel>
+    {
+        new("small", "Piccole (36 px)"),
+        new("medium", "Medie (42 px)"),
+        new("large", "Grandi (48 px)")
+    };
+
+    /// <summary>Three explicit icon sizes, independent of the bar height.</summary>
+    public string IconSizePreset
+    {
+        get => Settings.IconSize >= 46 ? "large" : Settings.IconSize >= 39 ? "medium" : "small";
+        set
+        {
+            Settings.IconSize = value switch
+            {
+                "large" => 48,
+                "medium" => 42,
+                _ => 36
+            };
+            OnPropertyChanged();
+        }
+    }
+
     public IReadOnlyList<ZoneOrderOptionViewModel> ZoneOrderOptions { get; } = new List<ZoneOrderOptionViewModel>
     {
         new("apps,system,actions", "App · Sistema · Azioni"),
@@ -622,6 +649,7 @@ public sealed record ScreenOptionViewModel(int Index, string DisplayName);
 public sealed record TabStyleOptionViewModel(string Id, string Name);
 public sealed record TabPositionOptionViewModel(string Id, string Name);
 public sealed record ZoneOrderOptionViewModel(string Id, string Name);
+public sealed record IconSizeOptionViewModel(string Id, string Name);
 public sealed record ShortcutInfoViewModel(string Name, string Path);
 
 public sealed class TaskbarWidgetOptionViewModel

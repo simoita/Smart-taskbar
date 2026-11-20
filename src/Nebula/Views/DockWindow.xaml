@@ -24,7 +24,7 @@
                 PreviewMouseDown="OnShellMouseDown"
                 MouseRightButtonUp="OnDockBackgroundRightClick">
 
-            <Grid ClipToBounds="True">
+            <Grid ClipToBounds="False">
                 <Grid x:Name="ShellChrome">
                 <Border CornerRadius="{Binding ShellRadius}" Background="{Binding Backdrop}"
                         Visibility="{Binding BackdropVisibility}" Opacity="0.55" />
