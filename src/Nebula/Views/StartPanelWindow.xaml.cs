@@ -293,6 +293,9 @@ public partial class StartPanelWindow : Window
         Panel.Margin = new Thickness(0, 0, 0, bottom);
         Panel.Height = Math.Clamp(work.Height - bottom - 54, 420, 680);
 
+        // Un programma installato durante la sessione compare senza riavvio.
+        App.Instance?.Catalog.LoadAsync();
+
         _shownAt = DateTime.UtcNow;
         SearchBox.Focus();
         Keyboard.Focus(SearchBox);

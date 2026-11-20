@@ -99,6 +99,10 @@ public partial class LauncherWindow : Window
 
         AnimateIn();
 
+        // Il catalogo viene ricostruito se è vecchio: un programma installato
+        // durante la sessione deve comparire senza riavviare Nebula.
+        _catalog.LoadAsync();
+
         _shownAt = DateTime.UtcNow;
         SearchBox.Focus();
         Keyboard.Focus(SearchBox);

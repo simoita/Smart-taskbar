@@ -1,7 +1,10 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
+using System.Text;
 using System.Windows.Media;
 using Nebula.Interop;
+using Nebula.Utilities;
 
 namespace Nebula.Services;
 
@@ -50,7 +53,7 @@ public sealed class AppEntry : INotifyPropertyChanged
     }
 
     /// <summary>Cached lowercase name: ranking runs on every keystroke.</summary>
-    public string NameLower => _nameLower ??= Name.ToLowerInvariant();
+    public string NameLower => _nameLower ??= SearchText.Fold(Name);
 
     /// <summary>Cached words of the name, so a query never splits it again.</summary>
     public string[] NameWords => _nameWords ??=
@@ -58,8 +61,30 @@ public sealed class AppEntry : INotifyPropertyChanged
 
     private string[]? _nameWords;
 
-    public string SearchKey => _searchKey ??=
-        (Name + " " + Keywords).Trim().ToLowerInvariant();
+    /// <summary>"vsc" finds "Visual Studio Code": the initials are built once.</summary>
+    public string Initials => _initials ??= SearchText.Initials(NameWords);
+
+    private string? _initials;
+
+    /// <summary>
+    /// Name, keywords and the executable file name: many installed programs are
+    /// known by their .exe ("chrome") more than by their display name.
+    /// </summary>
+    public string SearchKey => _searchKey ??= SearchText.Fold(
+        (Name + " " + Keywords + " " + System.IO.Path.GetFileNameWithoutExtension(Path ?? "")).Trim());
+
+    /// <summary>True when every typed word matches, whatever the order.</summary>
+    public bool MatchesAll(string[] tokens)
+    {
+        foreach (string token in tokens)
+        {
+            if (!NameLower.Contains(token, StringComparison.Ordinal) &&
+                !SearchKey.Contains(token, StringComparison.Ordinal))
+                return false;
+        }
+
+        return true;
+    }
 
     public void EnsureIcon()
     {
@@ -78,6 +103,7 @@ public sealed class AppCatalog
     private readonly object _gate = new();
     private List<AppEntry> _apps = new();
     private bool _loading;
+    private DateTime _loadedUtc;
 
     public IReadOnlyList<AppEntry> Apps => _apps;
 
@@ -85,9 +111,15 @@ public sealed class AppCatalog
 
     public event Action? Loaded;
 
-    public void LoadAsync()
+    /// <summary>
+    /// Builds the catalog off the UI thread. A stale catalog is rebuilt too, so
+    /// a program installed while Nebula runs appears without a restart.
+    /// </summary>
+    public void LoadAsync(bool force = false)
     {
         if (_loading)
+            return;
+        if (!force && IsLoaded && DateTime.UtcNow - _loadedUtc < TimeSpan.FromMinutes(5))
             return;
 
         _loading = true;
@@ -96,7 +128,9 @@ public sealed class AppCatalog
             List<AppEntry> scanned = Scan();
             lock (_gate)
                 _apps = scanned;
+            _loadedUtc = DateTime.UtcNow;
             IsLoaded = true;
+            Log.Write($"App catalog ready: {scanned.Count} entries.");
             _loading = false;
             Loaded?.Invoke();
         });
@@ -111,14 +145,19 @@ public sealed class AppCatalog
         if (string.IsNullOrWhiteSpace(query))
             return apps.Take(limit).ToList();
 
-        string q = query.Trim().ToLowerInvariant();
+        // Accents are folded and the words are matched one by one, so "attivita",
+        // "studio code" and "chrome google" all find their program.
+        string q = SearchText.Fold(query.Trim());
+        string[]? tokens = q.IndexOf(' ') >= 0
+            ? q.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            : null;
 
         // Plain loop over the cached lowercase names: this runs on every
         // keystroke and must not allocate an object per catalog entry.
         var matches = new List<(int Rank, AppEntry App)>(Math.Min(apps.Count, limit * 4));
         foreach (AppEntry app in apps)
         {
-            int rank = Rank(app, q);
+            int rank = Rank(app, q, tokens);
             if (rank >= 0)
                 matches.Add((rank, app));
         }
@@ -154,17 +193,23 @@ public sealed class AppCatalog
             string.Equals(app.Path, path, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static int Rank(AppEntry app, string query)
+    private static int Rank(AppEntry app, string query, string[]? tokens)
     {
         string name = app.NameLower;
-        if (name.StartsWith(query, StringComparison.Ordinal))
+        if (name.Equals(query, StringComparison.Ordinal))
             return 0;
-        if (app.NameWords.Any(word => word.StartsWith(query, StringComparison.Ordinal)))
+        if (name.StartsWith(query, StringComparison.Ordinal))
             return 1;
-        if (name.Contains(query, StringComparison.Ordinal))
+        if (app.NameWords.Any(word => word.StartsWith(query, StringComparison.Ordinal)))
             return 2;
-        if (app.SearchKey.Contains(query, StringComparison.Ordinal))
+        if (query.Length >= 2 && app.Initials.StartsWith(query, StringComparison.Ordinal))
             return 3;
+        if (name.Contains(query, StringComparison.Ordinal))
+            return 4;
+        if (tokens is { Length: > 1 } && app.MatchesAll(tokens))
+            return 5;
+        if (app.SearchKey.Contains(query, StringComparison.Ordinal))
+            return 6;
         return -1;
     }
 
@@ -173,12 +218,23 @@ public sealed class AppCatalog
         var found = new List<AppEntry>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Executables already covered by an entry, so a Start menu shortcut and
+        // the installed program it starts never appear twice.
+        var seenTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         void Add(string name, string path, string subtitle = "", string keywords = "",
             string? glyph = null, string? action = null, AppEntryKind kind = AppEntryKind.Application)
         {
             if (string.IsNullOrWhiteSpace(name) || !seen.Add(name + "|" + path))
                 return;
+
+            if (kind == AppEntryKind.Application && !string.IsNullOrWhiteSpace(path) &&
+                Path.IsPathRooted(path))
+            {
+                string? target = ShortcutResolver.ResolveExecutable(path);
+                if (target is not null && !seenTargets.Add(target))
+                    return;
+            }
 
             // A Start-menu shortcut and the packaged app can describe the same
             // program; the first (more specific) entry wins.
@@ -361,6 +417,18 @@ public sealed class AppCatalog
                 AppEntryKind.Application);
         }
 
+        // Programs without any Start menu shortcut: Chrome, Edge, Git, Python,
+        // per-user installs and portable apps. The uninstall registry and the
+        // app folders are the only places that know about them.
+        foreach (InstalledProgram program in InstalledPrograms.Enumerate())
+        {
+            if (ShouldSkip(program.Name))
+                continue;
+
+            Add(program.Name, program.Executable, "Programma installato",
+                "programma installato app installata", null, null, AppEntryKind.Application);
+        }
+
         return found
             .OrderBy(a => a.ActionId is null ? 1 : 0)
             .ThenBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase)
@@ -369,12 +437,68 @@ public sealed class AppCatalog
 
     private static bool ShouldSkip(string name)
     {
+        // Voci che non sono programmi: disinstallatori, documentazione, siti.
         string[] blocked =
         {
-            "uninstall", "disinstalla", "readme", "read me", "release notes", "help", "guida",
-            "website", "sito web", "license", "licenza", "documentation", "modifica"
+            "uninstall", "disinstalla", "readme", "read me", "release notes", "guida",
+            "website", "sito web", "license", "licenza", "documentation", "modifica",
+            "revision history", "example script", "changelog",
+            "novità", "faq", "web site", "manuals", "module docs", "pdf help"
         };
         string lower = name.ToLowerInvariant();
         return blocked.Any(lower.Contains);
+    }
+}
+
+/// <summary>
+/// Accent-insensitive normalisation and initials for the app search: typing
+/// "attivita" or "vsc" must find "Attività" and "Visual Studio Code".
+/// </summary>
+internal static class SearchText
+{
+    public static string Fold(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return "";
+
+        string lowered = value.ToLowerInvariant();
+        bool plain = true;
+        foreach (char character in lowered)
+        {
+            if (character > 127)
+            {
+                plain = false;
+                break;
+            }
+        }
+
+        if (plain)
+            return lowered;
+
+        var builder = new StringBuilder(lowered.Length);
+        foreach (char character in lowered.Normalize(NormalizationForm.FormD))
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
+                builder.Append(character);
+        }
+
+        return builder.ToString().Normalize(NormalizationForm.FormC);
+    }
+
+    public static string Initials(string[] words)
+    {
+        if (words.Length == 0)
+            return "";
+        if (words.Length == 1)
+            return words[0].Length == 0 ? "" : words[0][..1];
+
+        var builder = new StringBuilder(words.Length);
+        foreach (string word in words)
+        {
+            if (word.Length > 0)
+                builder.Append(word[0]);
+        }
+
+        return builder.ToString();
     }
 }
