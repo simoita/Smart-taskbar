@@ -85,7 +85,7 @@ Il workflow è in `.github/workflows/release.yml`. Non richiede secret manuali: 
 ## Cosa succede sul PC dell'utente
 
 - Il controllo automatico parte **15 secondi dopo l'avvio** e si ripete ogni **15 minuti**.
-- Se `AutoUpdate` è attivo e il manifest contiene una versione maggiore, Nebula mostra una finestra con versione installata, versione disponibile, note e i pulsanti **Più tardi** e **Aggiorna e riavvia**.
+- Se `AutoUpdate` è attivo e il manifest contiene una versione maggiore, Nebula mostra una finestra con versione installata, versione disponibile, note e i pulsanti **Più tardi** e **Aggiorna e riavvia**. Durante il download la finestra mostra una **barra di avanzamento** con la percentuale, i **byte scaricati sul totale** annunciato dal server e la **velocità** in MB/s; gli stessi dati compaiono nel pannello Studio se l'installazione parte da lì.
 - **Aggiorna e riavvia** scarica lo ZIP, verifica lo SHA-256, estrae in staging, scrive `%LOCALAPPDATA%\Nebula\updates\update-state.json`, genera `recover-update.ps1` e registra la voce `RunOnce` `NebulaUpdateRecovery`.
 - Lo script attende la chiusura di Nebula e del watchdog, quindi rinomina la cartella corrente in `.old`, mette la nuova build in posizione e preserva `unins000.exe`/`unins000.dat`. La nuova build viene avviata con `--startup`.
 - La nuova build scrive `update-confirmed.txt` solo dopo il Boot riuscito e il controllo di taskbar/AppBar; lo script attende fino a **60 secondi**. Se la conferma non arriva (crash, binario non valido, taskbar non riservata), ferma la nuova build, sposta la cartella guasta in `.failed`, ripristina `.old`, rimuove stato e `RunOnce`, scrive il marker di errore e riapre `Nebula.exe`.

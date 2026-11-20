@@ -15,8 +15,8 @@ public sealed record UpdateState(string Message, string Notes, bool HasUpdate);
 /// </summary>
 public sealed class UpdateCoordinator : IDisposable
 {
-    private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan StartupDelay = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(10);
 
     private readonly AppSettings _settings;
     private readonly UpdateService _service = new();
@@ -46,6 +46,9 @@ public sealed class UpdateCoordinator : IDisposable
     public event Action<UpdateState>? StateChanged;
     public event Action<UpdateManifest>? UpdateAvailable;
     public event Action? UpdateReady;
+
+    /// <summary>Live download metrics while a package is being fetched.</summary>
+    public event Action<UpdateProgress>? DownloadProgress;
 
     public void Start()
     {
@@ -155,7 +158,9 @@ public sealed class UpdateCoordinator : IDisposable
         try
         {
             SetState("Download e verifica del pacchetto…", _state.Notes, true);
-            (bool ok, string message) = await _service.InstallAsync(_pendingUpdate, cancellationToken)
+            var progress = new Progress<UpdateProgress>(value => DownloadProgress?.Invoke(value));
+            (bool ok, string message) = await _service
+                .InstallAsync(_pendingUpdate, cancellationToken, progress)
                 .ConfigureAwait(true);
             SetState(message, _state.Notes, !ok);
             if (ok)

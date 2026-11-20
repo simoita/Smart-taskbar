@@ -339,7 +339,18 @@ public sealed class SettingsViewModel : ObservableObject
             return;
         }
 
-        await _updates.InstallPendingAsync();
+        void OnProgress(UpdateProgress progress) =>
+            UpdateStatus = "Download del pacchetto: " + progress.Describe();
+
+        _updates.DownloadProgress += OnProgress;
+        try
+        {
+            await _updates.InstallPendingAsync();
+        }
+        finally
+        {
+            _updates.DownloadProgress -= OnProgress;
+        }
     }
     public string TabsSummary
     {

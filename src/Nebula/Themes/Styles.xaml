@@ -658,6 +658,27 @@
         </Setter>
     </Style>
 
+    <!-- Download progress: a solid 8 px bar for the update window. -->
+    <Style x:Key="DownloadBar" TargetType="ProgressBar">
+        <Setter Property="Height" Value="8" />
+        <Setter Property="Background" Value="{DynamicResource C.Track}" />
+        <Setter Property="Foreground" Value="{DynamicResource C.AccentGrad}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid>
+                        <Border x:Name="PART_Track" CornerRadius="4"
+                                Background="{TemplateBinding Background}" />
+                        <Border x:Name="PART_Indicator" CornerRadius="4"
+                                Background="{TemplateBinding Foreground}"
+                                HorizontalAlignment="Left" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Scrollbar -->
     <Style TargetType="ScrollBar">
         <Setter Property="Width" Value="10" />

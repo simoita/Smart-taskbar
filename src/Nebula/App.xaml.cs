@@ -274,6 +274,7 @@ public partial class App : Application
 
         Updates.UpdateReady += OnUpdateReady;
         Updates.UpdateAvailable += OnUpdateAvailable;
+        Updates.DownloadProgress += progress => _updatePrompt?.SetProgress(progress);
         Updates.Start();
 
         StartPipeServer();

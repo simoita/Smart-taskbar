@@ -6,6 +6,8 @@ L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminan
 
 **Novità 1.2:** pannello **Icone di sistema** con stili applicabili a collegamenti `.lnk`, tipi file e cartelle utente del profilo, icone personali dal dialog di Windows, ICO multi-size 16–256 px, backup esatto e recovery dopo chiusura forzata. Dettagli in [docs/icone-sistema.md](docs/icone-sistema.md).
 
+**Novità 1.6.9:** gli **aggiornamenti sono automatici** davvero: controllo 8 secondi dopo l'avvio e poi ogni 10 minuti sul canale GitHub, con popup alla nuova versione; durante il download la finestra mostra una **barra di avanzamento** con la percentuale, **quanti MB sono stati scaricati sul totale** e la **velocità** in MB/s, e gli stessi dati compaiono anche nel pannello Studio se l'installazione parte da lì.
+
 **Novità 1.6.8:** **icone più grandi** nella barra (40 px di base, fino a 52 dalle dimensioni esatte, e l'icona riempie quasi tutto il suo riquadro), **icone riordinabili trascinandole**: premi un'icona e trascinala sopra un'altra per scambiare la posizione — l'ordine resta anche dopo un riavvio e vale pure per il pannello Start; nell'isola espansa i **titoli delle attività lunghe vanno a capo** invece di essere tagliati con i puntini.
 
 **Novità 1.6.7:** la **Dynamic Island dentro la barra** ora si aggancia al rettangolo reale della barra invece che al bordo del monitor: se Windows lascia alla taskbar nativa la fascia inferiore (o se l'AppBar viene spostata più in alto), la capsula resta dentro la barra e non finisce più dietro o sotto la taskbar di Windows; l'isola viene inoltre impilata subito sopra la barra, non solo resa *topmost*, quindi cliccare la barra non la copre.

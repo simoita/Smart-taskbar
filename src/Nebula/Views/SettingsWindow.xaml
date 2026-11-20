@@ -2117,14 +2117,14 @@
                                         <Border Style="{StaticResource Card}" Margin="0,0,0,20">
                                             <StackPanel>
                                                 <TextBlock Text="AGGIORNAMENTI" Style="{StaticResource T.Section}" />
-                                                <TextBlock Text="Nebula controlla GitHub Releases all'avvio e ogni 15 minuti. Se è disponibile una versione nuova mostra il popup Aggiorna e riavvia: il download, la verifica SHA-256, l'installazione e il riavvio sono automatici. Il manifest predefinito punta all'ultima Release GitHub; puoi sovrascriverlo con un URL personalizzato."
+                                                <TextBlock Text="Nebula controlla GitHub Releases all'avvio e ogni 10 minuti. Se è disponibile una versione nuova mostra il popup Aggiorna e riavvia: il download, la verifica SHA-256, l'installazione e il riavvio sono automatici. Il manifest predefinito punta all'ultima Release GitHub; puoi sovrascriverlo con un URL personalizzato."
                                                            Style="{StaticResource T.Caption}" Margin="0,0,0,10" TextWrapping="Wrap" />
                                                 <Border Style="{StaticResource Row}">
                                                     <Grid>
                                                         <StackPanel MaxWidth="560" HorizontalAlignment="Left">
                                                             <TextBlock Text="Aggiornamenti automatici" FontSize="13"
                                                                        Foreground="{DynamicResource C.Text}" />
-                                                            <TextBlock Text="Controllo all'avvio e ogni 15 minuti; popup con Aggiorna e riavvio automatici quando viene pubblicata una nuova versione."
+                                                            <TextBlock Text="Controllo all'avvio e ogni 10 minuti; popup con Aggiorna e riavvio automatici quando viene pubblicata una nuova versione."
                                                                        Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
                                                         </StackPanel>
                                                         <CheckBox Style="{StaticResource Switch}" HorizontalAlignment="Right"

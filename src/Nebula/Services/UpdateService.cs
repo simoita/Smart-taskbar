@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -46,6 +48,38 @@ public static class UpdateDefaults
 }
 
 public sealed record UpdateManifest(string Version, string DownloadUrl, string Sha256, string Notes);
+
+/// <summary>
+/// Live download metrics: bytes received, the package size announced by the
+/// server and the current average speed.
+/// </summary>
+public sealed record UpdateProgress(long Downloaded, long? Total, double BytesPerSecond)
+{
+    private static readonly CultureInfo Culture = CultureInfo.GetCultureInfo("it-IT");
+
+    public double? Percent => Total is > 0
+        ? Math.Clamp(Downloaded * 100.0 / Total.Value, 0, 100)
+        : null;
+
+    /// <summary>"12,4 MB di 73,9 MB · 5,2 MB/s"</summary>
+    public string Describe()
+    {
+        string done = Size(Downloaded);
+        string speed = Size((long)Math.Max(0, BytesPerSecond)) + "/s";
+        return Total is > 0
+            ? $"{done} di {Size(Total.Value)} · {speed}"
+            : $"{done} · {speed}";
+    }
+
+    private static string Size(long bytes)
+    {
+        if (bytes >= 1024L * 1024 * 1024)
+            return (bytes / 1024.0 / 1024 / 1024).ToString("0.00", Culture) + " GB";
+        if (bytes >= 1024 * 1024)
+            return (bytes / 1024.0 / 1024).ToString("0.0", Culture) + " MB";
+        return (bytes / 1024.0).ToString("0", Culture) + " KB";
+    }
+}
 
 public sealed record UpdateCheckResult(bool HasUpdate, string Version, string Notes, UpdateManifest? Manifest,
     string? Error, bool Suppressed = false);
@@ -122,7 +156,7 @@ public sealed class UpdateService
     }
 
     public async Task<(bool Ok, string Message)> InstallAsync(UpdateManifest manifest,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, IProgress<UpdateProgress>? progress = null)
     {
         if (!Uri.TryCreate(manifest.DownloadUrl, UriKind.Absolute, out Uri? uri) ||
             !IsAllowedUpdateUri(uri))
@@ -139,9 +173,41 @@ public sealed class UpdateService
             if (Directory.Exists(staging))
                 Directory.Delete(staging, true);
 
-            await using (Stream source = await DownloadHttp.GetStreamAsync(uri, cancellationToken).ConfigureAwait(false))
-            await using (var target = File.Create(zipPath))
-                await source.CopyToAsync(target, cancellationToken).ConfigureAwait(false);
+            using (HttpResponseMessage response = await DownloadHttp
+                       .GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                       .ConfigureAwait(false))
+            {
+                response.EnsureSuccessStatusCode();
+                long? total = response.Content.Headers.ContentLength;
+                await using Stream source = await response.Content
+                    .ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                await using var target = File.Create(zipPath);
+
+                var buffer = new byte[81920];
+                long downloaded = 0;
+                var clock = Stopwatch.StartNew();
+                TimeSpan lastReport = TimeSpan.Zero;
+
+                int read;
+                while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+                {
+                    await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    downloaded += read;
+
+                    // Four updates per second are enough for a smooth bar and do
+                    // not flood the dispatcher while the file is being written.
+                    TimeSpan elapsed = clock.Elapsed;
+                    if (elapsed - lastReport < TimeSpan.FromMilliseconds(150))
+                        continue;
+
+                    lastReport = elapsed;
+                    progress?.Report(new UpdateProgress(downloaded, total,
+                        downloaded / Math.Max(0.001, elapsed.TotalSeconds)));
+                }
+
+                progress?.Report(new UpdateProgress(downloaded, total ?? downloaded,
+                    downloaded / Math.Max(0.001, clock.Elapsed.TotalSeconds)));
+            }
 
             string actualHash = await Sha256Async(zipPath, cancellationToken).ConfigureAwait(false);
             if (!string.Equals(actualHash, manifest.Sha256.Trim(), StringComparison.OrdinalIgnoreCase))
