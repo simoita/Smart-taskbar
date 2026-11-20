@@ -428,21 +428,12 @@ public partial class IslandWindow : Window
 
         // Floating keeps the screen centre; docked inside the bar the capsule
         // sits in the slot the bar reserves next to the Start button.
+        DockWindow? hostingBar = inBar ? App.Instance?.DockForMonitor(settings.MonitorIndex) : null;
         double centerX = bounds.Left + bounds.Width / 2;
-        if (inBar &&
-            App.Instance?.DockForMonitor(settings.MonitorIndex) is { } hostingBar &&
-            hostingBar.TryGetIslandSlotCenter(out double slotCenter))
-        {
+        if (hostingBar is not null && hostingBar.TryGetIslandSlotCenter(out double slotCenter))
             centerX = slotCenter;
-        }
 
         Left = centerX - Width / 2;
-
-        // Without a reserved work area the bar sits above the native taskbar,
-        // exactly like the dock itself does.
-        Rect barArea = settings.ReplaceWindowsTaskbar && settings.ReserveTaskbarSpace
-            ? bounds
-            : ScreenGeometry.WorkAreaDip(screen);
 
         // Anchoring the capsule to the bottom keeps its screen position stable
         // while the panel grows upwards, which is what a bar at the bottom of
@@ -453,20 +444,32 @@ public partial class IslandWindow : Window
 
         if (inBar)
         {
-            double barHeight = Math.Max(44, settings.DockHeight);
-            double barTop = settings.DockOnTop
-                ? barArea.Top + settings.EdgeMargin
-                : barArea.Bottom - settings.EdgeMargin - barHeight;
-
-            if (settings.DockOnTop)
+            // Follow the bar's real on-screen rectangle. Windows does not always
+            // grant a strip flush with the monitor edge: while the native bar
+            // still holds the bottom band the AppBar sits higher, and anchoring
+            // to the monitor edge left the capsule behind the Windows taskbar.
+            double barTop;
+            double barHeight;
+            if (hostingBar is not null && hostingBar.TryGetBarScreenRect(out Rect barRect))
             {
-                Top = barTop + (barHeight - _compactHeight) / 2;
+                barTop = barRect.Top;
+                barHeight = barRect.Height;
             }
             else
             {
-                double capsuleBottom = barTop + (barHeight + _compactHeight) / 2;
-                Top = capsuleBottom - Height;
+                Rect fallback = settings.ReplaceWindowsTaskbar && settings.ReserveTaskbarSpace
+                    ? bounds
+                    : ScreenGeometry.WorkAreaDip(screen);
+                barHeight = Math.Max(44, settings.DockHeight);
+                barTop = settings.DockOnTop
+                    ? fallback.Top + settings.EdgeMargin
+                    : fallback.Bottom - settings.EdgeMargin - barHeight;
             }
+
+            double capsuleCenterY = barTop + barHeight / 2;
+            Top = settings.DockOnTop
+                ? capsuleCenterY - _compactHeight / 2
+                : capsuleCenterY + _compactHeight / 2 - Height;
 
             // The bar and the island are both topmost windows: moving the
             // capsule into the bar does not raise it, so without this it stays
@@ -497,7 +500,12 @@ public partial class IslandWindow : Window
             if (handle == IntPtr.Zero)
                 return;
 
-            NativeMethods.SetWindowPos(handle, (IntPtr)NativeMethods.HWND_TOPMOST, 0, 0, 0, 0,
+            // Sitting directly above the bar window keeps the capsule in the
+            // same topmost band, so later clicks on the bar no longer cover it.
+            IntPtr above = App.Instance?.DockForMonitor(_dock.Settings.MonitorIndex)?.NativeHandle ?? IntPtr.Zero;
+            NativeMethods.SetWindowPos(handle,
+                above != IntPtr.Zero ? above : (IntPtr)NativeMethods.HWND_TOPMOST,
+                0, 0, 0, 0,
                 NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
         }
         catch (Exception ex)

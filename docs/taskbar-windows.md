@@ -95,6 +95,18 @@ volta per migrare la configurazione esistente, poi la lista è l'unica fonte di
 verità. I widget sono indipendenti dall'ordine delle zone e possono stare anche
 in una dock non a tutta larghezza.
 
+## Serve l'amministratore?
+
+No: Windows non ha un'impostazione, un criterio di gruppo o una chiave di
+registro che "toglia" la taskbar lasciando attivo Explorer. `Shell_TrayWnd`
+appartiene alla stessa sessione utente, quindi nasconderla, metterla in
+auto-hide e riservare il bordo con l'AppBar funziona da un processo normale,
+senza elevazione. Le uniche vie che richiedono davvero l'amministratore sono la
+sostituzione della shell (`Winlogon\Shell`) o la modalità chiosco/Assigned
+Access: entrambe rimuovono Explorer e il desktop, non solo la barra, e non sono
+adatte a un uso quotidiano. Se la barra Nebula non arriva a filo del bordo è
+quindi un problema di geometria dell'AppBar, non di permessi.
+
 ## Confronto con Windows 11 Taskbar Styler (Windhawk)
 
 [Windows 11 Taskbar Styler](https://windhawk.net/mods/windows-11-taskbar-styler)

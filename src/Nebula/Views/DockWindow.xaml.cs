@@ -989,6 +989,45 @@ public partial class DockWindow : Window
             Dispatcher.InvokeAsync(() => App.Instance?.RaiseIslandAboveDock(), DispatcherPriority.Input);
     }
 
+    /// <summary>Handle of the bar window, used to stack the island right above it.</summary>
+    public IntPtr NativeHandle => _hwndSource?.Handle ?? IntPtr.Zero;
+
+    /// <summary>
+    /// The bar's real screen rectangle in DIPs. Windows can grant an AppBar
+    /// strip that is not flush with the monitor edge (the native bar still
+    /// claims the bottom band for a moment), so the docked island must follow
+    /// this rectangle instead of the edge the user selected.
+    /// </summary>
+    public bool TryGetBarScreenRect(out Rect rect)
+    {
+        rect = Rect.Empty;
+        if (Shell is null || !IsVisible || Shell.ActualWidth < 1 || Shell.ActualHeight < 1)
+            return false;
+
+        try
+        {
+            Point topLeft = Shell.PointToScreen(new Point(0, 0));
+            Point bottomRight = Shell.PointToScreen(new Point(Shell.ActualWidth, Shell.ActualHeight));
+            DpiScale dpi = VisualTreeHelper.GetDpi(this);
+            double scaleX = Math.Max(0.5, dpi.DpiScaleX);
+            double scaleY = Math.Max(0.5, dpi.DpiScaleY);
+
+            double left = topLeft.X / scaleX;
+            double top = topLeft.Y / scaleY;
+            double width = Math.Max(0, bottomRight.X - topLeft.X) / scaleX;
+            double height = Math.Max(0, bottomRight.Y - topLeft.Y) / scaleY;
+            if (width < 1 || height < 1)
+                return false;
+
+            rect = new Rect(left, top, width, height);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// Screen X (in DIPs) of the point where the docked island must be centred:
     /// the empty slot the bar reserves right next to the Start button.
