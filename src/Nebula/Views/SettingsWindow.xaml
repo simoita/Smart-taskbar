@@ -774,6 +774,33 @@
                                     <StackPanel>
                                         <Border Style="{StaticResource Card}" Margin="0,0,0,20">
                                             <StackPanel>
+                                                <TextBlock Text="ICONE DELLA BARRA" Style="{StaticResource T.Section}" />
+                                                <TextBlock Text="Piccole, medie o grandi: la dimensione si applica subito alla barra, senza cambiare l'altezza."
+                                                           Style="{StaticResource T.Caption}" Margin="0,0,0,10" TextWrapping="Wrap" />
+                                                <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
+                                                    <Grid>
+                                                        <TextBlock Text="Dimensione delle icone" FontSize="13"
+                                                                   Foreground="{DynamicResource C.Text}"
+                                                                   VerticalAlignment="Center" />
+                                                        <ComboBox Width="226" Height="32" HorizontalAlignment="Right"
+                                                                  VerticalAlignment="Center"
+                                                                  AutomationProperties.Name="Dimensione delle icone nella barra"
+                                                                  ItemsSource="{Binding IconSizeOptions}"
+                                                                  SelectedValuePath="Id"
+                                                                  SelectedValue="{Binding IconSizePreset, Mode=TwoWay}">
+                                                            <ComboBox.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                                </DataTemplate>
+                                                            </ComboBox.ItemTemplate>
+                                                        </ComboBox>
+                                                    </Grid>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}" Margin="0,0,0,20">
+                                            <StackPanel>
                                                 <TextBlock Text="POSIZIONE" Style="{StaticResource T.Section}" />
                                                 <Border Style="{StaticResource Row}">
                                                     <Grid>
@@ -969,7 +996,7 @@
                                                         <StackPanel MaxWidth="500" HorizontalAlignment="Left">
                                                             <TextBlock Text="Posizione dell'isola" FontSize="13"
                                                                        Foreground="{DynamicResource C.Text}" />
-                                                            <TextBlock Text="Dentro la taskbar la capsula sta al centro della barra e si espande verso il desktop; serve la barra a tutta larghezza."
+                                                            <TextBlock Text="Dentro la taskbar la capsula sta al centro della barra e si espande verso il desktop; la sostituzione della taskbar e la barra a tutta larghezza si attivano da sole."
                                                                        Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
                                                         </StackPanel>
                                                         <ComboBox Width="226" Height="32" HorizontalAlignment="Right"

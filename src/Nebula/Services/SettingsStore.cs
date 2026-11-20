@@ -92,6 +92,14 @@ public sealed class SettingsStore : IDisposable
             s.IslandStyle = "capsule";
         if (s.IslandPlacement is not ("floating" or "taskbar"))
             s.IslandPlacement = "floating";
+        if (s.IslandPlacement == "taskbar")
+        {
+            // A profile saved when the replacement was off must not leave the
+            // island floating: the docked capsule needs the Nebula bar.
+            s.ReplaceWindowsTaskbar = true;
+            s.TaskbarFullWidth = true;
+            s.ReserveTaskbarSpace = true;
+        }
         s.SearchCardWidth = Math.Clamp(s.SearchCardWidth, 560, 900);
         s.TabsBarHeight = Math.Clamp(s.TabsBarHeight, 34, 64);
         if (s.TabsStyle is not ("glass" or "minimal" or "neon" or "soft" or "mono" or "liquid"))

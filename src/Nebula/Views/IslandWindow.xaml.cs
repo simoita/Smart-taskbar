@@ -45,6 +45,7 @@ public partial class IslandWindow : Window
     private Point _shelfDragStart;
     private ShelfItem? _shelfDragItem;
     private string _lastBarPlacement = "";
+    private string _lastPositionState = "";
 
     public IslandWindow(DockViewModel dock, ActivityCenter activities, FileShelf shelf)
     {
@@ -523,6 +524,17 @@ public partial class IslandWindow : Window
         if (settings.ReplaceWindowsTaskbar && settings.DockOnTop)
             top = bounds.Top + settings.DockHeight + 20 + settings.IslandTopMargin;
         Top = top;
+
+        // If the island stays at the top while the user chose the bar, this line
+        // says exactly which prerequisite was off.
+        string state = $"floating; placement={settings.IslandPlacement}; " +
+                       $"replace={settings.ReplaceWindowsTaskbar}; fullWidth={settings.TaskbarFullWidth}; " +
+                       $"reserve={settings.ReserveTaskbarSpace}; top={Top:0}; left={Left:0}";
+        if (!string.Equals(state, _lastPositionState, StringComparison.Ordinal))
+        {
+            _lastPositionState = state;
+            Log.Write("Island position: " + state);
+        }
     }
 
     /// <summary>

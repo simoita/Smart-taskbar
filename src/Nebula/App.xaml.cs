@@ -617,6 +617,18 @@ public partial class App : Application
                 }
                 break;
 
+            case nameof(AppSettings.IslandPlacement):
+                if (Settings.IslandPlacement == "taskbar")
+                {
+                    // The capsule can only live inside the bar when that bar
+                    // exists: turn the replacement and the full-width layout on
+                    // instead of leaving the island floating at the top.
+                    Settings.ReplaceWindowsTaskbar = true;
+                    Settings.TaskbarFullWidth = true;
+                    Settings.ReserveTaskbarSpace = true;
+                }
+                break;
+
             case nameof(AppSettings.ShowIsland):
                 if (Settings.ShowIsland)
                     ShowIsland();
