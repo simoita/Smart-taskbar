@@ -361,9 +361,14 @@ public sealed class UpdateService
     {
         string a = (left ?? "").Trim().TrimStart('v', 'V');
         string b = (right ?? "").Trim().TrimStart('v', 'V');
-        return Version.TryParse(a, out Version? va) && Version.TryParse(b, out Version? vb)
-            ? va == vb
-            : string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+        if (Version.TryParse(a, out Version? va) && Version.TryParse(b, out Version? vb))
+        {
+            // "1.6.13" and "1.6.13.0" are the same release: the receipt must not
+            // fail just because one side carries the revision component.
+            return va.Major == vb.Major && va.Minor == vb.Minor && va.Build == vb.Build;
+        }
+
+        return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeHash(string hash) => (hash ?? "").Trim().ToLowerInvariant();

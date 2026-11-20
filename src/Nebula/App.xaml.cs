@@ -139,6 +139,28 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Write("Startup failed: " + ex);
+
+            // Never leave a half-started bar over the Windows taskbar: restore
+            // the shell bar first, then get out of the way.
+            try
+            {
+                Taskbar?.Restore();
+                _dockWindow?.HideForTaskbarRestore();
+            }
+            catch (Exception cleanupError)
+            {
+                Log.Write("Startup failure cleanup error: " + cleanupError.Message);
+            }
+
+            // During an update the apply script is waiting for a receipt. Exit
+            // at once so it rolls back, instead of a modal dialog sitting there
+            // until the 60 second deadline.
+            if (UpdateService.ReadPendingUpdate() is not null)
+            {
+                Shutdown();
+                return;
+            }
+
             MessageBox.Show(
                 "Nebula non è riuscita ad avviarsi.\n\n" + ex.Message,
                 "Nebula", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -203,14 +225,34 @@ public partial class App : Application
         bool replacementApplied = Taskbar.Apply(Settings.ReplaceWindowsTaskbar);
         UpdateTaskbarGuard();
 
-        _dockWindow = new DockWindow(Dock, _store);
-        if (Settings.ReplaceWindowsTaskbar && replacementApplied)
-            _dockWindow.Show();
-        _dockWindow.ApplySettings();
-        SyncDockWindows();
+        // A layout fault in the bar must not abort the whole app: the tray,
+        // settings and (most important during an update) the startup receipt
+        // still have to work.
+        try
+        {
+            _dockWindow = new DockWindow(Dock, _store);
+            if (Settings.ReplaceWindowsTaskbar && replacementApplied)
+                _dockWindow.Show();
+            _dockWindow.ApplySettings();
+            SyncDockWindows();
 
-        if (Settings.ShowIsland)
-            ShowIsland();
+            if (Settings.ShowIsland)
+                ShowIsland();
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Dock startup failed: " + ex);
+            try
+            {
+                _dockWindow?.HideForTaskbarRestore();
+                Taskbar.Restore();
+            }
+            catch (Exception cleanupError)
+            {
+                Log.Write("Dock startup cleanup error: " + cleanupError.Message);
+            }
+            replacementApplied = false;
+        }
 
         // Hiding the native bar is only half the guarantee. If the AppBar did
         // not reserve the work area, put the native bar back instead of leaving
@@ -220,7 +262,7 @@ public partial class App : Application
         {
             Log.Write("AppBar verification failed at startup; restoring the native taskbar.");
             Taskbar.Restore();
-            _dockWindow.HideForTaskbarRestore();
+            _dockWindow?.HideForTaskbarRestore();
             replacementApplied = false;
         }
 
@@ -1231,24 +1273,29 @@ public partial class App : Application
         if (!UpdateService.VersionMatches(pending.TargetVersion, Updates.CurrentVersion))
             return;
 
-        await Task.Delay(TimeSpan.FromSeconds(4));
-
-        // Give a slow boot (many startup apps, AppBar re-registration) more room
-        // before the updater decides to roll back. The script waits 60 seconds.
-        for (int attempt = 0; attempt < 70; attempt++)
+        // Boot reached this point, so the new build runs and its bar is up. The
+        // shell state below is diagnostic only: a refused AppBar reservation or
+        // a busy Explorer used to veto every attempt and loop the same package
+        // forever. A build that really cannot start never gets here.
+        for (int attempt = 0; attempt < 10; attempt++)
         {
             if (IsHealthyForUpdateConfirmation())
-            {
-                if (UpdateService.ConfirmHealthyUpdate(pending.Token))
-                    Log.Write("Update health confirmation written for " + pending.TargetVersion);
-                return;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
+                break;
+            await Task.Delay(500);
         }
 
-        Log.Write("Update health confirmation withheld: taskbar/AppBar did not reach a healthy state.");
+        Log.Write("Update health before confirmation: " + HealthSnapshot());
+        if (UpdateService.ConfirmHealthyUpdate(pending.Token))
+            Log.Write("Update health confirmation written for " + pending.TargetVersion);
+        else
+            Log.Write("Update confirmation was not written; the pending state or version did not match.");
     }
+
+    private string HealthSnapshot() =>
+        $"replace={Settings.ReplaceWindowsTaskbar}; reserve={Settings.ReserveTaskbarSpace}; " +
+        $"nativeHidden={Taskbar.IsApplied}; docks={AllDocks.Count()}; " +
+        $"visible={AllDocks.Count(dock => dock.IsVisible)}; " +
+        $"appbar={string.Join(",", AllDocks.Select(dock => dock.AppBarApplySucceeded ? "ok" : "no"))}";
 
     private bool IsHealthyForUpdateConfirmation()
     {
