@@ -233,31 +233,30 @@ public partial class StartPanelWindow : Window
     {
         var menu = new ContextMenu();
 
-        MenuItem Add(string header, Action action)
-        {
-            var item = new MenuItem { Header = header };
-            item.Click += (_, _) => action();
-            menu.Items.Add(item);
-            return item;
-        }
+        void Add(string header, string glyph, Action action) =>
+            menu.Items.Add(MenuFactory.Item(header, glyph, action));
 
-        Add("Apri", () => App.Instance?.LaunchPath(path));
-        Add("Apri come amministratore", () =>
+        Add("Apri", "\uE8A7", () => App.Instance?.LaunchPath(path));
+
+        menu.Items.Add(new Separator());
+
+        Add("Apri come amministratore", "\uE7EF", () =>
             AppActions.RunAsAdmin(path, out string? error));
-        Add("Apri con…", () => AppActions.OpenWith(path, out _));
-        Add("Apri percorso file", () =>
+        Add("Apri percorso file", "\uE838", () =>
             AppLauncher.RevealInExplorer(ShortcutResolver.ResolveExecutable(path) ?? path, out _));
+        Add("Apri con…", "\uE8E5", () => AppActions.OpenWith(path, out _));
 
         menu.Items.Add(new Separator());
 
         bool pinned = App.Instance?.Settings.PinnedPaths
             .Any(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)) == true;
-        Add(pinned ? "Rimuovi dalla taskbar" : "Fissa alla taskbar", () =>
-            App.Instance?.TogglePin(path));
+        Add(pinned ? "Rimuovi dalla taskbar" : "Fissa alla taskbar",
+            pinned ? "\uE77A" : "\uE718",
+            () => App.Instance?.TogglePin(path));
 
         menu.Items.Add(new Separator());
 
-        Add("Disinstalla", () =>
+        Add("Disinstalla", "\uE74D", () =>
         {
             if (MessageBox.Show($"Disinstallare “{name}”?", "Nebula",
                     MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)

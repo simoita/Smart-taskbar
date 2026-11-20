@@ -161,6 +161,29 @@ public sealed class DockViewModel : ObservableObject
     public Visibility ChromeBorderVisibility =>
         DockFinish == "flat" ? Visibility.Collapsed : Visibility.Visible;
 
+    /// <summary>
+    /// The island is a separate window drawn over the bar. When it is docked
+    /// inside the bar the layout reserves exactly its compact width, so the
+    /// capsule sits next to Start without covering an icon.
+    /// </summary>
+    public bool IslandInBar =>
+        Settings.ShowIsland &&
+        Settings.IslandPlacement == "taskbar" &&
+        Settings.ReplaceWindowsTaskbar &&
+        Settings.TaskbarFullWidth;
+
+    public double IslandSlotWidth => IslandInBar
+        ? 208 * Math.Clamp(Settings.IslandScale, 0.8, 1.3)
+        : 0;
+
+    public Thickness IslandSlotMargin => IslandInBar
+        ? new Thickness(6, 0, 6, 0)
+        : new Thickness(0);
+
+    public Visibility IslandSlotVisibility => IslandInBar
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
     // Icons fill more of the bar than before: a slim margin keeps them off the
     // bar edges while the artwork stays large and readable.
     public double ItemSize => Math.Max(30, Settings.DockHeight - 8);
@@ -508,6 +531,18 @@ public sealed class DockViewModel : ObservableObject
             case nameof(AppSettings.ReserveTaskbarSpace):
             case nameof(AppSettings.ReplaceWindowsTaskbar):
                 OnPropertyChanged(nameof(ShellRadius));
+                OnPropertyChanged(nameof(IslandInBar));
+                OnPropertyChanged(nameof(IslandSlotWidth));
+                OnPropertyChanged(nameof(IslandSlotMargin));
+                OnPropertyChanged(nameof(IslandSlotVisibility));
+                break;
+            case nameof(AppSettings.IslandPlacement):
+            case nameof(AppSettings.ShowIsland):
+            case nameof(AppSettings.IslandScale):
+                OnPropertyChanged(nameof(IslandInBar));
+                OnPropertyChanged(nameof(IslandSlotWidth));
+                OnPropertyChanged(nameof(IslandSlotMargin));
+                OnPropertyChanged(nameof(IslandSlotVisibility));
                 break;
             case nameof(AppSettings.ShowPinned):
             case nameof(AppSettings.ShowRunning):

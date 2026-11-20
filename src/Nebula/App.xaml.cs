@@ -717,6 +717,22 @@ public partial class App : Application
     /// <summary>Raises the island above the bar when it is docked inside it.</summary>
     internal void RaiseIslandAboveDock() => _island?.BringAboveDock();
 
+    /// <summary>Re-anchors the island after the bar moved or resized.</summary>
+    internal void RepositionIsland()
+    {
+        if (_island is { IsVisible: true })
+            _island.ApplySettings();
+    }
+
+    /// <summary>The bar that draws on a monitor, so the island can anchor to it.</summary>
+    internal DockWindow? DockForMonitor(int monitor)
+    {
+        if (_extraDocks.TryGetValue(monitor, out DockWindow? extra))
+            return extra;
+
+        return _dockWindow;
+    }
+
     public void ShowSettings()
     {
         CloseStartPanel();

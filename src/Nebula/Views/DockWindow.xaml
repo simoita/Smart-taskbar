@@ -21,6 +21,7 @@
                 BorderBrush="{Binding StrokeBrush}" BorderThickness="1"
                 MinHeight="{Binding Settings.DockHeight}"
                 MouseMove="OnShellMouseMove" MouseLeave="OnShellMouseLeave"
+                PreviewMouseDown="OnShellMouseDown"
                 MouseRightButtonUp="OnDockBackgroundRightClick">
 
             <Grid ClipToBounds="True">
@@ -108,6 +109,14 @@
                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </UniformGrid>
                     </Button>
+
+                    <!-- Space the bar keeps for the Dynamic Island when it is
+                         docked inside the bar, right next to the Start button. -->
+                    <Border x:Name="IslandSlot"
+                            Width="{Binding IslandSlotWidth}"
+                            Margin="{Binding IslandSlotMargin}"
+                            Visibility="{Binding IslandSlotVisibility}"
+                            Background="Transparent" />
 
                     <Border Width="1" Height="24" Margin="8,0,6,0" VerticalAlignment="Center"
                             Background="{DynamicResource C.StrokeSoft}" />

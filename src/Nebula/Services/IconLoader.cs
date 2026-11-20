@@ -42,10 +42,9 @@ internal static class IconLoader
             ImageSource? icon = null;
             try
             {
-                // File.Exists is part of the worker work: URI targets and shell
-                // namespaces leave without paying a probe on the UI thread.
-                if (File.Exists(path))
-                    icon = IconExtractor.FromPath(path);
+                // The extractor also resolves shell names ("shell:AppsFolder\\…",
+                // "ms-settings:…"), so the work never probes the UI thread.
+                icon = IconExtractor.FromPath(path);
             }
             catch
             {

@@ -91,9 +91,8 @@ public sealed class AppEntry : INotifyPropertyChanged
         if (Icon is not null || string.IsNullOrWhiteSpace(Path))
             return;
 
-        if (!File.Exists(Path))
-            return;
-
+        // Packaged apps and Settings pages are shell names, not files: the
+        // extractor resolves them and returns nothing when there is no icon.
         Icon = IconExtractor.FromPath(Path);
     }
 }

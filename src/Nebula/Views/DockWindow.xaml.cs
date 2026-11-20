@@ -235,6 +235,11 @@ public partial class DockWindow : Window
         }
 
         UpdateAppBar();
+
+        // The docked island is anchored to the slot next to Start, so it has to
+        // follow the bar whenever the bar itself moves or changes size.
+        if (_vm.IslandInBar)
+            Dispatcher.InvokeAsync(() => App.Instance?.RepositionIsland(), DispatcherPriority.Background);
     }
 
     /// <summary>
@@ -431,7 +436,7 @@ public partial class DockWindow : Window
         // a single bar keeps the original half-spacing rhythm.
         double gap = separate ? Math.Max(8, spacing) : spacing / 2;
 
-        var entries = new List<(FrameworkElement Zone, Border? Divider)>();
+        var entries = new List<(FrameworkElement Zone, Border? Divider, string Key)>();
         bool first = true;
         foreach (string key in requested)
         {
@@ -473,13 +478,13 @@ public partial class DockWindow : Window
                 ? Transform.Identity
                 : new ScaleTransform(scale, scale);
             zone.Margin = new Thickness(0);
-            entries.Add((zone, divider));
+            entries.Add((zone, divider, key));
             first = false;
         }
 
         // Reparenting a zone is only legal after detaching it from the previous
         // container; otherwise WPF throws "element already has a logical parent".
-        foreach ((FrameworkElement zone, Border? divider) in entries)
+        foreach ((FrameworkElement zone, Border? divider, _) in entries)
         {
             if (zone.Parent is Panel zoneParent)
                 zoneParent.Children.Remove(zone);
@@ -493,9 +498,10 @@ public partial class DockWindow : Window
         bool fullWidth = settings.ReplaceWindowsTaskbar && settings.TaskbarFullWidth;
 
         var blocks = new List<FrameworkElement>();
+        var blockKeys = new List<string>();
         for (int i = 0; i < entries.Count; i++)
         {
-            (FrameworkElement zone, Border? divider) = entries[i];
+            (FrameworkElement zone, Border? divider, string blockKey) = entries[i];
             var container = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -517,6 +523,7 @@ public partial class DockWindow : Window
                 : container;
             block.Margin = margin;
             blocks.Add(block);
+            blockKeys.Add(blockKey);
         }
 
         if (!fullWidth || blocks.Count == 0)
@@ -555,12 +562,20 @@ public partial class DockWindow : Window
             return;
         }
 
-        // With the Dynamic Island docked inside the bar, the middle of the bar
-        // must stay free: the system and action groups share the right side.
-        // Only the bar that hosts the island keeps its middle free; the bars on
-        // the other monitors use the full width.
-        if (_forcedMonitor is null && settings.IslandPlacement == "taskbar" && settings.ShowIsland)
+        // With the Dynamic Island docked inside the bar it sits next to Start,
+        // so the whole app group (Start, island, icons) is centred on the bar
+        // and the other zones keep the right edge. Only the bar that hosts the
+        // island does this; the bars on the other monitors use the full width.
+        if (_forcedMonitor is null && _vm.IslandInBar)
         {
+            int appsAt = blockKeys.FindIndex(key => key == "apps");
+            if (appsAt < 0)
+                appsAt = 0;
+
+            FrameworkElement appsBlock = blocks[appsAt];
+            appsBlock.HorizontalAlignment = HorizontalAlignment.Center;
+            appsBlock.Margin = new Thickness(0);
+
             var right = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -568,11 +583,22 @@ public partial class DockWindow : Window
                 VerticalAlignment = VerticalAlignment.Center
             };
 
-            foreach (FrameworkElement block in blocks.Skip(1))
+            for (int i = 0; i < blocks.Count; i++)
             {
-                block.Margin = new Thickness(gap, 0, 0, 0);
-                right.Children.Add(block);
+                if (i == appsAt)
+                    continue;
+
+                blocks[i].Margin = new Thickness(gap, 0, 0, 0);
+                right.Children.Add(blocks[i]);
             }
+
+            ZoneHost.ColumnDefinitions.Clear();
+            ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            ZoneHost.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            Grid.SetColumn(appsBlock, 1);
+            ZoneHost.Children.Add(appsBlock);
 
             Grid.SetColumn(right, 2);
             ZoneHost.Children.Add(right);
@@ -678,6 +704,12 @@ public partial class DockWindow : Window
 
         _tick++;
         UpdateMonitorFollow();
+
+        // A click on any window of the topmost band can push the docked island
+        // behind the bar; keep it on top while it lives inside the bar.
+        if (_tick % 4 == 0 && _vm.IslandInBar && !_hidden)
+            App.Instance?.RaiseIslandAboveDock();
+
         bool fullscreen = false;
 
         if (_vm.Settings.HideInFullscreen && (_tick % 4 == 0 || _hidden))
@@ -946,6 +978,41 @@ public partial class DockWindow : Window
             });
     }
 
+    /// <summary>
+    /// The bar and a docked island are both topmost windows: a click on the bar
+    /// can lift it above the capsule, which then looks like the island simply
+    /// disappeared. Put the island back on top straight after the click.
+    /// </summary>
+    private void OnShellMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_vm.IslandInBar)
+            Dispatcher.InvokeAsync(() => App.Instance?.RaiseIslandAboveDock(), DispatcherPriority.Input);
+    }
+
+    /// <summary>
+    /// Screen X (in DIPs) of the point where the docked island must be centred:
+    /// the empty slot the bar reserves right next to the Start button.
+    /// </summary>
+    public bool TryGetIslandSlotCenter(out double centerX)
+    {
+        centerX = 0;
+        if (!_vm.IslandInBar || IslandSlot is null || !IsVisible || IslandSlot.ActualWidth < 1)
+            return false;
+
+        try
+        {
+            Point point = IslandSlot.PointToScreen(
+                new Point(IslandSlot.ActualWidth / 2, IslandSlot.ActualHeight / 2));
+            double scale = Math.Max(0.5, VisualTreeHelper.GetDpi(this).DpiScaleX);
+            centerX = point.X / scale;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void OnDockItemEnter(object sender, MouseEventArgs e)
     {
         if (!_vm.Settings.HoverMagnify || sender is not Button button)
@@ -1105,102 +1172,100 @@ public partial class DockWindow : Window
 
         if (item.Group is { } group)
         {
-            var tabs = new MenuItem { Header = "Raggruppa schede…" };
-            tabs.Click += (_, _) => App.Instance?.ShowGroupPicker(group.Windows.Select(w => w.Handle));
-            menu.Items.Add(tabs);
-            menu.Items.Add(new Separator());
-
+            // The windows of the app come first, each with the app's own icon:
+            // the list reads as "these are the open windows", then the actions.
             foreach (TrackedWindow window in group.Windows.Take(6))
             {
                 var entry = new MenuItem
                 {
-                    Header = window.Title.Length > 46 ? window.Title[..46] + "…" : window.Title
+                    Header = window.Title.Length > 46 ? window.Title[..46] + "…" : window.Title,
+                    Icon = item.Icon is { } appIcon
+                        ? new Image { Source = appIcon, Width = 16, Height = 16 }
+                        : MenuFactory.Icon("\uE737")
                 };
                 entry.Click += (_, _) => _vm.Tracker.ActivateWindow(window.Handle);
                 menu.Items.Add(entry);
             }
 
             if (group.Windows.Count > 1)
-            {
-                var minimize = new MenuItem { Header = "Riduci a icona tutte" };
-                minimize.Click += (_, _) => _vm.Tracker.MinimizeAll(group);
-                menu.Items.Add(minimize);
-            }
+                menu.Items.Add(MenuFactory.Item("Riduci a icona tutte", "\uE921",
+                    () => _vm.Tracker.MinimizeAll(group)));
+
+            menu.Items.Add(MenuFactory.Item("Raggruppa in schede…", "\uE7C4",
+                () => App.Instance?.ShowGroupPicker(group.Windows.Select(w => w.Handle))));
+
+            menu.Items.Add(new Separator());
+
+            menu.Items.Add(MenuFactory.Item("Chiudi le finestre", "\uE8BB",
+                () => _vm.Tracker.CloseAll(group)));
 
             // Ends the app the way Task Manager does: close request first, then
             // terminate the processes that ignore it.
-            var endTask = new MenuItem { Header = "Termina attività" };
-            endTask.Click += (_, _) => _vm.Tracker.EndTask(group);
-            menu.Items.Add(endTask);
-
-            var close = new MenuItem { Header = "Chiudi" };
-            close.Click += (_, _) => _vm.Tracker.CloseAll(group);
-            menu.Items.Add(close);
-            menu.Items.Add(new Separator());
+            menu.Items.Add(MenuFactory.Item("Termina attività", "\uE7BA",
+                () => _vm.Tracker.EndTask(group)));
         }
         else
         {
-            var open = new MenuItem { Header = "Apri" };
-            open.Click += (_, _) => Launch(item.LaunchPath, monitor);
-            menu.Items.Add(open);
+            menu.Items.Add(MenuFactory.Item("Apri", "\uE8A7",
+                () => Launch(item.LaunchPath, monitor)));
         }
 
         if (!string.IsNullOrWhiteSpace(item.LaunchPath) || !string.IsNullOrWhiteSpace(item.TargetPath))
         {
             string path = item.LaunchPath;
 
-            var admin = new MenuItem { Header = "Apri come amministratore" };
-            admin.Click += (_, _) =>
+            menu.Items.Add(MenuFactory.Item("Apri come amministratore", "\uE7EF", () =>
             {
                 AppActions.RunAsAdmin(path, out string? error);
                 Report(error);
-            };
-            menu.Items.Add(admin);
+            }));
 
-            var openWith = new MenuItem { Header = "Apri con…" };
-            openWith.Click += (_, _) =>
-            {
-                AppActions.OpenWith(path, out string? error);
-                Report(error);
-            };
-            menu.Items.Add(openWith);
-
-            var reveal = new MenuItem { Header = "Apri percorso file" };
-            reveal.Click += (_, _) =>
+            menu.Items.Add(MenuFactory.Item("Apri percorso file", "\uE838", () =>
             {
                 string target = item.TargetPath ?? path;
                 AppLauncher.RevealInExplorer(target, out string? error);
                 Report(error);
-            };
-            menu.Items.Add(reveal);
+            }));
 
-            var uninstall = new MenuItem { Header = "Disinstalla" };
-            uninstall.Click += (_, _) =>
+            menu.Items.Add(MenuFactory.Item("Apri con…", "\uE8E5", () =>
+            {
+                AppActions.OpenWith(path, out string? error);
+                Report(error);
+            }));
+        }
+
+        menu.Items.Add(new Separator());
+
+        menu.Items.Add(MenuFactory.Item(
+            item.IsPinned ? "Rimuovi dalla taskbar" : "Fissa alla taskbar",
+            item.IsPinned ? "\uE77A" : "\uE718",
+            () =>
+            {
+                if (item.IsPinned)
+                    _vm.Settings.PinnedPaths.RemoveAll(p =>
+                        string.Equals(p, item.LaunchPath, StringComparison.OrdinalIgnoreCase));
+                else if (!string.IsNullOrWhiteSpace(item.LaunchPath))
+                    _vm.Settings.PinnedPaths.Add(item.LaunchPath);
+
+                _store.MarkDirty();
+                _vm.RefreshItems();
+            }));
+
+        // Destructive action last, on its own, so it is never clicked by reflex.
+        if (!string.IsNullOrWhiteSpace(item.LaunchPath) || !string.IsNullOrWhiteSpace(item.TargetPath))
+        {
+            string uninstallPath = item.LaunchPath;
+            menu.Items.Add(new Separator());
+            menu.Items.Add(MenuFactory.Item("Disinstalla", "\uE74D", () =>
             {
                 if (MessageBox.Show($"Disinstallare “{item.Name}”?", "Nebula",
                         MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                     return;
 
-                AppActions.Uninstall(item.TargetPath ?? path, item.Name, out string? error);
+                AppActions.Uninstall(item.TargetPath ?? uninstallPath, item.Name, out string? error);
                 Report(error);
-            };
-            menu.Items.Add(uninstall);
-            menu.Items.Add(new Separator());
+            }));
         }
-
-        var pin = new MenuItem { Header = item.IsPinned ? "Rimuovi dalla taskbar" : "Fissa alla taskbar" };
-        pin.Click += (_, _) =>
-        {
-            if (item.IsPinned)
-                _vm.Settings.PinnedPaths.RemoveAll(p =>
-                    string.Equals(p, item.LaunchPath, StringComparison.OrdinalIgnoreCase));
-            else if (!string.IsNullOrWhiteSpace(item.LaunchPath))
-                _vm.Settings.PinnedPaths.Add(item.LaunchPath);
-
-            _store.MarkDirty();
-            _vm.RefreshItems();
-        };
-        menu.Items.Add(pin);
 
         menu.PlacementTarget = element;
         menu.IsOpen = true;

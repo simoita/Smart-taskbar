@@ -422,10 +422,21 @@ public partial class IslandWindow : Window
 
         Width = Math.Max(_expandedWidth + 40, 480 * scale);
         Height = Math.Max(_expandedHeight + 30, 300 * scale);
-        Left = bounds.Left + (bounds.Width - Width) / 2;
 
         AppSettings settings = _dock.Settings;
         bool inBar = InTaskbar;
+
+        // Floating keeps the screen centre; docked inside the bar the capsule
+        // sits in the slot the bar reserves next to the Start button.
+        double centerX = bounds.Left + bounds.Width / 2;
+        if (inBar &&
+            App.Instance?.DockForMonitor(settings.MonitorIndex) is { } hostingBar &&
+            hostingBar.TryGetIslandSlotCenter(out double slotCenter))
+        {
+            centerX = slotCenter;
+        }
+
+        Left = centerX - Width / 2;
 
         // Without a reserved work area the bar sits above the native taskbar,
         // exactly like the dock itself does.

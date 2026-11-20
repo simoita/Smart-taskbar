@@ -67,28 +67,89 @@ internal static class IconExtractor
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool DeleteObject(IntPtr hObject);
 
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern uint ExtractIconEx(
+        string file, int iconIndex, IntPtr[]? large, IntPtr[]? small, uint count);
+
     private const uint SHGFI_ICON = 0x000000100;
     private const uint SHGFI_LARGEICON = 0x000000000;
 
+    /// <summary>
+    /// Loads the icon the shell shows for a path. The path does not have to be
+    /// a real file: packaged (Store/UWP) apps are addressed as
+    /// "shell:AppsFolder\AUMID" and the Settings pages as "ms-settings:…",
+    /// and the shell resolves both. Requiring File.Exists here was why almost
+    /// every preinstalled app had no icon at all.
+    /// </summary>
     public static ImageSource? FromPath(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        if (string.IsNullOrWhiteSpace(path))
             return null;
+
+        string location = path.Trim().Trim('@').Trim('"');
+        location = Environment.ExpandEnvironmentVariables(location);
+        if (location.Length == 0)
+            return null;
+
+        // Shortcuts and the uninstall registry describe their icon as
+        // "file,index" (or "file,-resourceId"): the index selects the artwork.
+        string file = location;
+        int? index = null;
+        int comma = location.LastIndexOf(',');
+        if (comma > 2 && int.TryParse(location[(comma + 1)..].Trim(), out int parsed))
+        {
+            file = location[..comma].Trim().Trim('"');
+            index = parsed;
+        }
 
         lock (Gate)
         {
-            if (Cache.TryGetValue(path, out ImageSource? cached))
+            if (Cache.TryGetValue(location, out ImageSource? cached))
                 return cached;
         }
 
-        ImageSource? icon = LoadShellImage(path) ?? LoadShellIcon(path) ?? LoadAssociatedIcon(path);
+        ImageSource? icon = index is int forced
+            ? LoadIndexedIcon(file, forced) ?? LoadShellImage(file)
+            : null;
+
+        icon ??= LoadShellImage(file) ?? LoadShellIcon(file) ?? LoadAssociatedIcon(file);
         if (icon is not null)
         {
             lock (Gate)
-                Cache[path] = icon;
+                Cache[location] = icon;
         }
 
         return icon;
+    }
+
+    /// <summary>Reads the index specified inside an IconLocation value.</summary>
+    private static ImageSource? LoadIndexedIcon(string file, int index)
+    {
+        if (!File.Exists(file))
+            return null;
+
+        try
+        {
+            var large = new IntPtr[1];
+            if (ExtractIconEx(file, index, large, null, 1) == 0 || large[0] == IntPtr.Zero)
+                return null;
+
+            try
+            {
+                BitmapSource bitmap = Imaging.CreateBitmapSourceFromHIcon(
+                    large[0], Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                bitmap.Freeze();
+                return bitmap;
+            }
+            finally
+            {
+                NativeMethods.DestroyIcon(large[0]);
+            }
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public static ImageSource? FromWindow(IntPtr hwnd, string? fallbackPath)
@@ -177,6 +238,13 @@ internal static class IconExtractor
 
     private static ImageSource? LoadShellIcon(string path)
     {
+        // SHGetFileInfo answers with a made-up icon for anything it cannot
+        // find; only ask it about names the shell can actually look up.
+        if (!File.Exists(path) && !Directory.Exists(path) &&
+            !path.StartsWith("shell:", StringComparison.OrdinalIgnoreCase) &&
+            !path.StartsWith("::{", StringComparison.Ordinal))
+            return null;
+
         try
         {
             var info = new SHFILEINFO();
