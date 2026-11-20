@@ -213,9 +213,9 @@ public partial class SettingsWindow : Window
         try
         {
             var settings = _vm.Settings;
-            SizeCompact.IsChecked = MatchesSize(54, 28, 16, 0, 0);
-            SizeBalanced.IsChecked = MatchesSize(62, 34, 22, 2, 0);
-            SizeLarge.IsChecked = MatchesSize(74, 42, 28, 4, 0);
+            SizeCompact.IsChecked = MatchesSize(54, 36, 16, 0, 0);
+            SizeBalanced.IsChecked = MatchesSize(62, 40, 22, 2, 0);
+            SizeLarge.IsChecked = MatchesSize(74, 48, 28, 4, 0);
 
             MotionCalm.IsChecked = settings.AnimationsEnabled && settings.AnimationSpeed >= 1.4 && !settings.LaunchPulse;
             MotionBalanced.IsChecked = settings.AnimationsEnabled && settings.AnimationSpeed > 0.85 && settings.AnimationSpeed < 1.4;
@@ -253,21 +253,21 @@ public partial class SettingsWindow : Window
         {
             case "compact":
                 settings.DockHeight = 54;
-                settings.IconSize = 28;
+                settings.IconSize = 36;
                 settings.CornerRadius = 16;
                 settings.ItemSpacing = 0;
                 settings.EdgeMargin = 0;
                 break;
             case "large":
                 settings.DockHeight = 74;
-                settings.IconSize = 42;
+                settings.IconSize = 48;
                 settings.CornerRadius = 28;
                 settings.ItemSpacing = 4;
                 settings.EdgeMargin = 0;
                 break;
             default:
                 settings.DockHeight = 62;
-                settings.IconSize = 34;
+                settings.IconSize = 40;
                 settings.CornerRadius = 22;
                 settings.ItemSpacing = 2;
                 settings.EdgeMargin = 0;
@@ -320,7 +320,7 @@ public partial class SettingsWindow : Window
     {
         var settings = _vm.Settings;
         settings.DockHeight = ClampValue(PreciseDockHeight.Text, 44, 92, settings.DockHeight);
-        settings.IconSize = ClampValue(PreciseIconSize.Text, 16, 44, settings.IconSize);
+        settings.IconSize = ClampValue(PreciseIconSize.Text, 36, 52, settings.IconSize);
         settings.CornerRadius = ClampValue(PreciseCornerRadius.Text, 4, 36, settings.CornerRadius);
         settings.ItemSpacing = ClampValue(PreciseSpacing.Text, -4, 12, settings.ItemSpacing);
         settings.EdgeMargin = ClampValue(PreciseEdgeMargin.Text, 0, 48, settings.EdgeMargin);

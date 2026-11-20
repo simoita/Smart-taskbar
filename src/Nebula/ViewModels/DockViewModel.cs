@@ -186,8 +186,8 @@ public sealed class DockViewModel : ObservableObject
 
     // Icons fill more of the bar than before: a slim margin keeps them off the
     // bar edges while the artwork stays large and readable.
-    public double ItemSize => Math.Max(30, Settings.DockHeight - 8);
-    public double IconSize => Math.Min(Settings.IconSize, Math.Max(18, ItemSize - 6));
+    public double ItemSize => Math.Max(32, Settings.DockHeight - 6);
+    public double IconSize => Math.Min(Settings.IconSize, Math.Max(18, ItemSize - 4));
     public Thickness ItemMargin => new(Settings.ItemSpacing / 2, 0, Settings.ItemSpacing / 2, 0);
 
     public CornerRadius ShellRadius
@@ -345,6 +345,22 @@ public sealed class DockViewModel : ObservableObject
                 specs.Add(("run:" + group.ExePath, Items.FirstOrDefault(i => i.Key == "run:" + group.ExePath), null, group));
         }
 
+        // The order the user set by dragging wins over the automatic one; keys
+        // that were never dragged keep the order computed above.
+        if (Settings.DockItemOrder is { Count: > 0 } preferred)
+        {
+            var rank = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (int index = 0; index < preferred.Count; index++)
+                rank.TryAdd(preferred[index], index);
+
+            specs = specs
+                .Select((spec, index) => (spec, index))
+                .OrderBy(pair => rank.TryGetValue(pair.spec.Key, out int position) ? position : int.MaxValue)
+                .ThenBy(pair => pair.index)
+                .Select(pair => pair.spec)
+                .ToList();
+        }
+
         bool rebuild = specs.Count != Items.Count;
         if (!rebuild)
         {
@@ -390,6 +406,56 @@ public sealed class DockViewModel : ObservableObject
             if (item.Icon is null)
                 _ = LoadIconAsync(item);
         }
+    }
+
+    /// <summary>
+    /// Moves a dock icon where the user dropped it and saves the result, so the
+    /// order survives restarts, app launches and the tracker refreshing items.
+    /// </summary>
+    public void MoveItem(string fromKey, string toKey)
+    {
+        if (string.IsNullOrWhiteSpace(fromKey) || string.IsNullOrWhiteSpace(toKey) ||
+            string.Equals(fromKey, toKey, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        int from = Items.ToList().FindIndex(item =>
+            string.Equals(item.Key, fromKey, StringComparison.OrdinalIgnoreCase));
+        if (from < 0)
+            return;
+
+        List<string> order = Items.Select(item => item.Key).ToList();
+        string moved = order[from];
+        order.RemoveAt(from);
+
+        int target = order.FindIndex(key =>
+            string.Equals(key, toKey, StringComparison.OrdinalIgnoreCase));
+        if (target < 0)
+            target = order.Count;
+
+        order.Insert(target, moved);
+
+        Settings.DockItemOrder = order;
+        ReorderPins(order);
+        RefreshItems();
+    }
+
+    /// <summary>Keeps the Start panel pins in the same order as the bar.</summary>
+    private void ReorderPins(IReadOnlyList<string> order)
+    {
+        var pinned = order
+            .Where(key => key.StartsWith("pin:", StringComparison.Ordinal))
+            .Select(key => key[4..])
+            .Where(path => Settings.PinnedPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+        if (pinned.Count == 0)
+            return;
+
+        var rest = Settings.PinnedPaths
+            .Where(path => !pinned.Contains(path, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+        Settings.PinnedPaths.Clear();
+        Settings.PinnedPaths.AddRange(pinned);
+        Settings.PinnedPaths.AddRange(rest);
     }
 
     private async Task LoadIconAsync(DockItemViewModel item)

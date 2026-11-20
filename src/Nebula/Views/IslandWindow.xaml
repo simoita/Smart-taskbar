@@ -234,15 +234,20 @@
                                                         <StackPanel Grid.Column="1" Margin="8,0,8,0"
                                                                     VerticalAlignment="Center">
                                                             <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <!-- Il titolo va a capo invece di essere tagliato. -->
                                                                 <TextBlock Text="{Binding Title}" FontSize="11"
                                                                            FontWeight="SemiBold"
                                                                            Foreground="{DynamicResource C.Text}"
-                                                                           TextTrimming="CharacterEllipsis"
-                                                                           Margin="0,0,88,0" />
-                                                                <TextBlock Text="{Binding KindStatusLabel}" FontSize="8.5"
-                                                                           HorizontalAlignment="Right"
+                                                                           TextWrapping="Wrap"
+                                                                           Margin="0,0,6,0" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding KindStatusLabel}"
+                                                                           FontSize="8.5" VerticalAlignment="Top"
                                                                            Foreground="{DynamicResource C.TextFaint}"
-                                                                           MaxWidth="86" TextTrimming="CharacterEllipsis" />
+                                                                           MaxWidth="70" TextTrimming="CharacterEllipsis" />
                                                             </Grid>
                                                             <TextBlock Text="{Binding Detail}" FontSize="9"
                                                                        Margin="0,2,0,0"

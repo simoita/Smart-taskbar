@@ -39,6 +39,12 @@ public partial class DockWindow : Window
     private System.Drawing.Rectangle _physicalWorkArea;
     private System.Drawing.Rectangle _screenBounds;
 
+    private const string DockItemDragFormat = "Nebula.DockItem";
+    private Point _itemDragStart;
+    private DockItemViewModel? _itemDragSource;
+    private bool _itemDragging;
+    private bool _suppressItemClick;
+
     public DockWindow(DockViewModel vm, SettingsStore store, int? monitor = null)
     {
         _vm = vm;
@@ -1174,6 +1180,13 @@ public partial class DockWindow : Window
 
     private void OnItemClick(object sender, RoutedEventArgs e)
     {
+        // The drop that ends a drag must not count as a click and launch the app.
+        if (_suppressItemClick)
+        {
+            _suppressItemClick = false;
+            return;
+        }
+
         if (sender is not FrameworkElement element || element.DataContext is not DockItemViewModel item)
             return;
 
@@ -1198,6 +1211,85 @@ public partial class DockWindow : Window
 
         if (!string.IsNullOrWhiteSpace(item.LaunchPath))
             Launch(item.LaunchPath, MonitorIndex);
+    }
+
+    /// <summary>
+    /// Anchors must be draggable: pressing an icon records the pointer, and a
+    /// real drag (not a click) starts the reordering drag.
+    /// </summary>
+    private void OnItemDragStart(object sender, MouseButtonEventArgs e)
+    {
+        _suppressItemClick = false;
+        _itemDragSource = null;
+
+        if (e.ClickCount != 1 || sender is not FrameworkElement { DataContext: DockItemViewModel item })
+            return;
+
+        _itemDragSource = item;
+        _itemDragStart = e.GetPosition(this);
+    }
+
+    private void OnItemDragMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _itemDragSource is null || _itemDragging)
+            return;
+
+        Point current = e.GetPosition(this);
+        if (Math.Abs(current.X - _itemDragStart.X) < 6 && Math.Abs(current.Y - _itemDragStart.Y) < 6)
+            return;
+
+        DockItemViewModel source = _itemDragSource;
+        _itemDragSource = null;
+        _itemDragging = true;
+        _suppressItemClick = true;
+
+        try
+        {
+            DragDrop.DoDragDrop((DependencyObject)sender,
+                new DataObject(DockItemDragFormat, source.Key), DragDropEffects.Move);
+        }
+        finally
+        {
+            _itemDragging = false;
+            if (sender is FrameworkElement element)
+                element.Opacity = 1;
+        }
+    }
+
+    private void OnItemDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DockItemDragFormat))
+            return;
+
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+
+        // The icon under the pointer reads as the drop target.
+        if (sender is FrameworkElement element)
+            element.Opacity = 0.55;
+    }
+
+    private void OnItemDragLeave(object sender, DragEventArgs e)
+    {
+        if (sender is FrameworkElement element)
+            element.Opacity = 1;
+    }
+
+    private void OnItemDrop(object sender, DragEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: DockItemViewModel target } element)
+        {
+            element.Opacity = 1;
+
+            if (e.Data.GetDataPresent(DockItemDragFormat) &&
+                e.Data.GetData(DockItemDragFormat) is string fromKey)
+            {
+                e.Handled = true;
+                _vm.MoveItem(fromKey, target.Key);
+            }
+        }
+
+        _itemDragSource = null;
     }
 
     private void OnItemRightClick(object sender, MouseButtonEventArgs e)

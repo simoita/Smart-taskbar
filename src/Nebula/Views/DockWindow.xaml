@@ -134,7 +134,12 @@
                                         Height="{Binding DataContext.ItemSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                         Margin="{Binding DataContext.ItemMargin, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                         Click="OnItemClick" MouseRightButtonUp="OnItemRightClick"
-                                        MouseEnter="OnDockItemEnter" MouseLeave="OnDockItemLeave">
+                                        MouseEnter="OnDockItemEnter" MouseLeave="OnDockItemLeave"
+                                        AllowDrop="True"
+                                        PreviewMouseLeftButtonDown="OnItemDragStart"
+                                        PreviewMouseMove="OnItemDragMove"
+                                        DragOver="OnItemDragOver" DragLeave="OnItemDragLeave"
+                                        Drop="OnItemDrop">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="*" />

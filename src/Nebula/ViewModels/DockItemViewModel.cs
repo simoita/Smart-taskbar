@@ -102,7 +102,7 @@ public sealed class DockItemViewModel : ObservableObject
         _ => new CornerRadius(0)
     };
 
-    public double IconDisplaySize => Math.Max(8, _settings.IconSize - (IconStyle == "native" ? 0 : 6));
+    public double IconDisplaySize => Math.Max(8, _settings.IconSize - (IconStyle == "native" ? 0 : 2));
 
     public Geometry? IconClip
     {
