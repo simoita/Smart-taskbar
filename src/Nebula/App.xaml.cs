@@ -1220,7 +1220,10 @@ public partial class App : Application
             return;
 
         await Task.Delay(TimeSpan.FromSeconds(4));
-        for (int attempt = 0; attempt < 20; attempt++)
+
+        // Give a slow boot (many startup apps, AppBar re-registration) more room
+        // before the updater decides to roll back. The script waits 60 seconds.
+        for (int attempt = 0; attempt < 70; attempt++)
         {
             if (IsHealthyForUpdateConfirmation())
             {

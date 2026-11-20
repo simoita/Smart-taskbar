@@ -4,7 +4,8 @@ using System.Threading.Tasks;
 
 namespace Nebula.Services;
 
-public sealed record FileSearchResult(string Name, string Path, string Folder, long Size, DateTime Modified)
+public sealed record FileSearchResult(string Name, string Path, string Folder, long Size, DateTime Modified,
+    bool IsFolder = false)
 {
     // Ranking touches every indexed file on each keystroke: lower-case the
     // strings once when the index is built instead of thousands of times.
@@ -103,6 +104,16 @@ public sealed class FileSearchService
         if (string.IsNullOrWhiteSpace(query))
             return Array.Empty<FileSearchResult>();
 
+        // A query that starts with a shell variable searches that folder live,
+        // even when it is outside the index (AppData is deliberately skipped).
+        string trimmed = query.Trim();
+        if (trimmed.StartsWith('%'))
+        {
+            IReadOnlyList<FileSearchResult> special = SearchShellPath(trimmed, limit);
+            if (special.Count > 0)
+                return special;
+        }
+
         StartLoadIfNeeded();
         string q = query.Trim().ToLowerInvariant();
         List<FileSearchResult> snapshot;
@@ -137,6 +148,155 @@ public sealed class FileSearchService
             .Take(limit)
             .Select(item => item.File)
             .ToList();
+    }
+
+    private static readonly Dictionary<string, string> ShellAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["localdata"] = "%LOCALAPPDATA%",
+        ["localappdata"] = "%LOCALAPPDATA%",
+        ["appdata"] = "%APPDATA%",
+        ["roaming"] = "%APPDATA%",
+        ["userprofile"] = "%USERPROFILE%",
+        ["profile"] = "%USERPROFILE%",
+        ["user"] = "%USERPROFILE%",
+        ["home"] = "%USERPROFILE%",
+        ["desktop"] = "%USERPROFILE%\\Desktop",
+        ["documents"] = "%USERPROFILE%\\Documents",
+        ["downloads"] = "%USERPROFILE%\\Downloads",
+        ["pictures"] = "%USERPROFILE%\\Pictures",
+        ["music"] = "%USERPROFILE%\\Music",
+        ["videos"] = "%USERPROFILE%\\Videos",
+        ["temp"] = "%TEMP%",
+        ["tmp"] = "%TEMP%",
+        ["windir"] = "%WINDIR%",
+        ["windows"] = "%WINDIR%",
+        ["programfiles"] = "%PROGRAMFILES%",
+        ["programdata"] = "%PROGRAMDATA%"
+    };
+
+    /// <summary>
+    /// Resolves queries such as <c>%appdata%</c>, <c>%localappdata%\Nebula</c> or
+    /// <c>%temp%</c> into a real folder and returns what is inside it. The folder
+    /// itself comes first, so Enter opens it in Explorer.
+    /// </summary>
+    private static IReadOnlyList<FileSearchResult> SearchShellPath(string query, int limit)
+    {
+        int close = query.IndexOf('%', 1);
+        if (close < 1)
+            return Array.Empty<FileSearchResult>();
+
+        string token = query[1..close].Trim();
+        if (token.Length == 0)
+            return Array.Empty<FileSearchResult>();
+
+        string value = ShellAliases.TryGetValue(token, out string? alias)
+            ? alias
+            : "%" + token + "%";
+        string expanded = Environment.ExpandEnvironmentVariables(value);
+        if (string.Equals(expanded, value, StringComparison.OrdinalIgnoreCase))
+            return Array.Empty<FileSearchResult>();
+
+        string rest = query[(close + 1)..].Trim().Trim('"');
+        string combined = (expanded + rest).Replace('/', '\\').TrimEnd('\\');
+
+        string root;
+        string needle;
+        try
+        {
+            if (Directory.Exists(combined))
+            {
+                root = combined;
+                needle = "";
+            }
+            else
+            {
+                root = Path.GetDirectoryName(combined) ?? combined;
+                needle = Path.GetFileName(combined);
+            }
+        }
+        catch
+        {
+            return Array.Empty<FileSearchResult>();
+        }
+
+        if (!Directory.Exists(root))
+            return Array.Empty<FileSearchResult>();
+
+        var results = new List<FileSearchResult>(Math.Max(4, limit));
+        if (needle.Length == 0)
+        {
+            var folder = new DirectoryInfo(root);
+            results.Add(new FileSearchResult(
+                string.IsNullOrWhiteSpace(folder.Name) ? root : folder.Name,
+                folder.FullName,
+                folder.Parent?.FullName ?? root,
+                0,
+                folder.LastWriteTime,
+                true));
+        }
+
+        CollectShellEntries(root, needle, results, Math.Max(4, limit), 1);
+        return results;
+    }
+
+    private static void CollectShellEntries(string directory, string needle, List<FileSearchResult> results,
+        int limit, int depth)
+    {
+        if (results.Count >= limit)
+            return;
+
+        try
+        {
+            var info = new DirectoryInfo(directory);
+            if ((info.Attributes & (FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint)) != 0)
+                return;
+
+            var entries = new List<FileSystemInfo>();
+            var options = new EnumerationOptions
+            {
+                IgnoreInaccessible = true,
+                RecurseSubdirectories = false,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            };
+
+            foreach (FileSystemInfo child in info.EnumerateFileSystemInfos("*", options))
+            {
+                if (needle.Length == 0 || child.Name.Contains(needle, StringComparison.OrdinalIgnoreCase))
+                    entries.Add(child);
+            }
+
+            // Folders first, then names that start with what was typed.
+            foreach (FileSystemInfo child in entries
+                         .OrderByDescending(child => child is DirectoryInfo)
+                         .ThenByDescending(child => child.Name.StartsWith(needle, StringComparison.OrdinalIgnoreCase))
+                         .ThenBy(child => child.Name, StringComparer.CurrentCultureIgnoreCase))
+            {
+                results.Add(new FileSearchResult(
+                    child.Name,
+                    child.FullName,
+                    directory,
+                    child is FileInfo file ? file.Length : 0,
+                    child.LastWriteTime,
+                    child is DirectoryInfo));
+
+                if (results.Count >= limit)
+                    return;
+            }
+
+            if (depth <= 0 || needle.Length == 0)
+                return;
+
+            foreach (DirectoryInfo sub in info.EnumerateDirectories("*", options))
+            {
+                CollectShellEntries(sub.FullName, needle, results, limit, depth - 1);
+                if (results.Count >= limit)
+                    return;
+            }
+        }
+        catch
+        {
+            // Unreadable folder: keep the other results.
+        }
     }
 
     private static int Rank(FileSearchResult file, string query)

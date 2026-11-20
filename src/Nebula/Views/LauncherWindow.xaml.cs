@@ -386,8 +386,8 @@ public partial class LauncherWindow : Window
         Name = file.Name,
         Path = file.Path,
         FolderPath = file.Folder,
-        Subtitle = $"File · {file.Folder}",
-        Glyph = "\uE8A5",
+        Subtitle = (file.IsFolder ? "Cartella · " : "File · ") + file.Folder,
+        Glyph = file.IsFolder ? "\uE8B7" : "\uE8A5",
         Kind = AppEntryKind.File
     };
 
