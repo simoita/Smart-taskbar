@@ -18,7 +18,7 @@
     <ApplicationIcon>Assets\nebula.ico</ApplicationIcon>
     <Product>Nebula Taskbar Studio</Product>
     <AssemblyTitle>Nebula</AssemblyTitle>
-    <Version>1.6.14</Version>
+    <Version>1.7.0</Version>
     <DebugType>embedded</DebugType>
     <SatelliteResourceLanguages>it;en</SatelliteResourceLanguages>
     <!-- WPF owns DPI awareness through app.manifest; WFAC010 is a WinForms-only suggestion. -->
