@@ -161,7 +161,7 @@ public sealed class SettingsStore : IDisposable
             if (known is null || taskbarWidgets.Contains(known, StringComparer.OrdinalIgnoreCase))
                 continue;
             taskbarWidgets.Add(known);
-            if (taskbarWidgets.Count >= 16)
+            if (taskbarWidgets.Count >= TaskbarWidgetCatalog.MaxWidgets)
                 break;
         }
         s.TaskbarWidgets = taskbarWidgets;

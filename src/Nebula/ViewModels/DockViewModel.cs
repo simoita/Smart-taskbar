@@ -32,6 +32,7 @@ public sealed class DockViewModel : ObservableObject
     private Brush _tintBrush = Brushes.Transparent;
     private Brush _strokeBrush = Brushes.Transparent;
     private Brush _glowBrush = Brushes.Transparent;
+    private int _widgetSensorTick;
 
     public DockViewModel(AppSettings settings, ThemeEngine theme, WindowTracker tracker, SystemMonitor monitor)
     {
@@ -40,6 +41,9 @@ public sealed class DockViewModel : ObservableObject
         Tracker = tracker;
         Monitor = monitor;
         Media = new MediaSessionMonitor();
+        // Volume and brightness are read lazily: only a bar that actually has
+        // those widgets pays for the COM/DDC calls.
+        Controls = new QuickControls(false);
 
         _clockTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
         _clockTimer.Tick += (_, _) => UpdateClock();
@@ -48,6 +52,7 @@ public sealed class DockViewModel : ObservableObject
         _monitorTimer.Tick += (_, _) =>
         {
             Monitor.Update();
+            RefreshWidgetSensors();
             UpdateTaskbarWidgetValues();
         };
 
@@ -69,6 +74,7 @@ public sealed class DockViewModel : ObservableObject
     public WindowTracker Tracker { get; }
     public SystemMonitor Monitor { get; }
     public MediaSessionMonitor Media { get; }
+    public QuickControls Controls { get; }
 
     public ObservableCollection<DockItemViewModel> Items { get; } = new();
 
@@ -273,7 +279,33 @@ public sealed class DockViewModel : ObservableObject
         }
 
         UpdateTaskbarWidgetValues();
+        RefreshWidgetSensors(force: true);
     }
+
+    /// <summary>
+    /// Keeps the volume and brightness widgets current without polling the
+    /// expensive endpoints when those widgets are not on the bar.
+    /// </summary>
+    private void RefreshWidgetSensors(bool force = false)
+    {
+        _widgetSensorTick++;
+        try
+        {
+            if (HasWidget("volume") && (force || _widgetSensorTick % 3 == 0))
+                Controls.RefreshVolumeOnly();
+            if (HasWidget("brightness") && (force || _widgetSensorTick % 15 == 0))
+                Controls.RefreshBrightnessOnly();
+        }
+        catch (Exception ex)
+        {
+            // A missing audio/brightness endpoint only blanks that widget.
+            Log.Write("Widget sensor refresh failed: " + ex.Message);
+        }
+    }
+
+    private bool HasWidget(string id) =>
+        TaskbarWidgetItems.Any(widget =>
+            string.Equals(widget.Id, id, StringComparison.OrdinalIgnoreCase));
 
     public void UpdateTaskbarWidgetValues()
     {

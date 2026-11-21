@@ -236,9 +236,12 @@
                     </StackPanel>
 
                     <StackPanel x:Name="SystemZone" Orientation="Horizontal" VerticalAlignment="Center">
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                        <ScrollViewer x:Name="WidgetScroller"
+                                      HorizontalScrollBarVisibility="Hidden"
                                       VerticalScrollBarVisibility="Disabled"
                                       HorizontalContentAlignment="Center"
+                                      PanningMode="HorizontalOnly"
+                                      PreviewMouseWheel="OnWidgetScrollerWheel"
                                       CanContentScroll="False" Focusable="False">
                         <ItemsControl x:Name="TaskbarWidgets" ItemsSource="{Binding TaskbarWidgetItems}"
                                       VerticalAlignment="Center">

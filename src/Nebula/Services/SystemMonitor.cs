@@ -21,6 +21,8 @@ public sealed class SystemMonitor : ObservableObject
     private string _uptime = "--";
     private string _ramDetail = "";
     private string _diskText = "";
+    private string _diskFreeText = "";
+    private double _diskUsage;
     private string _networkText = "Rete";
     private bool _networkAvailable;
 
@@ -84,6 +86,20 @@ public sealed class SystemMonitor : ObservableObject
     {
         get => _diskText;
         private set => SetProperty(ref _diskText, value);
+    }
+
+    /// <summary>Free space on the system volume, shortened for the taskbar.</summary>
+    public string DiskFreeText
+    {
+        get => _diskFreeText;
+        private set => SetProperty(ref _diskFreeText, value);
+    }
+
+    /// <summary>Percentage of the system volume in use.</summary>
+    public double DiskUsage
+    {
+        get => _diskUsage;
+        private set => SetProperty(ref _diskUsage, value);
     }
 
     public string NetworkText
@@ -207,10 +223,14 @@ public sealed class SystemMonitor : ObservableObject
             double free = drive.AvailableFreeSpace / 1024.0 / 1024.0 / 1024.0;
             double total = drive.TotalSize / 1024.0 / 1024.0 / 1024.0;
             DiskText = $"{free:0} GB liberi di {total:0} GB";
+            DiskFreeText = $"{free:0} GB";
+            DiskUsage = total > 0 ? Math.Clamp((1.0 - free / total) * 100.0, 0, 100) : 0;
         }
         catch
         {
             DiskText = "";
+            DiskFreeText = "";
+            DiskUsage = 0;
         }
     }
 

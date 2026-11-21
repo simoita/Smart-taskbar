@@ -554,7 +554,8 @@ public sealed class SettingsViewModel : ObservableObject
         $"{Settings.PanelWidgets.Count} widget attivi · scegli dal catalogo";
 
     public string TaskbarWidgetCountText =>
-        $"{Settings.TaskbarWidgets?.Count ?? 0} widget nella barra · usa le frecce per cambiarne l'ordine";
+        $"{Settings.TaskbarWidgets?.Count ?? 0} di {TaskbarWidgetCatalog.MaxWidgets} widget nella barra · " +
+        "frecce per l'ordine · rotellina sulla barra per scorrere";
 
     public Visibility NoTaskbarWidgetsVisibility =>
         Settings.TaskbarWidgets is { Count: > 0 } ? Visibility.Collapsed : Visibility.Visible;
@@ -586,10 +587,26 @@ public sealed class SettingsViewModel : ObservableObject
     public void AddTaskbarWidget(TaskbarWidgetOptionViewModel option)
     {
         var widgets = new List<string>(Settings.TaskbarWidgets ?? new List<string>());
-        if (widgets.Contains(option.Id, StringComparer.OrdinalIgnoreCase) || widgets.Count >= 16)
+        if (widgets.Contains(option.Id, StringComparer.OrdinalIgnoreCase) ||
+            widgets.Count >= TaskbarWidgetCatalog.MaxWidgets)
             return;
 
         widgets.Add(option.Id);
+        Settings.TaskbarWidgets = widgets;
+        SyncTaskbarWidgets();
+    }
+
+    /// <summary>Fills the bar with the whole catalog in one click.</summary>
+    public void AddAllTaskbarWidgets()
+    {
+        var widgets = new List<string>();
+        foreach (TaskbarWidgetDefinition definition in TaskbarWidgetCatalog.All)
+        {
+            if (widgets.Count >= TaskbarWidgetCatalog.MaxWidgets)
+                break;
+            widgets.Add(definition.Id);
+        }
+
         Settings.TaskbarWidgets = widgets;
         SyncTaskbarWidgets();
     }

@@ -74,20 +74,45 @@ spazio con l'AppBar.
 **Studio → Widget → Widget nella taskbar** permette di aggiungere, rimuovere e
 riordinare i widget che vivono direttamente nella barra:
 
-| Widget | Cosa mostra |
+| Widget | Cosa mostra o apre |
 | --- | --- |
 | Orologio | Ora e data, secondi e formato 24h opzionali |
-| CPU / RAM | Percentuale e barra in tempo reale |
-| CPU + RAM | Due misuratori compatti nello stesso widget |
+| Data | Giorno e data completi; clic per il calendario |
+| CPU / RAM / CPU + RAM | Percentuale e barra in tempo reale |
+| Dettaglio RAM | Memoria usata sul totale, in GB |
+| Disco | Spazio libero e utilizzo del volume di sistema |
+| Uptime | Tempo dall'accensione del PC |
 | Batteria | Percentuale o alimentazione AC |
 | Rete | Nome dell'adattatore attivo o `Offline` |
-| Media | Play/pausa del player attivo |
+| Volume | Volume di Windows; clic per muto/riattiva |
+| Luminosità | Luminosità del monitor principale, se controllabile |
+| Media | Play/pausa del player attivo, con titolo e artista |
 | Ricerca | Apre la ricerca globale |
 | Schede | Apre il selettore dei gruppi di finestre |
-| Pannello widget | Apre calendario e widget |
+| Pannello widget | Apre calendario, sistema e widget |
 | Controlli rapidi | Apre volume, media e rete |
 | Impostazioni | Apre Nebula Studio |
+| Notifiche | Apre il centro notifiche (`Win+N`) |
+| Impostazioni rapide | Apre rete, volume e luminosità (`Win+A`) |
+| Panoramica | Mostra tutte le finestre (`Win+Tab`) |
+| Mostra desktop | Riduce a icona tutte le finestre (`Win+D`) |
+| Cattura schermo | Avvia lo strumento di cattura (`Win+Shift+S`) |
+| Appunti | Apre la cronologia appunti (`Win+V`) |
+| Emoji | Apre la tastiera emoji (`Win+.`) |
+| Blocca | Blocca la sessione (`Win+L`) |
+| Wi-Fi / Bluetooth | Aprono le impostazioni di Windows corrispondenti |
+| Esplora file | Apre la cartella personale |
+| Terminale | Apre Windows Terminal o PowerShell |
+| Gestione attività | Apre Gestione attività |
+| Cestino | Apre il cestino |
 | Separatore | Linea verticale tra due gruppi |
+
+Il catalogo contiene 33 widget e la barra ne accetta fino a 40. Quando i widget
+non entrano nella larghezza disponibile, la barra non li taglia: la zona sistema
+ha uno scroller orizzontale e la **rotellina del mouse** la fa scorrere. Ogni
+widget aggiorna i propri valori dentro un `try/catch`: un sensore assente
+(batteria, luminosità, endpoint audio) mostra `—` solo nel proprio riquadro e
+non interrompe gli altri né il timer della barra.
 
 La lista è salvata in `settings.json` come `TaskbarWidgets`. I vecchi
 interruttori `ShowClock`, `ShowStats` e `ShowBattery` vengono usati una sola
@@ -143,12 +168,20 @@ i file di sistema: possiede una finestra AppBar separata.
 
 ## Se la barra non riserva lo spazio
 
+Dopo l'avvio Nebula attende fino a 5 secondi che la finestra sia disposta e
+l'AppBar registrata. Se non lo è, ripristina la taskbar nativa e **riprova ogni
+15 secondi per 8 volte**; la stessa ripresa avviene se il watchdog non riesce a
+restare attivo. La scelta salvata non viene spenta: un errore transitorio non
+disattiva più la sostituzione per gli avvii successivi.
+
 1. Controlla che **Sostituisci la taskbar di Windows** e **Riserva lo spazio
    come una taskbar** siano attivi.
 2. Disattiva e riattiva **Riserva lo spazio** per forzare una nuova
    registrazione AppBar.
 3. Verifica `%APPDATA%\Nebula\app.log` per le righe `AppBar reserved`,
-   `AppBar released` e `AppBar reservation was not applied`.
+   `AppBar released`, `AppBar reservation was not applied`,
+   `Taskbar replacement verified after startup` e
+   `Taskbar replacement retry N/8`.
 4. Se un altro programma usa l'AppBar sullo stesso bordo, Windows può spostare
    la striscia: chiudi l'altro programma o cambia bordo alla dock.
 5. Se il preflight fallisce, Nebula lascia la taskbar nativa visibile e non

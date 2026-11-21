@@ -203,6 +203,28 @@ public partial class DockWindow : Window
             MaxHeight = maxHeight;
 
         bool fullWidth = _vm.Settings.ReplaceWindowsTaskbar && _vm.Settings.TaskbarFullWidth;
+
+        // A horizontal StackPanel measures its children with infinite width, so
+        // without a cap the widget ScrollViewer would grow past the screen and
+        // never scroll. Keep the widget zone inside the space the full-width
+        // grid actually gives it.
+        if (WidgetScroller is not null)
+        {
+            double cap = Math.Max(260, work.Width * 0.55);
+            if (fullWidth && ZoneHost.ColumnDefinitions.Count == 3)
+            {
+                double column = ZoneHost.ColumnDefinitions[1].ActualWidth;
+                if (column > 1)
+                    cap = Math.Min(cap, Math.Max(200, column - 6));
+            }
+
+            // The cap must live on the ScrollViewer itself: a horizontal
+            // StackPanel would still measure it with infinite width and the
+            // widget strip would overflow instead of scrolling.
+            if (double.IsNaN(WidgetScroller.MaxWidth) || Math.Abs(WidgetScroller.MaxWidth - cap) > 0.5)
+                WidgetScroller.MaxWidth = cap;
+        }
+
         if (fullWidth)
         {
             double target = Math.Max(360,
@@ -343,6 +365,7 @@ public partial class DockWindow : Window
             or nameof(Models.AppSettings.DockZonesSeparate)
             or nameof(Models.AppSettings.IslandPlacement)
             or nameof(Models.AppSettings.ShowIsland)
+            or nameof(Models.AppSettings.TaskbarWidgets)
             or nameof(Models.AppSettings.TaskbarFullWidth))
         {
             ApplyZoneLayout();
@@ -927,30 +950,119 @@ public partial class DockWindow : Window
         if (sender is not FrameworkElement { DataContext: TaskbarWidgetViewModel widget })
             return;
 
-        switch (widget.Id)
+        try
         {
-            case "search":
-                App.Instance?.ShowLauncher();
-                break;
-            case "clock":
-                App.Instance?.ShowWidgets();
-                break;
-            case "network":
-            case "controls":
-                App.Instance?.ShowControls();
-                break;
-            case "widgets":
-                App.Instance?.ShowWidgets();
-                break;
-            case "tabs":
-                App.Instance?.ShowGroupPicker();
-                break;
-            case "settings":
-                App.Instance?.ShowSettings();
-                break;
-            case "media":
-                App.Instance?.ToggleMediaPlayback();
-                break;
+            switch (widget.Id)
+            {
+                case "search":
+                    App.Instance?.ShowLauncher();
+                    break;
+                case "clock":
+                case "date":
+                case "widgets":
+                case "cpu":
+                case "ram":
+                case "stats":
+                case "ramdetail":
+                case "disk":
+                case "uptime":
+                case "battery":
+                    // Every read-only system widget opens the panel with the
+                    // full detail instead of doing nothing.
+                    App.Instance?.ShowWidgets();
+                    break;
+                case "network":
+                case "controls":
+                case "brightness":
+                    App.Instance?.ShowControls();
+                    break;
+                case "volume":
+                    _vm.Controls.ToggleMute(out _, out _);
+                    _vm.Controls.RefreshVolumeOnly();
+                    _vm.UpdateTaskbarWidgetValues();
+                    break;
+                case "tabs":
+                    App.Instance?.ShowGroupPicker();
+                    break;
+                case "settings":
+                    App.Instance?.ShowSettings();
+                    break;
+                case "media":
+                    App.Instance?.ToggleMediaPlayback();
+                    break;
+                case "notifications":
+                    _vm.Controls.SendWinShortcut(0x4E); // Win+N
+                    break;
+                case "quicksettings":
+                    _vm.Controls.SendWinShortcut(0x41); // Win+A
+                    break;
+                case "taskview":
+                    _vm.Controls.SendWinShortcut(0x09); // Win+Tab
+                    break;
+                case "showdesktop":
+                    _vm.Controls.SendWinShortcut(0x44); // Win+D
+                    break;
+                case "screenshot":
+                    _vm.Controls.SendWinShortcut(0x53, shift: true); // Win+Shift+S
+                    break;
+                case "clipboard":
+                    _vm.Controls.SendWinShortcut(0x56); // Win+V
+                    break;
+                case "emoji":
+                    _vm.Controls.SendWinShortcut(0xBE); // Win+.
+                    break;
+                case "lock":
+                    _vm.Controls.SendWinShortcut(0x4C); // Win+L
+                    break;
+                case "wifi":
+                    OpenShellTarget("ms-settings:network-wifi");
+                    break;
+                case "bluetooth":
+                    OpenShellTarget("ms-settings:bluetooth");
+                    break;
+                case "explorer":
+                    OpenShellTarget("explorer.exe");
+                    break;
+                case "terminal":
+                    OpenTerminal();
+                    break;
+                case "taskmgr":
+                    OpenShellTarget("taskmgr.exe");
+                    break;
+                case "recycle":
+                    OpenShellTarget("shell:RecycleBinFolder");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            // A missing optional app (Windows Terminal, Settings URI) must not
+            // take the bar down; the next click simply tries again.
+            Log.Write($"Taskbar widget action '{widget.Id}' failed: {ex.Message}");
+        }
+    }
+
+    private void OnWidgetScrollerWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (sender is not ScrollViewer viewer || viewer.ScrollableWidth <= 0)
+            return;
+
+        viewer.ScrollToHorizontalOffset(viewer.HorizontalOffset - e.Delta);
+        e.Handled = true;
+    }
+
+    private static void OpenShellTarget(string target) =>
+        Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+
+    private void OpenTerminal()
+    {
+        try
+        {
+            OpenShellTarget("wt.exe");
+        }
+        catch
+        {
+            OpenShellTarget("powershell.exe");
         }
     }
 

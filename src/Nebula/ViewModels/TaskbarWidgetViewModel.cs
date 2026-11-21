@@ -28,6 +28,7 @@ public sealed class TaskbarWidgetViewModel : ObservableObject
     private double _value;
     private double _value2;
     private bool _hasSecondBar;
+    private bool _faulted;
 
     public TaskbarWidgetViewModel(TaskbarWidgetDefinition definition)
     {
@@ -39,8 +40,8 @@ public sealed class TaskbarWidgetViewModel : ObservableObject
         Kind = definition.Id switch
         {
             "clock" => TaskbarWidgetKind.Clock,
-            "cpu" or "ram" or "stats" => TaskbarWidgetKind.Metric,
-            "battery" or "network" => TaskbarWidgetKind.Text,
+            "cpu" or "ram" or "stats" or "disk" or "volume" or "brightness" => TaskbarWidgetKind.Metric,
+            "battery" or "network" or "date" or "uptime" or "ramdetail" => TaskbarWidgetKind.Text,
             "media" => TaskbarWidgetKind.Media,
             "separator" => TaskbarWidgetKind.Separator,
             _ => TaskbarWidgetKind.Icon
@@ -51,6 +52,9 @@ public sealed class TaskbarWidgetViewModel : ObservableObject
             "cpu" => "CPU",
             "ram" => "RAM",
             "stats" => "CPU",
+            "disk" => "DISCO",
+            "volume" => "VOL",
+            "brightness" => "LUM",
             _ => ""
         };
         _label2 = "RAM";
@@ -188,7 +192,32 @@ public sealed class TaskbarWidgetViewModel : ObservableObject
             : "Nessun contenuto in riproduzione. Clic per play/pausa."
         : Description;
 
+    /// <summary>
+    /// Pulls fresh values from the dock. A sensor that fails (no battery, no
+    /// brightness endpoint, a COM hiccup) must never break the other widgets or
+    /// the bar refresh loop, so every update is isolated.
+    /// </summary>
     public void Apply(DockViewModel dock)
+    {
+        try
+        {
+            ApplyCore(dock);
+            _faulted = false;
+        }
+        catch (Exception ex)
+        {
+            if (_faulted)
+                return;
+
+            _faulted = true;
+            PrimaryText = "—";
+            Value = 0;
+            Value2 = 0;
+            Log.Write($"Taskbar widget '{Id}' update failed: {ex.Message}");
+        }
+    }
+
+    private void ApplyCore(DockViewModel dock)
     {
         AppSettings settings = dock.Settings;
 
@@ -197,6 +226,10 @@ public sealed class TaskbarWidgetViewModel : ObservableObject
             case "clock":
                 PrimaryText = dock.TimeText;
                 SecondaryText = settings.ShowDate ? dock.DateText : "";
+                break;
+
+            case "date":
+                PrimaryText = dock.DateText;
                 break;
 
             case "cpu":
@@ -223,6 +256,23 @@ public sealed class TaskbarWidgetViewModel : ObservableObject
                 HasSecondBar = true;
                 break;
 
+            case "ramdetail":
+                PrimaryText = dock.Monitor.RamDetail;
+                break;
+
+            case "disk":
+                Label = "DISCO";
+                PrimaryText = string.IsNullOrWhiteSpace(dock.Monitor.DiskFreeText)
+                    ? "—"
+                    : dock.Monitor.DiskFreeText;
+                Value = dock.Monitor.DiskUsage;
+                HasSecondBar = false;
+                break;
+
+            case "uptime":
+                PrimaryText = dock.Monitor.Uptime;
+                break;
+
             case "battery":
                 PrimaryText = dock.Monitor.HasBattery
                     ? dock.Monitor.BatteryText
@@ -231,6 +281,26 @@ public sealed class TaskbarWidgetViewModel : ObservableObject
 
             case "network":
                 PrimaryText = dock.Monitor.NetworkText;
+                break;
+
+            case "volume":
+                Label = "VOL";
+                PrimaryText = dock.Controls.VolumeSupported
+                    ? dock.Controls.Muted ? "Muto" : $"{dock.Controls.VolumePercent}%"
+                    : "—";
+                Value = dock.Controls.VolumeSupported ? dock.Controls.VolumePercent : 0;
+                HasSecondBar = false;
+                break;
+
+            case "brightness":
+                Label = "LUM";
+                PrimaryText = dock.Controls.BrightnessSupported
+                    ? $"{dock.Controls.BrightnessPercent}%"
+                    : "—";
+                Value = dock.Controls.BrightnessSupported
+                    ? Math.Max(0, dock.Controls.BrightnessPercent)
+                    : 0;
+                HasSecondBar = false;
                 break;
 
             case "media":

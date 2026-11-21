@@ -39,6 +39,9 @@ public partial class App : Application
     private readonly HashSet<string> _promptedUpdateVersions = new(StringComparer.OrdinalIgnoreCase);
     private DispatcherTimer? _trackerTimer;
     private DispatcherTimer? _taskbarGuard;
+    private DispatcherTimer? _taskbarRetry;
+    private int _taskbarRetryAttempt;
+    private const int TaskbarRetryLimit = 8;
     private CancellationTokenSource? _pipeCts;
 
     public static App Instance => (App)Current;
@@ -254,17 +257,12 @@ public partial class App : Application
             replacementApplied = false;
         }
 
-        // Hiding the native bar is only half the guarantee. If the AppBar did
-        // not reserve the work area, put the native bar back instead of leaving
-        // a bar that maximized windows can cover.
-        if (Settings.ReplaceWindowsTaskbar && Settings.ReserveTaskbarSpace &&
-            replacementApplied && !AllDocks.All(dock => dock.AppBarApplySucceeded))
-        {
-            Log.Write("AppBar verification failed at startup; restoring the native taskbar.");
-            Taskbar.Restore();
-            _dockWindow?.HideForTaskbarRestore();
-            replacementApplied = false;
-        }
+        // Hiding the native bar is only half the guarantee. The AppBar window
+        // has just been shown: verifying it in the same synchronous pass used
+        // to see a not-yet-laid-out window and restore the native bar for the
+        // rest of the session. Give the layout a moment, then decide.
+        if (Settings.ReplaceWindowsTaskbar && Settings.ReserveTaskbarSpace && replacementApplied)
+            _ = VerifyStartupReplacementAsync();
 
         Tracker.Refresh();
 
@@ -309,9 +307,10 @@ public partial class App : Application
 
         if (Settings.ReplaceWindowsTaskbar && !replacementApplied)
         {
-            Log.Write("Replacement requested at startup, but native taskbar was left visible.");
+            Log.Write("Replacement requested at startup, but native taskbar was left visible; scheduling a retry.");
             _tray.ShowBalloon("Taskbar non sostituita",
-                "Nebula ha lasciato la taskbar di Windows visibile. Controlla app.log e riprova dalle impostazioni.");
+                "La taskbar di Windows è rimasta visibile. Nebula riprova tra pochi secondi.");
+            ScheduleTaskbarRetry("startup apply");
         }
 
         Updates.UpdateReady += OnUpdateReady;
@@ -587,10 +586,14 @@ public partial class App : Application
                 break;
 
             case nameof(AppSettings.ReplaceWindowsTaskbar):
+                if (!Settings.ReplaceWindowsTaskbar)
+                    StopTaskbarRetry();
+
                 bool replacementApplied = Taskbar.Apply(Settings.ReplaceWindowsTaskbar);
                 UpdateTaskbarGuard();
                 if (Settings.ReplaceWindowsTaskbar && replacementApplied)
                 {
+                    StopTaskbarRetry();
                     foreach (DockWindow dock in AllDocks)
                         dock.ShowForTaskbarReplace();
                     SyncDockWindows();
@@ -600,8 +603,11 @@ public partial class App : Application
                     HideDockAndPanels();
                     SyncDockWindows();
                     if (Settings.ReplaceWindowsTaskbar)
+                    {
                         _tray?.ShowBalloon("Taskbar non sostituita",
-                            "La taskbar di Windows è rimasta visibile. Controlla app.log per il motivo.");
+                            "La taskbar di Windows è rimasta visibile. Nebula riprova tra pochi secondi.");
+                        ScheduleTaskbarRetry("settings toggle");
+                    }
                 }
                 break;
 
@@ -720,7 +726,14 @@ public partial class App : Application
         bool replacementApplied = Taskbar.Apply(Settings.ReplaceWindowsTaskbar);
         UpdateTaskbarGuard();
         if (Settings.ReplaceWindowsTaskbar && !replacementApplied)
+        {
             HideDockAndPanels();
+            ScheduleTaskbarRetry("apply all");
+        }
+        else
+        {
+            StopTaskbarRetry();
+        }
         StartupManager.Apply(Settings.LaunchAtStartup);
         Dock.RefreshItems();
         Dock.UpdateClock();
@@ -1103,8 +1116,145 @@ public partial class App : Application
             _taskbarGuard.Stop();
     }
 
+    /// <summary>
+    /// Waits for the freshly shown AppBar window to report a successful
+    /// reservation. A false negative here used to hide the Nebula bar and
+    /// restore the native taskbar until the next launch, which looked like the
+    /// replacement had simply stopped working.
+    /// </summary>
+    private async Task VerifyStartupReplacementAsync()
+    {
+        for (int attempt = 0; attempt < 20; attempt++)
+        {
+            await Task.Delay(250);
+            if (!Settings.ReplaceWindowsTaskbar)
+                return;
+
+            // The main bar is the one that must reserve the strip. A secondary
+            // bar can legitimately miss its AppBar on a hot-plugged screen and
+            // retries on its own; it must not veto the whole replacement.
+            if (_dockWindow is { AppBarApplySucceeded: true })
+            {
+                Log.Write("Taskbar replacement verified after startup.");
+                StopTaskbarRetry();
+                return;
+            }
+        }
+
+        Log.Write("AppBar verification failed at startup; restoring the native taskbar and scheduling a retry.");
+        Taskbar.Restore();
+        HideDockAndPanels();
+        ScheduleTaskbarRetry("startup AppBar verification");
+    }
+
+    /// <summary>
+    /// A refused AppBar or a busy Explorer is often transient. Retry the whole
+    /// replacement a few times instead of leaving the user with the native
+    /// taskbar and no Nebula bar until the next launch.
+    /// </summary>
+    private void ScheduleTaskbarRetry(string reason)
+    {
+        if (!Settings.ReplaceWindowsTaskbar)
+        {
+            StopTaskbarRetry();
+            return;
+        }
+
+        if (_taskbarRetry is null)
+        {
+            _taskbarRetry = new DispatcherTimer(DispatcherPriority.Background)
+            {
+                Interval = TimeSpan.FromSeconds(15)
+            };
+            _taskbarRetry.Tick += (_, _) => TryTaskbarReplacement();
+        }
+
+        if (_taskbarRetryAttempt >= TaskbarRetryLimit)
+        {
+            _taskbarRetry.Stop();
+            return;
+        }
+
+        Log.Write($"Taskbar replacement retry scheduled in 15 s ({reason}).");
+        _taskbarRetry.Start();
+    }
+
+    private void TryTaskbarReplacement()
+    {
+        if (!Settings.ReplaceWindowsTaskbar)
+        {
+            StopTaskbarRetry();
+            return;
+        }
+
+        if (_dockWindow is null)
+        {
+            _taskbarRetry?.Stop();
+            return;
+        }
+
+        if (_taskbarRetryAttempt >= TaskbarRetryLimit)
+        {
+            Log.Write($"Taskbar replacement gave up after {TaskbarRetryLimit} retries; " +
+                      "the setting stays saved for the next launch.");
+            _taskbarRetry?.Stop();
+            return;
+        }
+
+        _taskbarRetryAttempt++;
+        Log.Write($"Taskbar replacement retry {_taskbarRetryAttempt}/{TaskbarRetryLimit}.");
+
+        bool applied = Taskbar.Apply(true);
+        UpdateTaskbarGuard();
+        if (!applied)
+        {
+            Log.Write("Taskbar replacement retry could not hide the native taskbar.");
+            if (_taskbarRetryAttempt >= TaskbarRetryLimit)
+                _taskbarRetry?.Stop();
+            return;
+        }
+
+        foreach (DockWindow dock in AllDocks)
+            dock.ShowForTaskbarReplace();
+        SyncDockWindows();
+        foreach (DockWindow dock in AllDocks)
+            dock.ApplySettings();
+
+        _ = VerifyRetriedReplacementAsync();
+    }
+
+    private async Task VerifyRetriedReplacementAsync()
+    {
+        await Task.Delay(800);
+        if (!Settings.ReplaceWindowsTaskbar)
+        {
+            StopTaskbarRetry();
+            return;
+        }
+
+        if (_dockWindow is { AppBarApplySucceeded: true })
+        {
+            Log.Write("Taskbar replacement retry succeeded.");
+            StopTaskbarRetry();
+            return;
+        }
+
+        Log.Write("Taskbar replacement retry hid the shell bar but the AppBar is still missing.");
+        Taskbar.Restore();
+        HideDockAndPanels();
+        if (_taskbarRetryAttempt >= TaskbarRetryLimit)
+            _taskbarRetry?.Stop();
+    }
+
+    private void StopTaskbarRetry()
+    {
+        _taskbarRetry?.Stop();
+        _taskbarRetryAttempt = 0;
+    }
+
     public void RestoreWindowsTaskbar()
     {
+        StopTaskbarRetry();
         Settings.ReplaceWindowsTaskbar = false;
         Taskbar.Restore();
         UpdateTaskbarGuard();
@@ -1358,6 +1508,7 @@ public partial class App : Application
         }
 
         _tabs?.CloseAll();
+        StopTaskbarRetry();
         Taskbar?.Restore();
         SystemIcons?.CleanupOnExit();
         _trackerTimer?.Stop();
@@ -1389,6 +1540,7 @@ public partial class App : Application
         _hotkeys = null;
         _mediaControls?.Dispose();
         _mediaControls = null;
+        Dock?.Controls.Dispose();
         _tray?.Dispose();
         _tray = null;
         Updates?.Dispose();
@@ -1399,6 +1551,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _taskbarGuard?.Stop();
+        _taskbarRetry?.Stop();
         _tabs?.CloseAll();
         Taskbar?.Restore();
         SystemIcons?.CleanupOnExit();
@@ -1441,17 +1594,21 @@ public partial class App : Application
 
     /// <summary>
     /// The watchdog is the only guarantee that the native bar comes back after a
-    /// forced termination. If it dies and cannot be restarted, the replacement is
-    /// disabled instead of leaving the user with a hidden shell bar.
+    /// forced termination. If it dies and cannot be restarted, the native bar is
+    /// shown again for safety. The user's choice is kept: a transient failure
+    /// (Explorer busy, antivirus scanning the watchdog) must not disable the
+    /// replacement permanently, which used to leave Windows' bar and no Nebula
+    /// bar on every following launch.
     /// </summary>
     private void OnTaskbarProtectionLost()
     {
-        Log.Write("Taskbar protection lost; hiding the dock and disabling replacement.");
-        _dockWindow?.HideForTaskbarRestore();
-        Settings.ReplaceWindowsTaskbar = false;
+        Log.Write("Taskbar protection lost; restoring the native taskbar and scheduling a retry.");
+        HideDockAndPanels();
         _store.SaveNow();
         _tray?.ShowBalloon("Taskbar ripristinata",
-            "Nebula non è riuscita a mantenere attivo il watchdog. La taskbar di Windows è di nuovo visibile.");
+            "Nebula non è riuscita a mantenere attivo il watchdog e ha mostrato la taskbar di Windows. " +
+            "Riprova automaticamente tra pochi secondi.");
+        ScheduleTaskbarRetry("protection lost");
     }
 
     private void StartPipeServer()

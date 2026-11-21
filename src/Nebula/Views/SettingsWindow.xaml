@@ -1569,7 +1569,7 @@
                                         <Border Style="{StaticResource Card}" Margin="0,0,0,20">
                                             <StackPanel>
                                                 <TextBlock Text="WIDGET NELLA TASKBAR" Style="{StaticResource T.Section}" />
-                                                <TextBlock Text="Scegli cosa vive nella barra e in quale ordine: orologio, CPU, RAM, batteria, rete, media, ricerca, schede e altro. Ogni widget è indipendente e si aggiorna in tempo reale."
+                                                <TextBlock Text="Scegli cosa vive nella barra e in quale ordine: orologio e data, CPU, RAM, disco, uptime, batteria, rete, volume, luminosità, media, notifiche, appunti, cattura schermo, cestino e altro. Ogni widget è indipendente, si aggiorna in tempo reale e, se la barra è piena, la rotellina del mouse la fa scorrere."
                                                            Style="{StaticResource T.Caption}" Margin="0,0,0,10" TextWrapping="Wrap" />
 
                                                 <ItemsControl ItemsSource="{Binding ActiveTaskbarWidgets}">
@@ -1622,8 +1622,14 @@
                                                 <TextBlock Text="{Binding TaskbarWidgetCountText}"
                                                            Style="{StaticResource T.Caption}" Margin="0,4,0,10" />
 
-                                                <TextBlock Text="AGGIUNGI UN WIDGET" Style="{StaticResource T.Section}"
-                                                           Margin="0,4,0,6" />
+                                                <Grid Margin="0,4,0,6">
+                                                    <TextBlock Text="AGGIUNGI UN WIDGET" Style="{StaticResource T.Section}"
+                                                               Margin="0" VerticalAlignment="Center" />
+                                                    <Button Content="Aggiungi tutti" Style="{StaticResource GhostButton}"
+                                                            Padding="10,5" FontSize="10.5" HorizontalAlignment="Right"
+                                                            ToolTip="Riempie la barra con il catalogo completo; la rotellina la fa scorrere"
+                                                            Click="OnAddAllTaskbarWidgets" />
+                                                </Grid>
                                                 <ItemsControl ItemsSource="{Binding AvailableTaskbarWidgets}">
                                                     <ItemsControl.ItemsPanel>
                                                         <ItemsPanelTemplate>

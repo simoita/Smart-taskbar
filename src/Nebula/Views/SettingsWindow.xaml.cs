@@ -430,6 +430,11 @@ public partial class SettingsWindow : Window
         _store.MarkDirty();
     }
 
+    private void OnAddAllTaskbarWidgets(object sender, RoutedEventArgs e)
+    {
+        _vm.AddAllTaskbarWidgets();
+    }
+
     private void OnRemoveTaskbarWidget(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: TaskbarWidgetOptionViewModel option })

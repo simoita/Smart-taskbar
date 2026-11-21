@@ -40,9 +40,10 @@ public sealed class QuickControls : IDisposable
     public string NetworkText { get; private set; } = "Rilevatore rete…";
     public bool NetworkAvailable { get; private set; }
 
-    public QuickControls()
+    public QuickControls(bool autoRefresh = true)
     {
-        Refresh();
+        if (autoRefresh)
+            Refresh();
     }
 
     public void Refresh()
@@ -53,6 +54,55 @@ public sealed class QuickControls : IDisposable
         RefreshVolume();
         RefreshBrightness();
         RefreshNetwork();
+    }
+
+    /// <summary>
+    /// Lightweight refresh used by the taskbar widgets: reading the default
+    /// audio endpoint does not touch the monitor DDC channel or enumerate
+    /// network adapters, so it is cheap enough for a periodic poll.
+    /// </summary>
+    public void RefreshVolumeOnly()
+    {
+        if (!_disposed)
+            RefreshVolume();
+    }
+
+    /// <summary>Refreshes just the DDC brightness reading.</summary>
+    public void RefreshBrightnessOnly()
+    {
+        if (!_disposed)
+            RefreshBrightness();
+    }
+
+    /// <summary>
+    /// Sends a Windows key chord (for example Win+A for the quick settings
+    /// panel). Keys are released in reverse order so the shell never keeps a
+    /// modifier stuck down.
+    /// </summary>
+    public bool SendWinShortcut(byte virtualKey, bool shift = false)
+    {
+        const byte leftWin = 0x5B;
+        const byte shiftKey = 0x10;
+
+        try
+        {
+            keybd_event(leftWin, 0, 0, UIntPtr.Zero);
+            if (shift)
+                keybd_event(shiftKey, 0, 0, UIntPtr.Zero);
+
+            keybd_event(virtualKey, 0, 0, UIntPtr.Zero);
+            keybd_event(virtualKey, 0, KeyeventfKeyup, UIntPtr.Zero);
+
+            if (shift)
+                keybd_event(shiftKey, 0, KeyeventfKeyup, UIntPtr.Zero);
+            keybd_event(leftWin, 0, KeyeventfKeyup, UIntPtr.Zero);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Windows shortcut failed: " + ex.Message);
+            return false;
+        }
     }
 
     public bool SetVolume(int percent, out string? error)
