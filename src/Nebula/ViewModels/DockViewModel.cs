@@ -274,7 +274,11 @@ public sealed class DockViewModel : ObservableObject
             if (definition is null)
                 continue;
 
-            var widget = new TaskbarWidgetViewModel(definition);
+            string mode = Settings.TaskbarWidgetModes is { } modes &&
+                          modes.TryGetValue(definition.Id, out string? configured)
+                ? configured
+                : "expanded";
+            var widget = new TaskbarWidgetViewModel(definition, mode);
             TaskbarWidgetItems.Add(widget);
         }
 
@@ -672,6 +676,7 @@ public sealed class DockViewModel : ObservableObject
                 UpdateTaskbarWidgetValues();
                 break;
             case nameof(AppSettings.TaskbarWidgets):
+            case nameof(AppSettings.TaskbarWidgetModes):
                 RefreshTaskbarWidgets();
                 break;
             case nameof(AppSettings.ShowGlow):

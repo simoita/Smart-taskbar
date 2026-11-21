@@ -336,6 +336,9 @@ public partial class App : Application
         if (args.Any(a => string.Equals(a, "--widgets", StringComparison.OrdinalIgnoreCase)))
             Dispatcher.InvokeAsync(ShowWidgets);
 
+        if (args.Any(a => string.Equals(a, "--network", StringComparison.OrdinalIgnoreCase)))
+            Dispatcher.InvokeAsync(ShowNetworkPanel);
+
         if (_store.IsFirstRun && !captureDemo)
             _tray.ShowBalloon("Nebula è attiva",
                 "La tua dock è pronta. Apri le impostazioni per scegliere stile, vetro e widget.");
@@ -990,11 +993,17 @@ public partial class App : Application
 
     public void ShowControls() => ShowWidgetsPanel(WidgetsPanel.Controls);
 
+    /// <summary>Wi-Fi and Bluetooth quick panel, opened by the network widgets.</summary>
+    public void ShowNetworkPanel() => ShowWidgetsPanel(WidgetsPanel.Network);
+
     private void ShowWidgetsPanel(WidgetsPanel panel)
     {
-        bool enabled = panel == WidgetsPanel.Widget
-            ? Settings.ShowWidgets
-            : Settings.ShowQuickControls;
+        bool enabled = panel switch
+        {
+            WidgetsPanel.Widget => Settings.ShowWidgets,
+            WidgetsPanel.Controls => Settings.ShowQuickControls,
+            _ => true
+        };
 
         if (!enabled)
         {

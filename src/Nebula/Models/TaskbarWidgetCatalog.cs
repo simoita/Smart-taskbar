@@ -20,7 +20,7 @@ public static class TaskbarWidgetCatalog
         new("disk", "Disco", "Spazio libero e utilizzo del disco di sistema.", "\uEDA2"),
         new("uptime", "Uptime", "Tempo dall'accensione del PC.", "\uE916"),
         new("battery", "Batteria", "Stato della batteria o alimentazione AC.", "\uE83F"),
-        new("network", "Rete", "Stato della connessione attiva.", "\uE774"),
+        new("network", "Rete", "Stato della connessione e pannello Wi-Fi/Bluetooth.", "\uE774"),
 
         // Audio, video and display.
         new("volume", "Volume", "Volume di Windows; clic per attivare o disattivare l'audio.", "\uE767"),
@@ -43,8 +43,8 @@ public static class TaskbarWidgetCatalog
         new("clipboard", "Appunti", "Apre la cronologia degli appunti di Windows.", "\uE77F"),
         new("emoji", "Emoji", "Apre la tastiera emoji di Windows.", "\uE76E"),
         new("lock", "Blocca", "Blocca la sessione di Windows.", "\uE72E"),
-        new("wifi", "Wi-Fi", "Apre le impostazioni Wi-Fi di Windows.", "\uE701"),
-        new("bluetooth", "Bluetooth", "Apre le impostazioni Bluetooth di Windows.", "\uE702"),
+        new("wifi", "Wi-Fi", "Apre il pannello Nebula con le reti Wi-Fi.", "\uE701"),
+        new("bluetooth", "Bluetooth", "Apre il pannello Nebula con i dispositivi Bluetooth.", "\uE702"),
         new("explorer", "Esplora file", "Apre la cartella personale in Esplora file.", "\uE8B7"),
         new("terminal", "Terminale", "Apre Windows Terminal o PowerShell.", "\uE756"),
         new("taskmgr", "Gestione attività", "Apre Gestione attività di Windows.", "\uE9D9"),

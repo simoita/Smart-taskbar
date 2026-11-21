@@ -45,7 +45,9 @@ Nella dock, il tasto destro su un'app apre il menu per fissarla o rimuoverla. Le
 
 Apri il widget con l'icona **Widget** nella dock, con `Ctrl+Alt+W`, oppure da **Studio → Widget → Apri pannello widget**. Il pannello mostra la striscia dei widget scelti dal catalogo, oltre a orologio, data, statistiche CPU/RAM, batteria se presente e un grafico CPU. Ogni elemento ha un interruttore nella pagina **Widget**.
 
-I **Controlli rapidi** si aprono dall'icona dedicata nella dock o da **Studio → Controlli → Apri controlli rapidi**. Volume e mute agiscono sull'endpoint audio reale; i pulsanti media inviano play/pausa, precedente e successivo al player attivo; la rete mostra lo stato e apre le impostazioni di Windows; la luminosità usa DDC/CI quando il monitor la espone, altrimenti lo slider è disabilitato con un avviso. **Layout compatto controlli** riduce il pannello da 410 a 370 px.
+I **Controlli rapidi** si aprono dall'icona dedicata nella dock o da **Studio → Controlli → Apri controlli rapidi**. Volume e mute agiscono sull'endpoint audio reale; i pulsanti media inviano play/pausa, precedente e successivo al player attivo; la scheda **Rete** accende Wi-Fi e Bluetooth, elenca le reti e i dispositivi associati e apre le impostazioni di Windows quando serve una password o l'associazione; la luminosità usa DDC/CI quando il monitor la espone, altrimenti lo slider è disabilitato con un avviso. **Layout compatto controlli** riduce il pannello da 410 a 370 px.
+
+I widget della taskbar possono essere **espansi** o ridotti a **icona** dalla riga corrispondente in **Studio → Widget**; quelli espansi si ingrandiscono ancora al passaggio del mouse. La scelta è salvata per singolo widget.
 
 Widget e controlli condividono la stessa finestra: non vengono creati processi o finestre WPF aggiuntive.
 

@@ -33,7 +33,7 @@
                             <TextBlock x:Name="PanelTitle" Text="Widget" FontSize="14"
                                        FontWeight="{DynamicResource S.TitleWeight}"
                                        Foreground="{DynamicResource C.Text}" />
-                            <TextBlock Text="Calendario, sistema e controlli"
+                            <TextBlock x:Name="PanelSubtitle" Text="Calendario, sistema e widget"
                                        FontSize="9.5" Foreground="{DynamicResource C.TextMuted}" />
                         </StackPanel>
                     </StackPanel>
@@ -55,6 +55,9 @@
                         <Button x:Name="ControlsTab" Content="Controlli" Style="{StaticResource GhostButton}"
                                 Padding="14,6" FontSize="11" BorderThickness="0" Margin="3,0,0,0"
                                 Click="OnControlsTab" AutomationProperties.Name="Scheda controlli rapidi" />
+                        <Button x:Name="NetworkTab" Content="Rete" Style="{StaticResource GhostButton}"
+                                Padding="14,6" FontSize="11" BorderThickness="0" Margin="3,0,0,0"
+                                Click="OnNetworkTab" AutomationProperties.Name="Scheda Wi-Fi e Bluetooth" />
                     </StackPanel>
                 </Border>
 
@@ -322,6 +325,135 @@
                         </Border>
 
                         <TextBlock x:Name="ControlStatus" Style="{StaticResource T.Caption}" FontSize="9.5"
+                                   Margin="2,0,2,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- WIFI E BLUETOOTH -->
+                <Grid x:Name="NetworkPage" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="Connessioni rapide" Style="{StaticResource T.H2}" FontSize="18" />
+                        <TextBlock Text="Attiva le radio, scegli una rete e gestisci i dispositivi senza aprire il pannello di Windows."
+                                   Style="{StaticResource T.Caption}" Margin="0,3,0,12" />
+
+                        <Border Background="{DynamicResource S.InnerBg}"
+                                BorderBrush="{DynamicResource S.InnerBorder}"
+                                BorderThickness="{DynamicResource S.BorderThickness}"
+                                CornerRadius="13" Padding="13,11" Margin="0,0,0,9">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE701;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                   Foreground="{DynamicResource C.AccentText}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Text="WI-FI" Style="{StaticResource T.Section}"
+                                                   Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <CheckBox x:Name="WifiSwitch" Style="{StaticResource Switch}"
+                                              HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Click="OnWifiToggle" AutomationProperties.Name="Attiva Wi-Fi" />
+                                </Grid>
+                                <TextBlock x:Name="WifiStateText" Text="Rilevatore Wi-Fi…"
+                                           Style="{StaticResource T.Caption}" Margin="0,5,0,0" />
+
+                                <ItemsControl x:Name="WifiList" Margin="0,8,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource NetworkRowButton}"
+                                                    Tag="{Binding}" Click="OnWifiNetworkClick">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" FontSize="11.5"
+                                                                   Foreground="{DynamicResource C.Text}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Detail}" FontSize="9"
+                                                                   Foreground="{DynamicResource C.TextMuted}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{Binding ActionLabel}"
+                                                               FontSize="9.5" Margin="8,0,0,0"
+                                                               Foreground="{DynamicResource C.AccentText}"
+                                                               VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="WifiEmptyText" Text="Nessuna rete trovata."
+                                           Style="{StaticResource T.Caption}" Margin="2,4,0,0" />
+
+                                <Grid Margin="0,8,0,0">
+                                    <Button Content="Aggiorna reti" Style="{StaticResource GhostButton}"
+                                            Padding="10,5" HorizontalAlignment="Left"
+                                            Click="OnRefreshWireless"
+                                            AutomationProperties.Name="Aggiorna reti Wi-Fi" />
+                                    <Button Content="Impostazioni Wi-Fi" Style="{StaticResource GhostButton}"
+                                            Padding="10,5" HorizontalAlignment="Right"
+                                            Click="OnOpenWifiSettings" AutomationProperties.Name="Impostazioni Wi-Fi" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{DynamicResource S.InnerBg}"
+                                BorderBrush="{DynamicResource S.InnerBorder}"
+                                BorderThickness="{DynamicResource S.BorderThickness}"
+                                CornerRadius="13" Padding="13,11" Margin="0,0,0,9">
+                            <StackPanel>
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE702;" FontFamily="Segoe Fluent Icons" FontSize="11"
+                                                   Foreground="{DynamicResource C.AccentText}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Text="BLUETOOTH" Style="{StaticResource T.Section}"
+                                                   Margin="7,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <CheckBox x:Name="BluetoothSwitch" Style="{StaticResource Switch}"
+                                              HorizontalAlignment="Right" VerticalAlignment="Center"
+                                              Click="OnBluetoothToggle" AutomationProperties.Name="Attiva Bluetooth" />
+                                </Grid>
+                                <TextBlock x:Name="BluetoothStateText" Text="Rilevatore Bluetooth…"
+                                           Style="{StaticResource T.Caption}" Margin="0,5,0,0" />
+
+                                <ItemsControl x:Name="BluetoothList" Margin="0,8,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource NetworkRowButton}"
+                                                    Tag="{Binding}" Click="OnBluetoothDeviceClick">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" FontSize="11.5"
+                                                                   Foreground="{DynamicResource C.Text}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Detail}" FontSize="9"
+                                                                   Foreground="{DynamicResource C.TextMuted}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="Gestisci" FontSize="9.5"
+                                                               Margin="8,0,0,0"
+                                                               Foreground="{DynamicResource C.AccentText}"
+                                                               VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="BluetoothEmptyText" Text="Nessun dispositivo associato."
+                                           Style="{StaticResource T.Caption}" Margin="2,4,0,0" />
+
+                                <Button Content="Gestisci dispositivi Bluetooth" Style="{StaticResource GhostButton}"
+                                        Padding="10,5" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                        Click="OnOpenBluetoothSettings"
+                                        AutomationProperties.Name="Gestisci dispositivi Bluetooth" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock x:Name="WirelessStatus" Style="{StaticResource T.Caption}" FontSize="9.5"
                                    Margin="2,0,2,0" TextWrapping="Wrap" />
                     </StackPanel>
                 </Grid>

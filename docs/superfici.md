@@ -2,7 +2,7 @@
 
 Nebula usa le superfici già presenti nella dock, non processi o finestre WPF aggiuntive:
 
-- **Widget** e **Controlli rapidi** condividono la stessa `WidgetsWindow` con due schede. Aprendo una scheda si riusa la finestra già creata; chiudendola si fermano timer e risorse della scheda.
+- **Widget**, **Controlli rapidi** e **Rete** condividono la stessa `WidgetsWindow` con tre schede. Aprendo una scheda si riusa la finestra già creata; chiudendola si fermano timer e risorse della scheda.
 - **Ricerca** usa la `LauncherWindow` esistente. Cerca app del menu Start e, se attivo, finestre aperte tramite `WindowTracker`.
 - Tutte le superfici leggono lo stesso `settings.json` in `%APPDATA%\Nebula` e reagiscono dal vivo alle modifiche dello studio.
 
@@ -12,6 +12,7 @@ Nebula usa le superfici già presenti nella dock, non processi o finestre WPF ag
 | --- | --- | --- | --- |
 | Widget | icona **Widget** | **Widget → Apri pannello widget** | `Ctrl+Alt+W` |
 | Controlli rapidi | icona **Controlli rapidi** | **Controlli → Apri controlli rapidi** | — |
+| Rete | widget **Wi-Fi**, **Bluetooth** o **Rete** | **Controlli → Apri controlli rapidi** | — |
 | Ricerca | icona **Cerca** | **Ricerca → Apri ricerca** | `Ctrl+Alt+Spazio` |
 
 Le icone della dock compaiono solo se la superficie è attiva. Il menu contestuale della dock offre le stesse voci. `Esc` chiude il pannello o la ricerca; un clic fuori dalla ricerca la chiude.
@@ -31,11 +32,11 @@ In **Studio → Stile → PRESET SUPERFICI** ci sono sei pulsanti: **Vetro**, **
 
 Il preset cambia anche sfondo, bordo, padding, spessore del bordo e peso del titolo. Widget, controlli rapidi e ricerca usano le stesse risorse dinamiche `S.*`: non serve riaprirli. La tabella qui sopra descrive i valori impostati da `ThemeEngine.ApplySurfaceResources`; le famiglie e le dimensioni dei font sono risorse dinamiche, non valori duplicati nelle singole viste.
 
-Con **Animazioni fluide** disattivato, l'apertura di widget e ricerca non avvia fade o slide; con l'interruttore riattivato le transizioni tornano. Il grafico CPU viene fermato quando il pannello passa ai controlli.
+Con **Animazioni fluide** disattivato, l'apertura di widget e ricerca non avvia fade o slide; con l'interruttore riattivato le transizioni tornano. Il grafico CPU viene fermato quando il pannello passa ai controlli; la scheda Rete aggiorna lo stato delle radio ogni 7 secondi e le reti Wi-Fi al massimo ogni 15 secondi, per non forzare una scansione continua.
 
 ## Widget
 
-La scheda **Widget** mostra la striscia dei widget scelti dal catalogo, oltre a orologio, data, statistiche CPU/RAM, batteria (se presente) e grafico CPU. Il catalogo contiene 11 widget: orologio, data, calendario, sistema, batteria, rete, uptime, disco, media, ricerca e controlli. Ogni widget si attiva o disattiva in **Studio → Widget** e la striscia si aggiorna senza chiudere il pannello. Orologio, data, secondi, formato 24 ore, statistiche e batteria hanno interruttori dedicati. Il pannello segue stile, accento, vetro, grana, bagliore e animazioni correnti.
+La scheda **Widget** mostra la striscia dei widget scelti dal catalogo, oltre a orologio, data, statistiche CPU/RAM, batteria (se presente) e grafico CPU. Il catalogo contiene 33 widget; ogni widget si attiva o disattiva in **Studio → Widget** e la striscia si aggiorna senza chiudere il pannello. Nella stessa riga il pulsante **Icona/Espanso** decide se il widget mostra il valore completo o solo il glifo; i widget espansi si ingrandiscono al passaggio del mouse. Orologio, data, secondi, formato 24 ore, statistiche e batteria hanno interruttori dedicati. Il pannello segue stile, accento, vetro, grana, bagliore e animazioni correnti.
 
 ## Controlli rapidi
 
@@ -43,6 +44,7 @@ La scheda **Controlli rapidi** agisce sul sistema:
 
 - **Volume e mute:** endpoint COM predefinito (`IAudioEndpointVolume`); lo slider e il pulsante cambiano il volume reale e mostrano la percentuale.
 - **Media:** pulsanti precedente, play/pausa e successivo inviano i tasti multimediali di Windows (`keybd_event`), quindi funzionano con il player attivo senza integrarsi nel suo processo.
+- **Rete:** interruttori Wi-Fi e Bluetooth tramite l'API WinRT `Windows.Devices.Radios.Radio`, senza elevazione. Le reti si leggono e si aprono con `netsh wlan`; una rete protetta non ancora salvata apre le impostazioni Wi-Fi di Windows per la password. La sezione Bluetooth elenca i dispositivi associati e apre le impostazioni di Windows per associazione e connessione, perché Windows non espone un'API generica di connessione per ogni profilo.
 - **Rete:** legge lo stato degli adattatori attivi e mostra interfaccia e velocità; **Apri impostazioni di rete** apre `ms-settings:network-status`.
 - **Luminosità:** usa DDC/CI quando il monitor lo espone. Se il display non lo supporta, lo slider viene disabilitato e compare un avviso esplicito; non viene simulato un controllo inesistente.
 

@@ -100,7 +100,7 @@ riordinare i widget che vivono direttamente nella barra:
 | Appunti | Apre la cronologia appunti (`Win+V`) |
 | Emoji | Apre la tastiera emoji (`Win+.`) |
 | Blocca | Blocca la sessione (`Win+L`) |
-| Wi-Fi / Bluetooth | Aprono le impostazioni di Windows corrispondenti |
+| Wi-Fi / Bluetooth | Aprono il pannello **Rete** di Nebula, con radio, reti e dispositivi |
 | Esplora file | Apre la cartella personale |
 | Terminale | Apre Windows Terminal o PowerShell |
 | Gestione attività | Apre Gestione attività |
@@ -113,6 +113,13 @@ ha uno scroller orizzontale e la **rotellina del mouse** la fa scorrere. Ogni
 widget aggiorna i propri valori dentro un `try/catch`: un sensore assente
 (batteria, luminosità, endpoint audio) mostra `—` solo nel proprio riquadro e
 non interrompe gli altri né il timer della barra.
+
+Ogni widget può restare **Espanso** (icona, valore e barra) oppure essere
+ridotto a **Icona**, dal pulsante nella sua riga in **Studio → Widget**. La
+scelta è salvata per singolo widget in `TaskbarWidgetModes` (`icon`; l'assenza
+della chiave significa espanso). I widget espansi si ingrandiscono del 16% al
+passaggio del mouse, senza spostare gli altri; quelli in modalità icona restano
+compatti.
 
 La lista è salvata in `settings.json` come `TaskbarWidgets`. I vecchi
 interruttori `ShowClock`, `ShowStats` e `ShowBattery` vengono usati una sola

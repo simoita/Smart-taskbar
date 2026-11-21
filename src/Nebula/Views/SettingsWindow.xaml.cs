@@ -435,6 +435,12 @@ public partial class SettingsWindow : Window
         _vm.AddAllTaskbarWidgets();
     }
 
+    private void OnToggleTaskbarWidgetMode(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: TaskbarWidgetOptionViewModel option })
+            _vm.ToggleTaskbarWidgetMode(option);
+    }
+
     private void OnRemoveTaskbarWidget(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: TaskbarWidgetOptionViewModel option })

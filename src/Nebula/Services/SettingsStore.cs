@@ -166,6 +166,15 @@ public sealed class SettingsStore : IDisposable
         }
         s.TaskbarWidgets = taskbarWidgets;
 
+        var widgetModes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, string> pair in s.TaskbarWidgetModes ??
+                 new Dictionary<string, string>())
+        {
+            if (TaskbarWidgetCatalog.IsKnown(pair.Key) && pair.Value is "icon" or "expanded")
+                widgetModes[pair.Key] = pair.Value;
+        }
+        s.TaskbarWidgetModes = widgetModes;
+
         s.CustomIcons ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         s.CustomIconStyles ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var styles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

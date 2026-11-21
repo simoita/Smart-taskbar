@@ -198,7 +198,8 @@ public sealed class SettingsViewModel : ObservableObject
         {
             SyncWidgetOptions();
         }
-        else if (e.PropertyName == nameof(AppSettings.TaskbarWidgets))
+        else         if (e.PropertyName == nameof(AppSettings.TaskbarWidgets) ||
+            e.PropertyName == nameof(AppSettings.TaskbarWidgetModes))
         {
             SyncTaskbarWidgets();
         }
@@ -571,7 +572,8 @@ public sealed class SettingsViewModel : ObservableObject
             TaskbarWidgetDefinition? definition = TaskbarWidgetCatalog.Find(id);
             if (definition is null || !used.Add(definition.Id))
                 continue;
-            ActiveTaskbarWidgets.Add(new TaskbarWidgetOptionViewModel(definition));
+            ActiveTaskbarWidgets.Add(new TaskbarWidgetOptionViewModel(
+                definition, TaskbarWidgetMode(definition.Id)));
         }
 
         foreach (TaskbarWidgetDefinition definition in TaskbarWidgetCatalog.All)
@@ -582,6 +584,28 @@ public sealed class SettingsViewModel : ObservableObject
 
         OnPropertyChanged(nameof(TaskbarWidgetCountText));
         OnPropertyChanged(nameof(NoTaskbarWidgetsVisibility));
+    }
+
+    private string TaskbarWidgetMode(string id) =>
+        Settings.TaskbarWidgetModes is { } modes &&
+        modes.TryGetValue(id, out string? mode)
+            ? mode
+            : "expanded";
+
+    /// <summary>Switches one widget between the rich and the icon-only layout.</summary>
+    public void ToggleTaskbarWidgetMode(TaskbarWidgetOptionViewModel option)
+    {
+        var modes = new Dictionary<string, string>(
+            Settings.TaskbarWidgetModes ?? new Dictionary<string, string>(),
+            StringComparer.OrdinalIgnoreCase);
+
+        if (option.Mode == "icon")
+            modes.Remove(option.Id);
+        else
+            modes[option.Id] = "icon";
+
+        Settings.TaskbarWidgetModes = modes;
+        SyncTaskbarWidgets();
     }
 
     public void AddTaskbarWidget(TaskbarWidgetOptionViewModel option)
@@ -671,9 +695,12 @@ public sealed record ShortcutInfoViewModel(string Name, string Path);
 
 public sealed class TaskbarWidgetOptionViewModel
 {
-    public TaskbarWidgetOptionViewModel(TaskbarWidgetDefinition definition)
+    public TaskbarWidgetOptionViewModel(TaskbarWidgetDefinition definition, string mode = "expanded")
     {
         Definition = definition;
+        Mode = string.Equals(mode, "icon", StringComparison.OrdinalIgnoreCase)
+            ? "icon"
+            : "expanded";
     }
 
     public TaskbarWidgetDefinition Definition { get; }
@@ -681,6 +708,11 @@ public sealed class TaskbarWidgetOptionViewModel
     public string Name => Definition.Name;
     public string Description => Definition.Description;
     public string Glyph => Definition.Glyph;
+    public string Mode { get; }
+    public string ModeLabel => Mode == "icon" ? "Icona" : "Espanso";
+    public string ModeToolTip => Mode == "icon"
+        ? "Passa alla versione espansa con valori e barre"
+        : "Riduci a icona nella barra";
 }
 
 public sealed class WidgetOptionViewModel : ObservableObject

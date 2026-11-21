@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
@@ -15,7 +16,8 @@ namespace Nebula.Views;
 public enum WidgetsPanel
 {
     Widget,
-    Controls
+    Controls,
+    Network
 }
 
 public partial class WidgetsWindow : Window
@@ -25,7 +27,14 @@ public partial class WidgetsWindow : Window
 
     private readonly DockViewModel _dock;
     private readonly DispatcherTimer _timer;
+    private readonly DispatcherTimer _networkTimer;
     private readonly QuickControls _controls = new();
+    private readonly WirelessPanelService _wireless = new();
+    private readonly ObservableCollection<WifiNetworkItem> _wifiNetworks = new();
+    private readonly ObservableCollection<BluetoothDeviceItem> _bluetoothDevices = new();
+    private bool _networkBusy;
+    private bool _suppressWirelessEvents;
+    private DateTime _lastWifiScan = DateTime.MinValue;
     private DateTime _month = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private WidgetsPanel _panel = WidgetsPanel.Widget;
     private bool _suppressControlEvents;
@@ -47,6 +56,12 @@ public partial class WidgetsWindow : Window
             UpdateWidgetStripValues();
         };
         _timer.Start();
+
+        _networkTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(7) };
+        _networkTimer.Tick += (_, _) => _ = RefreshWirelessAsync();
+
+        WifiList.ItemsSource = _wifiNetworks;
+        BluetoothList.ItemsSource = _bluetoothDevices;
 
         _dock.Settings.PropertyChanged += OnSettingsChanged;
         _dock.Theme.Changed += OnThemeChanged;
@@ -79,8 +94,9 @@ public partial class WidgetsWindow : Window
 
         WidgetTab.Visibility = widgets ? Visibility.Visible : Visibility.Collapsed;
         ControlsTab.Visibility = controls ? Visibility.Visible : Visibility.Collapsed;
+        NetworkTab.Visibility = Visibility.Visible;
 
-        if (!widgets && !controls)
+        if (!widgets && !controls && _panel != WidgetsPanel.Network)
         {
             if (IsVisible)
                 Close();
@@ -88,9 +104,9 @@ public partial class WidgetsWindow : Window
         }
 
         if (_panel == WidgetsPanel.Widget && !widgets)
-            _panel = WidgetsPanel.Controls;
+            _panel = controls ? WidgetsPanel.Controls : WidgetsPanel.Network;
         if (_panel == WidgetsPanel.Controls && !controls)
-            _panel = WidgetsPanel.Widget;
+            _panel = widgets ? WidgetsPanel.Widget : WidgetsPanel.Network;
 
         ApplyPanel();
     }
@@ -111,6 +127,7 @@ public partial class WidgetsWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         _timer.Stop();
+        _networkTimer.Stop();
         StopMotion();
         _dock.Settings.PropertyChanged -= OnSettingsChanged;
         _dock.Theme.Changed -= OnThemeChanged;
@@ -175,21 +192,48 @@ public partial class WidgetsWindow : Window
 
         WidgetPage.Visibility = _panel == WidgetsPanel.Widget ? Visibility.Visible : Visibility.Collapsed;
         ControlsPage.Visibility = _panel == WidgetsPanel.Controls ? Visibility.Visible : Visibility.Collapsed;
-        PanelTitle.Text = _panel == WidgetsPanel.Widget ? "Widget" : "Controlli rapidi";
-        Width = _panel == WidgetsPanel.Controls && _dock.Settings.QuickControlsCompact ? 400 : 445;
+        NetworkPage.Visibility = _panel == WidgetsPanel.Network ? Visibility.Visible : Visibility.Collapsed;
+
+        PanelTitle.Text = _panel switch
+        {
+            WidgetsPanel.Widget => "Widget",
+            WidgetsPanel.Controls => "Controlli rapidi",
+            _ => "Wi-Fi e Bluetooth"
+        };
+        PanelSubtitle.Text = _panel switch
+        {
+            WidgetsPanel.Widget => "Calendario, sistema e widget",
+            WidgetsPanel.Controls => "Volume, media, rete e luminosità",
+            _ => "Collega reti e dispositivi in un clic"
+        };
+        Width = _panel switch
+        {
+            WidgetsPanel.Controls when _dock.Settings.QuickControlsCompact => 400,
+            WidgetsPanel.Network => 470,
+            _ => 445
+        };
 
         StyleTab(WidgetTab, _panel == WidgetsPanel.Widget);
         StyleTab(ControlsTab, _panel == WidgetsPanel.Controls);
+        StyleTab(NetworkTab, _panel == WidgetsPanel.Network);
 
-        if (_panel == WidgetsPanel.Controls)
+        if (_panel == WidgetsPanel.Network)
         {
             _timer.Stop();
+            _networkTimer.Start();
+            _ = RefreshWirelessAsync(forceScan: true);
+        }
+        else if (_panel == WidgetsPanel.Controls)
+        {
+            _timer.Stop();
+            _networkTimer.Stop();
             if (CalendarGrid.Children.Count > 0)
                 CalendarGrid.Children.Clear();
             RefreshControls();
         }
         else
         {
+            _networkTimer.Stop();
             RefreshWidgetStrip();
             if (CalendarGrid.Children.Count == 0)
                 BuildCalendar();
@@ -282,6 +326,8 @@ public partial class WidgetsWindow : Window
     private void OnWidgetTab(object sender, RoutedEventArgs e) => ShowPanel(WidgetsPanel.Widget);
 
     private void OnControlsTab(object sender, RoutedEventArgs e) => ShowPanel(WidgetsPanel.Controls);
+
+    private void OnNetworkTab(object sender, RoutedEventArgs e) => ShowPanel(WidgetsPanel.Network);
 
     private void OnVolumeChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
@@ -547,6 +593,153 @@ public partial class WidgetsWindow : Window
     {
         _month = _month.AddMonths(1);
         BuildCalendar();
+    }
+
+    private async Task RefreshWirelessAsync(bool forceScan = false)
+    {
+        if (_networkBusy || _panel != WidgetsPanel.Network)
+            return;
+
+        _networkBusy = true;
+        WirelessStatus.Text = "Aggiornamento…";
+        try
+        {
+            RadioStateInfo wifi = await _wireless.GetWifiStateAsync();
+            SetSwitchSilently(WifiSwitch, wifi.On);
+            WifiSwitch.IsEnabled = wifi.Supported;
+            WifiStateText.Text = !wifi.Supported
+                ? "Nessuna scheda Wi-Fi rilevata."
+                : wifi.On ? "Wi-Fi attivo" : "Wi-Fi disattivato";
+
+            if (wifi.On &&
+                (forceScan || DateTime.UtcNow - _lastWifiScan > TimeSpan.FromSeconds(15)))
+            {
+                _lastWifiScan = DateTime.UtcNow;
+                _wifiNetworks.Clear();
+                IReadOnlyList<WifiNetworkItem> networks = await _wireless.ScanWifiAsync();
+                foreach (WifiNetworkItem network in networks)
+                    _wifiNetworks.Add(network);
+            }
+            else if (!wifi.On)
+            {
+                _wifiNetworks.Clear();
+            }
+
+            WifiEmptyText.Text = !wifi.Supported
+                ? "Collega una scheda Wi-Fi per vedere le reti."
+                : wifi.On
+                    ? "Nessuna rete trovata. Premi Aggiorna reti."
+                    : "Attiva il Wi-Fi per vedere le reti.";
+            WifiEmptyText.Visibility = _wifiNetworks.Count == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            RadioStateInfo bluetooth = await _wireless.GetBluetoothStateAsync();
+            SetSwitchSilently(BluetoothSwitch, bluetooth.On);
+            BluetoothSwitch.IsEnabled = bluetooth.Supported;
+            BluetoothStateText.Text = !bluetooth.Supported
+                ? "Nessuna radio Bluetooth rilevata."
+                : bluetooth.On ? "Bluetooth attivo" : "Bluetooth disattivato";
+
+            _bluetoothDevices.Clear();
+            if (bluetooth.On)
+            {
+                IReadOnlyList<BluetoothDeviceItem> devices = await _wireless.GetBluetoothDevicesAsync();
+                foreach (BluetoothDeviceItem device in devices)
+                    _bluetoothDevices.Add(device);
+            }
+
+            BluetoothEmptyText.Text = !bluetooth.Supported
+                ? "Nessuna radio Bluetooth rilevata."
+                : bluetooth.On
+                    ? "Nessun dispositivo associato. Usa Gestisci dispositivi per associarne uno."
+                    : "Attiva il Bluetooth per vedere i dispositivi.";
+            BluetoothEmptyText.Visibility = _bluetoothDevices.Count == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            if (_wifiNetworks.Count == 0 && !string.IsNullOrWhiteSpace(_wireless.LastMessage))
+                WirelessStatus.Text = _wireless.LastMessage;
+            else
+                WirelessStatus.Text = "";
+        }
+        catch (Exception ex)
+        {
+            WirelessStatus.Text = "Aggiornamento non riuscito: " + ex.Message;
+            Log.Write("Wireless panel refresh failed: " + ex.Message);
+        }
+        finally
+        {
+            _networkBusy = false;
+        }
+    }
+
+    private void SetSwitchSilently(CheckBox box, bool value)
+    {
+        _suppressWirelessEvents = true;
+        box.IsChecked = value;
+        _suppressWirelessEvents = false;
+    }
+
+    private async void OnWifiToggle(object sender, RoutedEventArgs e)
+    {
+        if (_suppressWirelessEvents || _networkBusy)
+            return;
+
+        bool on = WifiSwitch.IsChecked == true;
+        WifiSwitch.IsEnabled = false;
+        await _wireless.SetWifiAsync(on);
+        await Task.Delay(1200);
+        await RefreshWirelessAsync(forceScan: true);
+        WirelessStatus.Text = _wireless.LastMessage;
+    }
+
+    private async void OnBluetoothToggle(object sender, RoutedEventArgs e)
+    {
+        if (_suppressWirelessEvents || _networkBusy)
+            return;
+
+        bool on = BluetoothSwitch.IsChecked == true;
+        BluetoothSwitch.IsEnabled = false;
+        await _wireless.SetBluetoothAsync(on);
+        await Task.Delay(900);
+        await RefreshWirelessAsync();
+        WirelessStatus.Text = _wireless.LastMessage;
+    }
+
+    private async void OnRefreshWireless(object sender, RoutedEventArgs e)
+    {
+        await RefreshWirelessAsync(forceScan: true);
+    }
+
+    private async void OnWifiNetworkClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: WifiNetworkItem network })
+            return;
+
+        string message = await _wireless.ConnectWifiAsync(network);
+        WirelessStatus.Text = message;
+        await Task.Delay(1800);
+        await RefreshWirelessAsync(forceScan: true);
+        WirelessStatus.Text = message;
+    }
+
+    private void OnBluetoothDeviceClick(object sender, RoutedEventArgs e)
+    {
+        WirelessPanelService.OpenBluetoothSettings();
+        WirelessStatus.Text = "Gestisci il dispositivo dalle impostazioni Bluetooth di Windows.";
+    }
+
+    private void OnOpenWifiSettings(object sender, RoutedEventArgs e)
+    {
+        WirelessPanelService.OpenWifiSettings();
+        WirelessStatus.Text = "Impostazioni Wi-Fi di Windows aperte.";
+    }
+
+    private void OnOpenBluetoothSettings(object sender, RoutedEventArgs e)
+    {
+        WirelessPanelService.OpenBluetoothSettings();
+        WirelessStatus.Text = "Impostazioni Bluetooth di Windows aperte.";
     }
 
     private void OnCloseClick(object sender, RoutedEventArgs e) => Close();

@@ -87,6 +87,7 @@ public sealed class AppSettings : ObservableObject
     private bool _autoUpdate = true;
     private List<string> _panelWidgets = new() { "clock", "calendar", "stats", "battery", "network" };
     private List<string> _taskbarWidgets = new() { "stats", "battery", "clock" };
+    private Dictionary<string, string> _taskbarWidgetModes = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string> _customIcons = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string> _customIconStyles = new(StringComparer.OrdinalIgnoreCase);
 
@@ -626,6 +627,13 @@ public sealed class AppSettings : ObservableObject
     {
         get => _taskbarWidgets;
         set => SetProperty(ref _taskbarWidgets, value);
+    }
+
+    /// <summary>Per-widget presentation: "expanded" (default) or "icon".</summary>
+    public Dictionary<string, string> TaskbarWidgetModes
+    {
+        get => _taskbarWidgetModes;
+        set => SetProperty(ref _taskbarWidgetModes, value);
     }
 
     /// <summary>Schema version used to migrate older settings files in place.</summary>

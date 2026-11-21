@@ -972,6 +972,10 @@ public partial class DockWindow : Window
                     App.Instance?.ShowWidgets();
                     break;
                 case "network":
+                case "wifi":
+                case "bluetooth":
+                    App.Instance?.ShowNetworkPanel();
+                    break;
                 case "controls":
                 case "brightness":
                     App.Instance?.ShowControls();
@@ -1014,12 +1018,6 @@ public partial class DockWindow : Window
                 case "lock":
                     _vm.Controls.SendWinShortcut(0x4C); // Win+L
                     break;
-                case "wifi":
-                    OpenShellTarget("ms-settings:network-wifi");
-                    break;
-                case "bluetooth":
-                    OpenShellTarget("ms-settings:bluetooth");
-                    break;
                 case "explorer":
                     OpenShellTarget("explorer.exe");
                     break;
@@ -1040,6 +1038,48 @@ public partial class DockWindow : Window
             // take the bar down; the next click simply tries again.
             Log.Write($"Taskbar widget action '{widget.Id}' failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Expanded widgets grow a little under the pointer. The transform lives on
+    /// the content grid and only runs when the widget is not in icon mode.
+    /// </summary>
+    private void OnTaskbarWidgetPointerEnter(object sender, MouseEventArgs e)
+    {
+        if (sender is Button { DataContext: TaskbarWidgetViewModel widget } button &&
+            widget.IsExpandedMode &&
+            widget.Kind != TaskbarWidgetKind.Separator)
+            AnimateWidgetScale(button, 1.16);
+    }
+
+    private void OnTaskbarWidgetPointerLeave(object sender, MouseEventArgs e)
+    {
+        if (sender is Button button)
+            AnimateWidgetScale(button, 1.0);
+    }
+
+    private void AnimateWidgetScale(Button button, double target)
+    {
+        if (button.Content is not FrameworkElement { RenderTransform: ScaleTransform scale })
+            return;
+
+        Panel.SetZIndex(button, target > 1 ? 20 : 0);
+
+        if (!_vm.Settings.AnimationsEnabled)
+        {
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            scale.ScaleX = target;
+            scale.ScaleY = target;
+            return;
+        }
+
+        var duration = TimeSpan.FromMilliseconds(140);
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(target, duration) { EasingFunction = ease });
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty,
+            new DoubleAnimation(target, duration) { EasingFunction = ease });
     }
 
     private void OnWidgetScrollerWheel(object sender, MouseWheelEventArgs e)

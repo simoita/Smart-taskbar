@@ -1569,7 +1569,7 @@
                                         <Border Style="{StaticResource Card}" Margin="0,0,0,20">
                                             <StackPanel>
                                                 <TextBlock Text="WIDGET NELLA TASKBAR" Style="{StaticResource T.Section}" />
-                                                <TextBlock Text="Scegli cosa vive nella barra e in quale ordine: orologio e data, CPU, RAM, disco, uptime, batteria, rete, volume, luminosità, media, notifiche, appunti, cattura schermo, cestino e altro. Ogni widget è indipendente, si aggiorna in tempo reale e, se la barra è piena, la rotellina del mouse la fa scorrere."
+                                                <TextBlock Text="Scegli cosa vive nella barra e in quale ordine: orologio e data, CPU, RAM, disco, uptime, batteria, rete, volume, luminosità, media, notifiche, appunti, cattura schermo, cestino e altro. Ogni widget può essere “Espanso” (valori e barre) o “Icona”; quelli espansi si ingrandiscono al passaggio del mouse. Se la barra è piena, la rotellina del mouse la fa scorrere."
                                                            Style="{StaticResource T.Caption}" Margin="0,0,0,10" TextWrapping="Wrap" />
 
                                                 <ItemsControl ItemsSource="{Binding ActiveTaskbarWidgets}">
@@ -1594,6 +1594,10 @@
                                                                                    TextTrimming="CharacterEllipsis" />
                                                                     </StackPanel>
                                                                     <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                                                        <Button Style="{StaticResource GhostButton}" Padding="8,4" FontSize="10"
+                                                                                Margin="0,0,4,0" Content="{Binding ModeLabel}"
+                                                                                ToolTip="{Binding ModeToolTip}" Tag="{Binding}"
+                                                                                Click="OnToggleTaskbarWidgetMode" />
                                                                         <Button Style="{StaticResource IconButton}" Width="26" Height="26"
                                                                                 ToolTip="Sposta a sinistra" Tag="{Binding}"
                                                                                 Click="OnMoveTaskbarWidgetUp">

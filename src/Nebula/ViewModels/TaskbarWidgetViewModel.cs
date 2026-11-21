@@ -30,9 +30,12 @@ public sealed class TaskbarWidgetViewModel : ObservableObject
     private bool _hasSecondBar;
     private bool _faulted;
 
-    public TaskbarWidgetViewModel(TaskbarWidgetDefinition definition)
+    public TaskbarWidgetViewModel(TaskbarWidgetDefinition definition, string? mode = null)
     {
         Id = definition.Id;
+        Mode = string.Equals(mode, "icon", StringComparison.OrdinalIgnoreCase)
+            ? "icon"
+            : "expanded";
         Name = definition.Name;
         Description = definition.Description;
         Glyph = definition.Glyph;
@@ -70,8 +73,12 @@ public sealed class TaskbarWidgetViewModel : ObservableObject
     public string Name { get; }
     public string Description { get; }
     public string Glyph { get; }
+    public string Mode { get; }
     public TaskbarWidgetKind Kind { get; }
     public string KindKey => Kind.ToString();
+    public bool IsIconMode => string.Equals(Mode, "icon", StringComparison.OrdinalIgnoreCase);
+    public bool IsExpandedMode => !IsIconMode;
+    public string ModeKey => IsIconMode ? "Icon" : "Expanded";
 
     public bool IsClock { get; }
     public bool IsMetric { get; }
