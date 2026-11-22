@@ -90,10 +90,24 @@ var
   ResultCode: Integer;
 begin
   Result := '';
-  // Ask the already installed copy to clean up before its files are replaced.
+  // Ask the installed copy to clean up before its files are replaced.
   if FileExists(ExpandConstant('{app}\{#MyAppExeName}')) then
     Exec(ExpandConstant('{app}\{#MyAppExeName}'), '--exit', '', SW_HIDE,
          ewWaitUntilTerminated, ResultCode);
+
+  // The user may be running a portable copy from another folder. It holds the
+  // same single-instance mutex, so the version this Setup installs would exit
+  // immediately. Close every Nebula copy, give the watchdog time to restore the
+  // native bar, then stop the watchdog too: replacing its exe while it runs is
+  // what used to leave a half-installed folder.
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM {#MyAppExeName}', '',
+       SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // ping (not timeout) because timeout refuses redirected console input
+  // inside the hidden installer process.
+  Exec(ExpandConstant('{sys}\cmd.exe'), '/c ping -n 3 127.0.0.1 >nul', '',
+       SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM Nebula.Watchdog.exe', '',
+       SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

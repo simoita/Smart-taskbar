@@ -130,9 +130,24 @@ public partial class App : Application
         _mutex = new Mutex(true, MutexName, out bool isNewInstance);
         if (!isNewInstance)
         {
-            TrySendShow();
-            Shutdown(0);
-            return;
+            // An update can start the new build while the previous copy still
+            // owns the mutex. If the running copy is older, ask it to leave and
+            // take over, otherwise the installer's launch would just reopen the
+            // old build and the update would look failed.
+            _mutex.Dispose();
+            _mutex = null;
+
+            if (TryTakeOverFromOlderInstance())
+                _mutex = AcquireMutex();
+
+            if (_mutex is null)
+            {
+                TrySendShow();
+                Shutdown(0);
+                return;
+            }
+
+            Log.Write("This build took over the single-instance session from an older one.");
         }
 
         try
@@ -173,6 +188,9 @@ public partial class App : Application
 
     private void Boot(string[] args)
     {
+        string version = typeof(App).Assembly.GetName().Version?.ToString(3) ?? "?";
+        Log.Write($"Nebula {version} starting from {AppContext.BaseDirectory} (pid {Environment.ProcessId}).");
+
         UpdateService.CleanupConfirmedUpdateAtStartup();
         NativeTaskbarController.RecoverFromUncleanExit();
         TabRecovery.RestorePending();
@@ -1667,6 +1685,140 @@ public partial class App : Application
     }
 
     private static void TrySendShow() => TrySendPipe("show");
+
+    private static Version CurrentAssemblyVersion =>
+        typeof(App).Assembly.GetName().Version ?? new Version(0, 0);
+
+    private static Version? VersionOf(Process process)
+    {
+        try
+        {
+            string? path = process.MainModule?.FileName;
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                return null;
+            string? text = FileVersionInfo.GetVersionInfo(path).FileVersion;
+            return Version.TryParse(text, out Version? version) ? version : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// When this build is newer than every other Nebula process in the session,
+    /// ask those copies to exit and wait for the mutex. The installer and the
+    /// update script both launch the freshly copied exe while an older portable
+    /// copy may still be running: without this hand-off the new build exits on
+    /// the single-instance check and the old (possibly broken) bar stays.
+    /// </summary>
+    private static bool TryTakeOverFromOlderInstance()
+    {
+        try
+        {
+            var others = new List<(int Id, Version? Version)>();
+            foreach (Process process in Process.GetProcessesByName("Nebula"))
+            {
+                try
+                {
+                    if (process.Id != Environment.ProcessId)
+                        others.Add((process.Id, VersionOf(process)));
+                }
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+
+            if (others.Count == 0)
+                return false;
+
+            Version current = CurrentAssemblyVersion;
+            // An unknown or newer process keeps the session: downgrading or
+            // stealing from a build we cannot identify is never worth it.
+            if (others.Any(other => other.Version is null || other.Version >= current))
+                return false;
+
+            Log.Write($"Starting {current} over older Nebula instance(s): " +
+                      string.Join(", ", others.Select(other => $"{other.Id} ({other.Version})")));
+            TrySendPipe("exit", 500, 8_000);
+
+            DateTime deadline = DateTime.UtcNow.AddSeconds(12);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (!AnyOtherInstance())
+                    return true;
+                Thread.Sleep(200);
+            }
+
+            // A hung previous build (for example a modal error dialog) must not
+            // prevent a just-installed version from starting.
+            foreach (Process process in Process.GetProcessesByName("Nebula"))
+            {
+                try
+                {
+                    if (process.Id == Environment.ProcessId)
+                        continue;
+                    Log.Write("Force-closing old Nebula instance " + process.Id + ".");
+                    process.Kill();
+                }
+                catch (Exception ex)
+                {
+                    Log.Write("Old Nebula instance could not be closed: " + ex.Message);
+                }
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+
+            Thread.Sleep(600);
+            return !AnyOtherInstance();
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Instance takeover failed: " + ex.Message);
+            return false;
+        }
+    }
+
+    private static bool AnyOtherInstance()
+    {
+        foreach (Process process in Process.GetProcessesByName("Nebula"))
+        {
+            try
+            {
+                if (process.Id != Environment.ProcessId)
+                    return true;
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Creates the named mutex once the previous owner has released it. The
+    /// kernel object can outlive the process for a moment (another handle is
+    /// open), so a few attempts are safer than a single check.
+    /// </summary>
+    private static Mutex? AcquireMutex()
+    {
+        for (int attempt = 0; attempt < 30; attempt++)
+        {
+            var mutex = new Mutex(true, MutexName, out bool createdNew);
+            if (createdNew)
+                return mutex;
+
+            mutex.Dispose();
+            Thread.Sleep(200);
+        }
+
+        return null;
+    }
 
     private static bool TrySendPipe(string message, int connectTimeoutMs = 800, int retryForMs = 0)
     {

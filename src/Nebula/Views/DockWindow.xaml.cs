@@ -467,7 +467,34 @@ public partial class DockWindow : Window
     }
 
     /// <summary>Rebuilds the dock from independent app/system/action zones.</summary>
+    /// <summary>
+    /// A layout fault must never abort the startup (which used to restore the
+    /// native bar and leave the app in an error state after an update). The
+    /// core keeps the bar usable; a failure is logged and leaves an empty but
+    /// interactive shell instead of taking the whole app down.
+    /// </summary>
     private void ApplyZoneLayout()
+    {
+        try
+        {
+            ApplyZoneLayoutCore();
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Zone layout failed; keeping the bar usable: " + ex);
+            try
+            {
+                ZoneHost.Children.Clear();
+                ZoneHost.ColumnDefinitions.Clear();
+            }
+            catch
+            {
+                // Nothing else can be done for this layout pass.
+            }
+        }
+    }
+
+    private void ApplyZoneLayoutCore()
     {
         if (ZoneHost is null || AppsZone is null || SystemZone is null || ActionsZone is null)
             return;

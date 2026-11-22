@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
@@ -68,7 +69,14 @@ internal static class ShellIntegration
                                 ?? throw new InvalidOperationException("Chiave App Paths non scrivibile.");
 
         string directory = Path.GetDirectoryName(exe) ?? "";
-        if (!string.Equals(key.GetValue(null, null) as string, exe, StringComparison.OrdinalIgnoreCase))
+        string? registered = key.GetValue(null, null) as string;
+        if (RegistrationBelongsToNewerBuild(exe, registered))
+        {
+            Log.Write("App Paths left on the newer build: " + registered);
+            return;
+        }
+
+        if (!string.Equals(registered, exe, StringComparison.OrdinalIgnoreCase))
             key.SetValue("", exe, RegistryValueKind.String);
         if (!string.Equals(key.GetValue("Path", null) as string, directory, StringComparison.OrdinalIgnoreCase))
             key.SetValue("Path", directory, RegistryValueKind.String);
@@ -97,8 +105,14 @@ internal static class ShellIntegration
             link = shellLink.CreateShortcut(path);
             dynamic shortcut = link;
 
-            if (File.Exists(path) &&
-                string.Equals((string)shortcut.TargetPath, exe, StringComparison.OrdinalIgnoreCase))
+            string? registered = File.Exists(path) ? (string)shortcut.TargetPath : null;
+            if (RegistrationBelongsToNewerBuild(exe, registered))
+            {
+                Log.Write("Start menu entry left on the newer build: " + registered);
+                return;
+            }
+
+            if (string.Equals(registered, exe, StringComparison.OrdinalIgnoreCase))
                 return;
 
             shortcut.TargetPath = exe;
@@ -113,6 +127,32 @@ internal static class ShellIntegration
         {
             Release(link);
             Release(shell);
+        }
+    }
+
+    /// <summary>
+    /// A portable copy started from an old folder must not move the Start menu
+    /// and App Paths away from a newer installed build. The installer updates
+    /// those entries itself, so leaving them alone is the safe choice.
+    /// </summary>
+    private static bool RegistrationBelongsToNewerBuild(string exe, string? registered)
+    {
+        if (string.IsNullOrWhiteSpace(registered) || !File.Exists(registered))
+            return false;
+        if (string.Equals(registered, exe, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        try
+        {
+            string? mineText = FileVersionInfo.GetVersionInfo(exe).FileVersion;
+            string? theirsText = FileVersionInfo.GetVersionInfo(registered).FileVersion;
+            return Version.TryParse(mineText, out Version? mine) &&
+                   Version.TryParse(theirsText, out Version? theirs) &&
+                   theirs > mine;
+        }
+        catch
+        {
+            return false;
         }
     }
 
