@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Threading.Tasks;
 using System.Windows.Threading;
 using Nebula.Interop;
 using Nebula.Services;
@@ -40,10 +41,23 @@ public partial class DockWindow : Window
     private System.Drawing.Rectangle _screenBounds;
 
     private const string DockItemDragFormat = "Nebula.DockItem";
+    private const string TaskbarWidgetDragFormat = "Nebula.TaskbarWidget";
     private Point _itemDragStart;
     private DockItemViewModel? _itemDragSource;
     private bool _itemDragging;
     private bool _suppressItemClick;
+
+    // Hover preview of every window of a group, like the Windows taskbar.
+    private readonly DispatcherTimer _previewShowTimer;
+    private readonly DispatcherTimer _previewHideTimer;
+    private WindowPreviewWindow? _preview;
+    private Button? _previewAnchor;
+    private DockItemViewModel? _previewItem;
+
+    private Point _widgetDragStart;
+    private TaskbarWidgetViewModel? _widgetDragSource;
+    private bool _widgetDragging;
+    private bool _suppressWidgetClick;
 
     public DockWindow(DockViewModel vm, SettingsStore store, int? monitor = null)
     {
@@ -70,6 +84,7 @@ public partial class DockWindow : Window
         DpiChanged += (_, _) => Reposition();
         Closed += (_, _) =>
         {
+            CloseWindowPreview();
             _watchTimer.Stop();
             try
             {
@@ -90,6 +105,29 @@ public partial class DockWindow : Window
         {
             _backdropTimer.Stop();
             UpdateBackdrop();
+        };
+
+        // A short rest on the icon opens the previews; moving away gives the
+        // pointer time to reach the flyout before it disappears.
+        _previewShowTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(380)
+        };
+        _previewShowTimer.Tick += (_, _) =>
+        {
+            _previewShowTimer.Stop();
+            ShowWindowPreview();
+        };
+
+        _previewHideTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(340)
+        };
+        _previewHideTimer.Tick += (_, _) =>
+        {
+            _previewHideTimer.Stop();
+            if (_preview is { IsMouseOver: false } && _previewAnchor?.IsMouseOver != true)
+                CloseWindowPreview();
         };
     }
 
@@ -813,6 +851,7 @@ public partial class DockWindow : Window
         if (_hidden || _animating)
             return;
 
+        CloseWindowPreview();
         _hidden = true;
         double target = HiddenTop();
 
@@ -947,6 +986,13 @@ public partial class DockWindow : Window
 
     private void OnTaskbarWidgetClick(object sender, RoutedEventArgs e)
     {
+        // The mouse-up that ends a reorder drag is not a click on the widget.
+        if (_suppressWidgetClick)
+        {
+            _suppressWidgetClick = false;
+            return;
+        }
+
         if (sender is not FrameworkElement { DataContext: TaskbarWidgetViewModel widget })
             return;
 
@@ -1038,6 +1084,88 @@ public partial class DockWindow : Window
             // take the bar down; the next click simply tries again.
             Log.Write($"Taskbar widget action '{widget.Id}' failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Widgets are reordered by dragging them along the bar: pressing one
+    /// records the pointer, a real movement starts the drop, and the widget
+    /// lands in front of the one under the cursor.
+    /// </summary>
+    private void OnTaskbarWidgetDragStart(object sender, MouseButtonEventArgs e)
+    {
+        _widgetDragSource = null;
+        _suppressWidgetClick = false;
+
+        if (e.ClickCount != 1 ||
+            sender is not FrameworkElement { DataContext: TaskbarWidgetViewModel widget })
+            return;
+
+        _widgetDragStart = e.GetPosition(this);
+        _widgetDragSource = widget;
+    }
+
+    private void OnTaskbarWidgetDragMove(object sender, MouseEventArgs e)
+    {
+        if (_widgetDragging || _widgetDragSource is null ||
+            e.LeftButton != MouseButtonState.Pressed)
+            return;
+
+        Point current = e.GetPosition(this);
+        if (Math.Abs(current.X - _widgetDragStart.X) < 6 &&
+            Math.Abs(current.Y - _widgetDragStart.Y) < 6)
+            return;
+
+        TaskbarWidgetViewModel source = _widgetDragSource;
+        _widgetDragSource = null;
+        _widgetDragging = true;
+        _suppressWidgetClick = true;
+
+        try
+        {
+            DragDrop.DoDragDrop((DependencyObject)sender,
+                new DataObject(TaskbarWidgetDragFormat, source.Id), DragDropEffects.Move);
+        }
+        finally
+        {
+            _widgetDragging = false;
+            if (sender is FrameworkElement element)
+                element.Opacity = 1;
+        }
+    }
+
+    private void OnTaskbarWidgetDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(TaskbarWidgetDragFormat))
+            return;
+
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+
+        if (sender is FrameworkElement element)
+            element.Opacity = 0.55;
+    }
+
+    private void OnTaskbarWidgetDragLeave(object sender, DragEventArgs e)
+    {
+        if (sender is FrameworkElement element)
+            element.Opacity = 1;
+    }
+
+    private void OnTaskbarWidgetDrop(object sender, DragEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: TaskbarWidgetViewModel target } element)
+        {
+            element.Opacity = 1;
+
+            if (e.Data.GetDataPresent(TaskbarWidgetDragFormat) &&
+                e.Data.GetData(TaskbarWidgetDragFormat) is string fromId)
+            {
+                e.Handled = true;
+                _vm.MoveTaskbarWidget(fromId, target.Id);
+            }
+        }
+
+        _widgetDragSource = null;
     }
 
     /// <summary>
@@ -1217,13 +1345,23 @@ public partial class DockWindow : Window
 
     private void OnDockItemEnter(object sender, MouseEventArgs e)
     {
-        if (!_vm.Settings.HoverMagnify || sender is not Button button)
+        if (sender is not Button button || button.DataContext is not DockItemViewModel item)
             return;
 
-        // The icon grows above its neighbours; the bar no longer clips it and
-        // the higher Z-order keeps it in front of the other buttons.
-        Panel.SetZIndex(button, 10);
-        AnimateItem(button, 1.35, 0.18, true);
+        if (_vm.Settings.HoverMagnify)
+        {
+            // The icon grows above its neighbours; the bar no longer clips it
+            // and the higher Z-order keeps it in front of the other buttons.
+            Panel.SetZIndex(button, 10);
+            AnimateItem(button, 1.35, 0.18, true);
+        }
+
+        // The previews replace the tooltip for a group: two popups on top of
+        // each other would cover the thumbnails.
+        if (item.Group is { Windows.Count: > 1 })
+            ToolTipService.SetIsEnabled(button, false);
+
+        ScheduleWindowPreview(button, item);
     }
 
     private void OnDockItemLeave(object sender, MouseEventArgs e)
@@ -1233,6 +1371,139 @@ public partial class DockWindow : Window
 
         Panel.SetZIndex(button, 0);
         AnimateItem(button, 1, 0.18, false);
+        ToolTipService.SetIsEnabled(button, true);
+
+        if (ReferenceEquals(_previewAnchor, button))
+        {
+            _previewShowTimer.Stop();
+            _previewHideTimer.Start();
+        }
+    }
+
+    /// <summary>
+    /// Waits for the pointer to rest on an icon whose app has more than one
+    /// window, then opens the per-window previews. A single-window app keeps the
+    /// normal click behaviour and no flyout.
+    /// </summary>
+    private void ScheduleWindowPreview(Button button, DockItemViewModel item)
+    {
+        _previewHideTimer.Stop();
+
+        if (item.Group is not { Windows.Count: > 1 })
+        {
+            _previewShowTimer.Stop();
+            CloseWindowPreview();
+            return;
+        }
+
+        if (_preview is { IsVisible: true } && ReferenceEquals(_previewAnchor, button))
+            return;
+
+        _previewShowTimer.Stop();
+        _previewAnchor = button;
+        _previewItem = item;
+        _previewShowTimer.Start();
+    }
+
+    private void ShowWindowPreview()
+    {
+        if (!IsVisible || _hidden || _previewAnchor is not { IsMouseOver: true } anchor ||
+            _previewItem is not { } item || item.Group is not { Windows.Count: > 1 } group)
+            return;
+
+        CloseWindowPreview(keepAnchor: true);
+
+        try
+        {
+            var cards = new List<WindowPreviewItem>();
+            foreach (TrackedWindow window in group.Windows.Take(6))
+            {
+                cards.Add(new WindowPreviewItem
+                {
+                    Handle = window.Handle,
+                    Title = string.IsNullOrWhiteSpace(window.Title) ? item.Name : window.Title,
+                    Icon = item.Icon
+                });
+            }
+
+            if (cards.Count < 2)
+                return;
+
+            _preview = new WindowPreviewWindow(
+                cards,
+                handle => _vm.Tracker.ActivateWindow(handle),
+                () => _previewAnchor?.IsMouseOver == true)
+            {
+                ShowActivated = false
+            };
+            _preview.Closed += (_, _) => _preview = null;
+            _preview.Show();
+
+            double dpiScale = Math.Max(0.5, VisualTreeHelper.GetDpi(anchor).DpiScaleX);
+            Point origin = anchor.PointToScreen(new Point(0, 0));
+            var anchorRect = new Rect(
+                origin.X / dpiScale,
+                origin.Y / dpiScale,
+                anchor.ActualWidth,
+                anchor.ActualHeight);
+            Rect screen = ScreenGeometry.BoundsDip(ScreenGeometry.Target(MonitorIndex));
+            _preview.Place(anchorRect, screen, above: !_vm.Settings.DockOnTop);
+
+            // The flyout is already on screen with placeholders; each picture
+            // arrives from a worker so an unresponsive app cannot stall the bar.
+            _ = LoadPreviewThumbnailsAsync(_preview, cards);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Window preview failed: " + ex.Message);
+            CloseWindowPreview();
+        }
+    }
+
+    private async Task LoadPreviewThumbnailsAsync(
+        WindowPreviewWindow preview, IReadOnlyList<WindowPreviewItem> items)
+    {
+        foreach (WindowPreviewItem item in items)
+        {
+            try
+            {
+                IntPtr handle = item.Handle;
+                var image = await Task.Run(() => WindowThumbnail.Capture(handle, 170, 102));
+                if (!ReferenceEquals(_preview, preview))
+                    return;
+
+                item.Thumbnail = image;
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Preview thumbnail failed: " + ex.Message);
+            }
+        }
+    }
+
+    private void CloseWindowPreview(bool keepAnchor = false)
+    {
+        _previewShowTimer.Stop();
+        _previewHideTimer.Stop();
+        if (!keepAnchor)
+        {
+            _previewAnchor = null;
+            _previewItem = null;
+        }
+
+        if (_preview is null)
+            return;
+
+        WindowPreviewWindow preview = _preview;
+        _preview = null;
+        try
+        {
+            preview.Close();
+        }
+        catch
+        {
+            // The flyout may already be closing with the bar.
+        }
     }
 
     private void AnimateItem(Button button, double to, double seconds, bool elastic)
@@ -1349,6 +1620,7 @@ public partial class DockWindow : Window
         if (sender is not FrameworkElement element || element.DataContext is not DockItemViewModel item)
             return;
 
+        CloseWindowPreview();
         Pulse(element);
 
         if (item.Group is { Windows.Count: > 0 } group)
@@ -1454,6 +1726,7 @@ public partial class DockWindow : Window
     private void OnItemRightClick(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
+        CloseWindowPreview();
         if (sender is not FrameworkElement element || element.DataContext is not DockItemViewModel item)
             return;
 

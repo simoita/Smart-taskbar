@@ -595,6 +595,10 @@ public sealed class SettingsViewModel : ObservableObject
     /// <summary>Switches one widget between the rich and the icon-only layout.</summary>
     public void ToggleTaskbarWidgetMode(TaskbarWidgetOptionViewModel option)
     {
+        // Shortcut widgets only have an icon layout: there is nothing to toggle.
+        if (!option.CanExpand)
+            return;
+
         var modes = new Dictionary<string, string>(
             Settings.TaskbarWidgetModes ?? new Dictionary<string, string>(),
             StringComparer.OrdinalIgnoreCase);
@@ -656,6 +660,27 @@ public sealed class SettingsViewModel : ObservableObject
         SyncTaskbarWidgets();
     }
 
+    /// <summary>
+    /// Moves a widget in front of another one. The Studio list and the bar both
+    /// use this for drag-and-drop reordering.
+    /// </summary>
+    public void ReorderTaskbarWidget(string fromId, string toId)
+    {
+        var widgets = new List<string>(Settings.TaskbarWidgets ?? new List<string>());
+        int from = widgets.FindIndex(id => string.Equals(id, fromId, StringComparison.OrdinalIgnoreCase));
+        int to = widgets.FindIndex(id => string.Equals(id, toId, StringComparison.OrdinalIgnoreCase));
+        if (from < 0 || to < 0 || from == to)
+            return;
+
+        string moved = widgets[from];
+        widgets.RemoveAt(from);
+        to = widgets.FindIndex(id => string.Equals(id, toId, StringComparison.OrdinalIgnoreCase));
+        widgets.Insert(to < 0 ? widgets.Count : to, moved);
+
+        Settings.TaskbarWidgets = widgets;
+        SyncTaskbarWidgets();
+    }
+
     public void AddPin(string path)
     {
         if (string.IsNullOrWhiteSpace(path) ||
@@ -695,12 +720,15 @@ public sealed record ShortcutInfoViewModel(string Name, string Path);
 
 public sealed class TaskbarWidgetOptionViewModel
 {
+    private readonly string _mode;
+
     public TaskbarWidgetOptionViewModel(TaskbarWidgetDefinition definition, string mode = "expanded")
     {
         Definition = definition;
-        Mode = string.Equals(mode, "icon", StringComparison.OrdinalIgnoreCase)
-            ? "icon"
-            : "expanded";
+        CanExpand = definition.Expandable;
+        _mode = CanExpand && !string.Equals(mode, "icon", StringComparison.OrdinalIgnoreCase)
+            ? "expanded"
+            : "icon";
     }
 
     public TaskbarWidgetDefinition Definition { get; }
@@ -708,11 +736,17 @@ public sealed class TaskbarWidgetOptionViewModel
     public string Name => Definition.Name;
     public string Description => Definition.Description;
     public string Glyph => Definition.Glyph;
-    public string Mode { get; }
+
+    /// <summary>False for the shortcut widgets, which only have an icon layout.</summary>
+    public bool CanExpand { get; }
+    public string Mode => _mode;
     public string ModeLabel => Mode == "icon" ? "Icona" : "Espanso";
-    public string ModeToolTip => Mode == "icon"
-        ? "Passa alla versione espansa con valori e barre"
-        : "Riduci a icona nella barra";
+    public string ModeToolTip => !CanExpand
+        ? "Questo widget mostra solo l'icona: non ha una versione espansa."
+        : Mode == "icon"
+            ? "Passa alla versione espansa con valori e barre"
+            : "Riduci a icona nella barra";
+    public Visibility ModeToggleVisibility => CanExpand ? Visibility.Visible : Visibility.Collapsed;
 }
 
 public sealed class WidgetOptionViewModel : ObservableObject

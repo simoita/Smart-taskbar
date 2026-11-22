@@ -673,10 +673,14 @@ public partial class App : Application
                 {
                     // The capsule can only live inside the bar when that bar
                     // exists: turn the replacement and the full-width layout on
-                    // instead of leaving the island floating at the top.
+                    // instead of leaving the island floating at the top. It also
+                    // has to be shown, otherwise choosing "Dentro la taskbar"
+                    // looks like nothing happened.
                     Settings.ReplaceWindowsTaskbar = true;
                     Settings.TaskbarFullWidth = true;
                     Settings.ReserveTaskbarSpace = true;
+                    Settings.ShowIsland = true;
+                    ShowIsland();
                 }
                 break;
 

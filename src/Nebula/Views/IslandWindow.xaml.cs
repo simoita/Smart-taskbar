@@ -502,6 +502,14 @@ public partial class IslandWindow : Window
                 ? capsuleCenterY - _compactHeight / 2
                 : capsuleCenterY + _compactHeight / 2 - Height;
 
+            // Never let the capsule (or the room its expanded panel needs) end
+            // up outside the monitor, whatever the bar rectangle reports.
+            Left = Math.Clamp(Left, bounds.Left + 4,
+                Math.Max(bounds.Left + 4, bounds.Right - Width - 4));
+            Top = Math.Clamp(Top, bounds.Top,
+                Math.Max(bounds.Top, bounds.Bottom - Height));
+            Topmost = true;
+
             // One line per distinct placement, so app.log shows where the bar and
             // the capsule ended up if it ever looks empty again.
             string placement = $"{barTop:0}/{barHeight:0}/{Top:0}/{Left:0}";
@@ -553,11 +561,11 @@ public partial class IslandWindow : Window
             if (handle == IntPtr.Zero)
                 return;
 
-            // Sitting directly above the bar window keeps the capsule in the
-            // same topmost band, so later clicks on the bar no longer cover it.
-            IntPtr above = App.Instance?.DockForMonitor(_dock.Settings.MonitorIndex)?.NativeHandle ?? IntPtr.Zero;
+            // HWND_TOPMOST — not the bar handle — is what keeps the capsule in
+            // front: SetWindowPos with a window as hWndInsertAfter puts this
+            // window *behind* it, which hid the island inside a bottom bar.
             NativeMethods.SetWindowPos(handle,
-                above != IntPtr.Zero ? above : (IntPtr)NativeMethods.HWND_TOPMOST,
+                (IntPtr)NativeMethods.HWND_TOPMOST,
                 0, 0, 0, 0,
                 NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
         }

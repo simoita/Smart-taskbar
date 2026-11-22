@@ -84,6 +84,10 @@ public partial class LauncherWindow : Window
         Loaded += OnLoaded;
         _catalog.Loaded += OnCatalogLoaded;
         Closed += OnClosed;
+
+        // The search card can be moved with the mouse while the dim keeps the
+        // rest of the desktop in place.
+        PanelDrag.AttachCard(HeaderDragArea, Card, CardDragShift);
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)

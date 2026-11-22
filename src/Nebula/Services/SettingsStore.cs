@@ -170,7 +170,10 @@ public sealed class SettingsStore : IDisposable
         foreach (KeyValuePair<string, string> pair in s.TaskbarWidgetModes ??
                  new Dictionary<string, string>())
         {
-            if (TaskbarWidgetCatalog.IsKnown(pair.Key) && pair.Value is "icon" or "expanded")
+            TaskbarWidgetDefinition? definition = TaskbarWidgetCatalog.Find(pair.Key);
+            // Shortcut widgets have no expanded layout: drop a stale "expanded"
+            // so the Studio does not claim they can be expanded.
+            if (definition is not null && definition.Expandable && pair.Value is ("icon" or "expanded"))
                 widgetModes[pair.Key] = pair.Value;
         }
         s.TaskbarWidgetModes = widgetModes;

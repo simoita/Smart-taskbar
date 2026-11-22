@@ -253,6 +253,49 @@ public partial class App
                     $"viewModel={mutated}; reloaded={persisted}; visual={visualMutated}");
             }
 
+            // 7b. Widget layouts: an icon-only shortcut is never treated as
+            // expanded, an expandable widget really expands, and the order can
+            // be changed by a drag-style move in the bar.
+            settings.TaskbarWidgets = new List<string> { "clock", "search", "cpu", "separator" };
+            settings.TaskbarWidgetModes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["search"] = "expanded",
+                ["clock"] = "icon"
+            };
+            dockVm.RefreshTaskbarWidgets();
+            await Task.Delay(250);
+
+            TaskbarWidgetViewModel clockWidget = dockVm.TaskbarWidgetItems.First(w => w.Id == "clock");
+            TaskbarWidgetViewModel searchWidget = dockVm.TaskbarWidgetItems.First(w => w.Id == "search");
+            Add(checks, "widgets.icon_only_mode",
+                !searchWidget.SupportsExpanded && searchWidget.IsIconMode && !searchWidget.IsExpandedMode,
+                $"search: supportsExpanded={searchWidget.SupportsExpanded}; iconMode={searchWidget.IsIconMode}; mode={searchWidget.Mode}");
+
+            settings.TaskbarWidgetModes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["clock"] = "expanded"
+            };
+            dockVm.RefreshTaskbarWidgets();
+            await Task.Delay(250);
+            TaskbarWidgetViewModel clockExpanded = dockVm.TaskbarWidgetItems.First(w => w.Id == "clock");
+            Add(checks, "widgets.expand_mode",
+                clockExpanded.SupportsExpanded && clockExpanded.IsExpandedMode && !clockExpanded.IsIconMode,
+                $"clock: supportsExpanded={clockExpanded.SupportsExpanded}; expanded={clockExpanded.IsExpandedMode}; mode={clockExpanded.Mode}");
+
+            dockVm.MoveTaskbarWidget("cpu", "clock");
+            await Task.Delay(200);
+            string draggedOrder = string.Join(",", dockVm.TaskbarWidgetItems.Select(w => w.Id));
+            Add(checks, "widgets.drag_reorder", draggedOrder == "cpu,clock,search,separator",
+                $"order={draggedOrder}");
+
+            store.SaveNow();
+            using (var modeStore = new SettingsStore())
+            {
+                bool staleDropped = !modeStore.Settings.TaskbarWidgetModes.ContainsKey("search");
+                Add(checks, "widgets.icon_only_mode_reloaded", staleDropped,
+                    $"modes={string.Join(",", modeStore.Settings.TaskbarWidgetModes.Select(p => p.Key + "=" + p.Value))}");
+            }
+
             // 8. Dynamic Island: persisted options, applied style resources,
             // compact/expanded geometry and click-through outside the capsule.
             settings.IslandStyle = "pill";
@@ -311,6 +354,117 @@ public partial class App
                 $"expanded={island.IsExpanded}");
             Add(checks, "island.hit_test_transparent_outside", inside && !outside,
                 $"inside={inside}; outside={outside}; rect={islandRect}");
+
+            // 8b. The island docked inside a bottom bar: the capsule must sit
+            // in the granted bar rectangle, stay on screen, be in front of the
+            // bar and expand upward without leaving the monitor.
+            island.CollapseForTest();
+            await Task.Delay(250);
+            settings.IslandPlacement = "taskbar";
+            settings.DockOnTop = false;
+            settings.ReplaceWindowsTaskbar = true;
+            settings.TaskbarFullWidth = true;
+            settings.ReserveTaskbarSpace = true;
+            settings.ShowIsland = true;
+            dock.ApplySettings();
+            dock.Reposition();
+            await Task.Delay(700);
+            island.ApplySettings();
+            await Task.Delay(400);
+            island.UpdateLayout();
+
+            double dpiScale = ScreenGeometry.Scale(screen);
+            Rect screenDip = ScreenGeometry.BoundsDip(screen);
+            bool hasBarRect = dock.TryGetBarScreenRect(out Rect barRect);
+            Rect compactDip = ToDip(island.CapsuleScreenRect, dpiScale);
+            bool capsuleInBar = hasBarRect &&
+                                compactDip.Top >= barRect.Top - 2 &&
+                                compactDip.Bottom <= barRect.Bottom + 2 &&
+                                compactDip.Left >= screenDip.Left - 1 &&
+                                compactDip.Right <= screenDip.Right + 1;
+            int islandZ = ZOrderIndex(new WindowInteropHelper(island).Handle);
+            int dockZ = ZOrderIndex(new WindowInteropHelper(dock).Handle);
+            bool islandInFront = islandZ >= 0 && dockZ >= 0 && islandZ < dockZ;
+            Add(checks, "island.bottom_in_bar", capsuleInBar && islandInFront && island.IsVisible,
+                $"capsule={compactDip}; bar={barRect}; screen={screenDip}; z(island)={islandZ}; z(dock)={dockZ}; visible={island.IsVisible}");
+            Capture(island.Capsule, Path.Combine(outputDir, "island-bottom-compact.png"));
+
+            island.ExpandForTest();
+            await Task.Delay(320);
+            island.UpdateLayout();
+            Rect expandedDip = ToDip(island.CapsuleScreenRect, dpiScale);
+            bool grew = expandedDip.Height > compactDip.Height + 10;
+            bool anchored = Math.Abs(expandedDip.Bottom - compactDip.Bottom) < 3;
+            bool expandedOnScreen = expandedDip.Top >= screenDip.Top - 1 &&
+                                    expandedDip.Bottom <= screenDip.Bottom + 1;
+            Add(checks, "island.bottom_expanded", grew && anchored && expandedOnScreen,
+                $"compact={compactDip}; expanded={expandedDip}; screen={screenDip}");
+            Capture(island.Capsule, Path.Combine(outputDir, "island-bottom-expanded.png"));
+            island.CollapseForTest();
+            await Task.Delay(250);
+            settings.IslandPlacement = "floating";
+            island.ApplySettings();
+
+            // 8c. Hover preview: a group with two windows gets two cards, each
+            // with its own title and captured picture.
+            using (var alpha = new Forms.Form
+                   {
+                       Text = "Nebula preview Alpha",
+                       Size = new System.Drawing.Size(520, 340),
+                       StartPosition = Forms.FormStartPosition.Manual,
+                       Location = new System.Drawing.Point(screen.Bounds.Left + 80, screen.Bounds.Top + 80),
+                       ShowInTaskbar = false
+                   })
+            using (var beta = new Forms.Form
+                   {
+                       Text = "Nebula preview Beta",
+                       Size = new System.Drawing.Size(480, 300),
+                       StartPosition = Forms.FormStartPosition.Manual,
+                       Location = new System.Drawing.Point(screen.Bounds.Left + 640, screen.Bounds.Top + 160),
+                       ShowInTaskbar = false
+                   })
+            {
+                alpha.Show();
+                beta.Show();
+                Forms.Application.DoEvents();
+                await Task.Delay(400);
+
+                var previewCards = new List<WindowPreviewItem>
+                {
+                    new()
+                    {
+                        Handle = alpha.Handle,
+                        Title = alpha.Text,
+                        Thumbnail = WindowThumbnail.Capture(alpha.Handle, 170, 102)
+                    },
+                    new()
+                    {
+                        Handle = beta.Handle,
+                        Title = beta.Text,
+                        Thumbnail = WindowThumbnail.Capture(beta.Handle, 170, 102)
+                    }
+                };
+
+                var preview = new WindowPreviewWindow(previewCards, _ => { }, () => false)
+                {
+                    ShowActivated = false
+                };
+                preview.Show();
+                await WaitUntilAsync(() => preview.IsLoaded, 3000);
+                await Task.Delay(300);
+                preview.UpdateLayout();
+                preview.Place(new Rect(400, screenDip.Bottom - 120, 44, 44), screenDip, above: true);
+
+                bool twoCards = preview.ItemCount == 2 &&
+                                preview.ActualWidth > 100 &&
+                                preview.ActualHeight > 80 &&
+                                preview.Top < screenDip.Bottom - 120;
+                Add(checks, "preview.multi_window", twoCards && previewCards.Any(card => card.Thumbnail is not null),
+                    $"cards={preview.ItemCount}; size={preview.ActualWidth:0.#}x{preview.ActualHeight:0.#}; " +
+                    $"thumbs={previewCards.Count(card => card.Thumbnail is not null)}; top={preview.Top:0.#}");
+                Capture(preview.CardElement, Path.Combine(outputDir, "preview-two-windows.png"));
+                preview.Close();
+            }
 
             island.Close();
             island = null;
@@ -466,6 +620,25 @@ public partial class App
             foreach (T descendant in FindVisualChildren<T>(child))
                 yield return descendant;
         }
+    }
+
+    private static Rect ToDip(Rect physical, double scale) =>
+        new(physical.Left / scale, physical.Top / scale,
+            physical.Width / scale, physical.Height / scale);
+
+    /// <summary>Position of a top-level window from the top of the Z order.</summary>
+    private static int ZOrderIndex(IntPtr hwnd)
+    {
+        IntPtr current = NativeMethods.GetTopWindow(IntPtr.Zero);
+        for (int index = 0; current != IntPtr.Zero && index < 5000; index++)
+        {
+            if (current == hwnd)
+                return index;
+
+            current = NativeMethods.GetWindow(current, (uint)NativeMethods.GW_HWNDNEXT);
+        }
+
+        return -1;
     }
 
     private static void Capture(FrameworkElement element, string path)

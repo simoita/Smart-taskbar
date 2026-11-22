@@ -19,7 +19,8 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid>
+            <Grid Background="Transparent" MouseLeftButtonDown="OnHeaderDrag" Cursor="SizeAll"
+                  ToolTip="Trascina per spostare la finestra">
                 <StackPanel>
                     <TextBlock Text="Raggruppa finestre" Style="{StaticResource T.H1}"
                                FontSize="23" />

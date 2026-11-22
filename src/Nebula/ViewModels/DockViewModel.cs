@@ -287,6 +287,25 @@ public sealed class DockViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Reorders the bar by dragging one widget onto another. The dragged widget
+    /// lands in front of the target, which matches the direction of the drag.
+    /// </summary>
+    public void MoveTaskbarWidget(string fromId, string toId)
+    {
+        var widgets = new List<string>(Settings.TaskbarWidgets ?? new List<string>());
+        int from = widgets.FindIndex(id => string.Equals(id, fromId, StringComparison.OrdinalIgnoreCase));
+        int to = widgets.FindIndex(id => string.Equals(id, toId, StringComparison.OrdinalIgnoreCase));
+        if (from < 0 || to < 0 || from == to)
+            return;
+
+        string moved = widgets[from];
+        widgets.RemoveAt(from);
+        to = widgets.FindIndex(id => string.Equals(id, toId, StringComparison.OrdinalIgnoreCase));
+        widgets.Insert(to < 0 ? widgets.Count : to, moved);
+        Settings.TaskbarWidgets = widgets;
+    }
+
+    /// <summary>
     /// Keeps the volume and brightness widgets current without polling the
     /// expensive endpoints when those widgets are not on the bar.
     /// </summary>

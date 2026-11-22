@@ -33,9 +33,13 @@ public sealed class TaskbarWidgetViewModel : ObservableObject
     public TaskbarWidgetViewModel(TaskbarWidgetDefinition definition, string? mode = null)
     {
         Id = definition.Id;
-        Mode = string.Equals(mode, "icon", StringComparison.OrdinalIgnoreCase)
-            ? "icon"
-            : "expanded";
+        SupportsExpanded = definition.Expandable;
+        // An icon-only widget has no rich layout: it stays an icon even when an
+        // older profile saved "expanded" for it, so it is never treated (or
+        // magnified) as an expanded widget.
+        Mode = SupportsExpanded && !string.Equals(mode, "icon", StringComparison.OrdinalIgnoreCase)
+            ? "expanded"
+            : "icon";
         Name = definition.Name;
         Description = definition.Description;
         Glyph = definition.Glyph;
@@ -76,8 +80,9 @@ public sealed class TaskbarWidgetViewModel : ObservableObject
     public string Mode { get; }
     public TaskbarWidgetKind Kind { get; }
     public string KindKey => Kind.ToString();
-    public bool IsIconMode => string.Equals(Mode, "icon", StringComparison.OrdinalIgnoreCase);
-    public bool IsExpandedMode => !IsIconMode;
+    public bool SupportsExpanded { get; }
+    public bool IsIconMode => !SupportsExpanded || string.Equals(Mode, "icon", StringComparison.OrdinalIgnoreCase);
+    public bool IsExpandedMode => SupportsExpanded && !IsIconMode;
     public string ModeKey => IsIconMode ? "Icon" : "Expanded";
 
     public bool IsClock { get; }

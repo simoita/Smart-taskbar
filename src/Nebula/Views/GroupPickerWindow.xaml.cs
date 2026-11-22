@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Input;
 using Nebula.Models;
 using Nebula.Services;
+using Nebula.Utilities;
 using Nebula.ViewModels;
 
 namespace Nebula.Views;
@@ -75,4 +77,7 @@ public partial class GroupPickerWindow : Window
     }
 
     private void OnCancelClick(object sender, RoutedEventArgs e) => DialogResult = false;
+
+    private void OnHeaderDrag(object sender, MouseButtonEventArgs e) =>
+        PanelDrag.MoveWindow(this, e);
 }

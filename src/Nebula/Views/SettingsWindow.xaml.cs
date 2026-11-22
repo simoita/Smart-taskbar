@@ -32,9 +32,14 @@ public partial class SettingsWindow : Window
         ["info"] = ("Info", "Nebula Taskbar Studio, comandi rapidi e ripristino.")
     };
 
+    private const string TaskbarWidgetDragFormat = "Nebula.TaskbarWidgetRow";
+
     private readonly SettingsViewModel _vm;
     private readonly SettingsStore _store;
     private bool _syncingPresets;
+    private Point _widgetDragStart;
+    private TaskbarWidgetOptionViewModel? _widgetDragSource;
+    private bool _widgetDragging;
 
     public SettingsWindow(SettingsViewModel viewModel, SettingsStore store)
     {
@@ -466,6 +471,93 @@ public partial class SettingsWindow : Window
 
         _vm.MoveTaskbarWidget(option, 1);
         _store.MarkDirty();
+    }
+
+    /// <summary>
+    /// Reorders the bar by dragging a row of the Studio list: the row under the
+    /// pointer receives the dragged widget just before itself.
+    /// </summary>
+    private void OnTaskbarWidgetRowDragStart(object sender, MouseButtonEventArgs e)
+    {
+        _widgetDragSource = null;
+        if (e.ClickCount != 1 ||
+            sender is not FrameworkElement { DataContext: TaskbarWidgetOptionViewModel option } element)
+            return;
+
+        // The buttons inside the row keep their normal click.
+        if (FindAncestorButton(e.OriginalSource as DependencyObject) is not null)
+            return;
+
+        _widgetDragStart = e.GetPosition(element);
+        _widgetDragSource = option;
+    }
+
+    private void OnTaskbarWidgetRowDragMove(object sender, MouseEventArgs e)
+    {
+        if (_widgetDragging || _widgetDragSource is null ||
+            e.LeftButton != MouseButtonState.Pressed ||
+            sender is not FrameworkElement element)
+            return;
+
+        Point current = e.GetPosition(element);
+        if (Math.Abs(current.X - _widgetDragStart.X) < 6 &&
+            Math.Abs(current.Y - _widgetDragStart.Y) < 6)
+            return;
+
+        string id = _widgetDragSource.Id;
+        _widgetDragSource = null;
+        _widgetDragging = true;
+
+        try
+        {
+            DragDrop.DoDragDrop(element, new DataObject(TaskbarWidgetDragFormat, id),
+                DragDropEffects.Move);
+        }
+        finally
+        {
+            _widgetDragging = false;
+        }
+    }
+
+    private void OnTaskbarWidgetRowDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(TaskbarWidgetDragFormat))
+            return;
+
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private void OnTaskbarWidgetRowDragLeave(object sender, DragEventArgs e)
+    {
+        // The row itself has no separate hover chrome: nothing to reset.
+    }
+
+    private void OnTaskbarWidgetRowDrop(object sender, DragEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: TaskbarWidgetOptionViewModel target } ||
+            !e.Data.GetDataPresent(TaskbarWidgetDragFormat) ||
+            e.Data.GetData(TaskbarWidgetDragFormat) is not string fromId)
+            return;
+
+        e.Handled = true;
+        _vm.ReorderTaskbarWidget(fromId, target.Id);
+        _store.MarkDirty();
+    }
+
+    private static Button? FindAncestorButton(DependencyObject? element)
+    {
+        while (element is not null)
+        {
+            if (element is Button button)
+                return button;
+
+            element = element is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(element)
+                : LogicalTreeHelper.GetParent(element);
+        }
+
+        return null;
     }
 
     private void OnOpenWidgets(object sender, RoutedEventArgs e) => App.Instance?.ShowWidgets();

@@ -90,6 +90,7 @@ public partial class StartPanelWindow : Window
         // The panel is already full-screen and correctly sized before it is
         // shown, so it does not appear small and then jump into place.
         ApplyScreenGeometry();
+        PanelDrag.AttachCard(HeaderDragArea, Panel, PanelDragShift);
     }
 
     private void ApplyScreenGeometry()

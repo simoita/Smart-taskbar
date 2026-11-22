@@ -38,6 +38,7 @@ public partial class WidgetsWindow : Window
     private DateTime _month = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private WidgetsPanel _panel = WidgetsPanel.Widget;
     private bool _suppressControlEvents;
+    private bool _userMoved;
     private readonly Dictionary<string, TextBlock> _widgetValues = new(StringComparer.OrdinalIgnoreCase);
 
     public WidgetsWindow(DockViewModel dock)
@@ -291,8 +292,26 @@ public partial class WidgetsWindow : Window
         MaxHeight = Math.Max(360, work.Height - 40);
         Width = Math.Min(Width, MaxWidth);
         UpdateLayout();
+
+        // Once the panel was dragged by the mouse it keeps the position the
+        // user chose; a size change only clamps it back on the screen.
+        if (_userMoved)
+        {
+            Left = Math.Clamp(Left, work.Left + 8,
+                Math.Max(work.Left + 8, work.Right - ActualWidth - 8));
+            Top = Math.Clamp(Top, work.Top + 8,
+                Math.Max(work.Top + 8, work.Bottom - ActualHeight - 8));
+            return;
+        }
+
         Left = Math.Max(work.Left + 12, work.Right - ActualWidth - 34);
         Top = Math.Max(work.Top + 24, work.Bottom - ActualHeight - 92);
+    }
+
+    private void OnPanelHeaderDrag(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (PanelDrag.MoveWindow(this, e))
+            _userMoved = true;
     }
 
     private void RefreshControls()

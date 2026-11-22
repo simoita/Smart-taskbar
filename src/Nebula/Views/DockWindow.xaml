@@ -258,6 +258,12 @@
                                             Click="OnTaskbarWidgetClick"
                                             MouseEnter="OnTaskbarWidgetPointerEnter"
                                             MouseLeave="OnTaskbarWidgetPointerLeave"
+                                            AllowDrop="True"
+                                            PreviewMouseLeftButtonDown="OnTaskbarWidgetDragStart"
+                                            PreviewMouseMove="OnTaskbarWidgetDragMove"
+                                            DragOver="OnTaskbarWidgetDragOver"
+                                            DragLeave="OnTaskbarWidgetDragLeave"
+                                            Drop="OnTaskbarWidgetDrop"
                                             ToolTip="{Binding Tooltip}">
                                         <Grid x:Name="WidgetRoot" MinHeight="28" RenderTransformOrigin="0.5,0.5">
                                             <Grid.RenderTransform>

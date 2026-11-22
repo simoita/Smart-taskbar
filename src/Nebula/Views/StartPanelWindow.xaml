@@ -50,7 +50,10 @@
                 BorderBrush="{DynamicResource C.DockStroke}" BorderThickness="1"
                 Opacity="0" RenderTransformOrigin="0.5,1">
             <Border.RenderTransform>
-                <TranslateTransform x:Name="PanelShift" Y="34" />
+                <TransformGroup>
+                    <TranslateTransform x:Name="PanelDragShift" />
+                    <TranslateTransform x:Name="PanelShift" Y="34" />
+                </TransformGroup>
             </Border.RenderTransform>
             <Border.Effect>
                 <DropShadowEffect BlurRadius="44" ShadowDepth="16" Direction="270"
@@ -65,7 +68,8 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Grid Margin="24,20,18,4">
+                <Grid x:Name="HeaderDragArea" Margin="24,20,18,4" Background="Transparent"
+                      Cursor="SizeAll" ToolTip="Trascina per spostare il pannello">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Border Width="38" Height="38" CornerRadius="12"
                                 Background="{DynamicResource C.AccentGrad}">
