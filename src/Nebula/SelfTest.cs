@@ -296,7 +296,7 @@ public partial class App
                     $"modes={string.Join(",", modeStore.Settings.TaskbarWidgetModes.Select(p => p.Key + "=" + p.Value))}");
             }
 
-            // 8. Dynamic Island: persisted options, applied style resources,
+            // 8. Dockbar: persisted options, applied style resources,
             // compact/expanded geometry and click-through outside the capsule.
             settings.IslandStyle = "pill";
             settings.IslandScale = 1.1;
@@ -373,32 +373,35 @@ public partial class App
             await Task.Delay(400);
             island.UpdateLayout();
 
-            double dpiScale = ScreenGeometry.Scale(screen);
-            Rect screenDip = ScreenGeometry.BoundsDip(screen);
+            // Every rectangle below is in physical pixels: the capsule, the bar
+            // and the monitor all come from Win32, so no DPI conversion is
+            // involved and a mixed-DPI desktop cannot skew the comparison.
+            Rect screenPx = new(screen.Bounds.Left, screen.Bounds.Top,
+                screen.Bounds.Width, screen.Bounds.Height);
             bool hasBarRect = dock.TryGetBarScreenRect(out Rect barRect);
-            Rect compactDip = ToDip(island.CapsuleScreenRect, dpiScale);
+            Rect compactPx = island.CapsuleScreenRect;
             bool capsuleInBar = hasBarRect &&
-                                compactDip.Top >= barRect.Top - 2 &&
-                                compactDip.Bottom <= barRect.Bottom + 2 &&
-                                compactDip.Left >= screenDip.Left - 1 &&
-                                compactDip.Right <= screenDip.Right + 1;
+                                compactPx.Top >= barRect.Top - 2 &&
+                                compactPx.Bottom <= barRect.Bottom + 2 &&
+                                compactPx.Left >= screenPx.Left - 2 &&
+                                compactPx.Right <= screenPx.Right + 2;
             int islandZ = ZOrderIndex(new WindowInteropHelper(island).Handle);
             int dockZ = ZOrderIndex(new WindowInteropHelper(dock).Handle);
             bool islandInFront = islandZ >= 0 && dockZ >= 0 && islandZ < dockZ;
             Add(checks, "island.bottom_in_bar", capsuleInBar && islandInFront && island.IsVisible,
-                $"capsule={compactDip}; bar={barRect}; screen={screenDip}; z(island)={islandZ}; z(dock)={dockZ}; visible={island.IsVisible}");
+                $"capsule={compactPx}; bar={barRect}; screen={screenPx}; z(island)={islandZ}; z(dock)={dockZ}; visible={island.IsVisible}");
             Capture(island.Capsule, Path.Combine(outputDir, "island-bottom-compact.png"));
 
             island.ExpandForTest();
             await Task.Delay(320);
             island.UpdateLayout();
-            Rect expandedDip = ToDip(island.CapsuleScreenRect, dpiScale);
-            bool grew = expandedDip.Height > compactDip.Height + 10;
-            bool anchored = Math.Abs(expandedDip.Bottom - compactDip.Bottom) < 3;
-            bool expandedOnScreen = expandedDip.Top >= screenDip.Top - 1 &&
-                                    expandedDip.Bottom <= screenDip.Bottom + 1;
+            Rect expandedPx = island.CapsuleScreenRect;
+            bool grew = expandedPx.Height > compactPx.Height + 10;
+            bool anchored = Math.Abs(expandedPx.Bottom - compactPx.Bottom) < 3;
+            bool expandedOnScreen = expandedPx.Top >= screenPx.Top - 2 &&
+                                    expandedPx.Bottom <= screenPx.Bottom + 2;
             Add(checks, "island.bottom_expanded", grew && anchored && expandedOnScreen,
-                $"compact={compactDip}; expanded={expandedDip}; screen={screenDip}");
+                $"compact={compactPx}; expanded={expandedPx}; screen={screenPx}");
             Capture(island.Capsule, Path.Combine(outputDir, "island-bottom-expanded.png"));
             island.CollapseForTest();
             await Task.Delay(250);
@@ -453,6 +456,9 @@ public partial class App
                 await WaitUntilAsync(() => preview.IsLoaded, 3000);
                 await Task.Delay(300);
                 preview.UpdateLayout();
+                // The preview panel is placed from the work area in DIPs, which
+                // is what the panel itself expects.
+                Rect screenDip = ScreenGeometry.BoundsDip(screen);
                 preview.Place(new Rect(400, screenDip.Bottom - 120, 44, 44), screenDip, above: true);
 
                 bool twoCards = preview.ItemCount == 2 &&
@@ -622,10 +628,6 @@ public partial class App
         }
     }
 
-    private static Rect ToDip(Rect physical, double scale) =>
-        new(physical.Left / scale, physical.Top / scale,
-            physical.Width / scale, physical.Height / scale);
-
     /// <summary>Position of a top-level window from the top of the Z order.</summary>
     private static int ZOrderIndex(IntPtr hwnd)
     {
@@ -652,7 +654,7 @@ public partial class App
                 return;
             // RenderTargetBitmap.Render(visual) includes the visual's offset
             // inside its parent. A VisualBrush draws the element from its own
-            // top-left corner, so centred elements (the Dynamic Island) are not
+            // top-left corner, so centred elements (the dockbar) are not
             // clipped in their screenshot.
             var visual = new DrawingVisual();
             using (DrawingContext context = visual.RenderOpen())

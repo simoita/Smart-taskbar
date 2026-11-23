@@ -110,12 +110,13 @@
                         </UniformGrid>
                     </Button>
 
-                    <!-- Space the bar keeps for the Dynamic Island when it is
-                         docked inside the bar, right next to the Start button. -->
+                    <!-- Space the bar keeps for the dockbar when it is docked
+                         inside the bar, right next to the Start button. Only the
+                         bar on the capsule's own monitor shows it. -->
                     <Border x:Name="IslandSlot"
                             Width="{Binding IslandSlotWidth}"
                             Margin="{Binding IslandSlotMargin}"
-                            Visibility="{Binding IslandSlotVisibility}"
+                            Visibility="Collapsed"
                             Background="Transparent" />
 
                     <Border Width="1" Height="24" Margin="8,0,6,0" VerticalAlignment="Center"

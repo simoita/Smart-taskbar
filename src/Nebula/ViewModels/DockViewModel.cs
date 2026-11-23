@@ -168,7 +168,7 @@ public sealed class DockViewModel : ObservableObject
         DockFinish == "flat" ? Visibility.Collapsed : Visibility.Visible;
 
     /// <summary>
-    /// The island is a separate window drawn over the bar. When it is docked
+    /// The dockbar is a separate window drawn over the bar. When it is docked
     /// inside the bar the layout reserves exactly its compact width, so the
     /// capsule sits next to Start without covering an icon.
     /// </summary>

@@ -419,7 +419,13 @@ public partial class IslandWindow : Window
     private void PositionIsland()
     {
         Forms.Screen screen = ScreenGeometry.Target(_dock.Settings.MonitorIndex);
-        Rect bounds = ScreenGeometry.BoundsDip(screen);
+        // Everything below is computed in physical pixels: monitor and bar
+        // rectangles come from Win32, and only the final window position is
+        // converted with this window's own DPI. Mixing the bar's scale with the
+        // capsule's put the dockbar on the wrong monitor on mixed-DPI setups.
+        System.Drawing.Rectangle monitor = screen.Bounds;
+        double monitorScale = Math.Max(0.5, ScreenGeometry.Scale(screen));
+        int monitorIndex = ScreenGeometry.Clamp(_dock.Settings.MonitorIndex);
         double scale = Math.Clamp(_dock.Settings.IslandScale, 0.8, 1.3);
 
         Width = Math.Max(_expandedWidth + 40, 480 * scale);
@@ -429,8 +435,12 @@ public partial class IslandWindow : Window
         bool inBar = InTaskbar;
 
         // Floating keeps the screen centre; docked inside the bar the capsule
-        // sits in the slot the bar reserves next to the Start button.
-        DockWindow? hostingBar = inBar ? App.Instance?.DockForMonitor(settings.MonitorIndex) : null;
+        // sits in the slot the bar reserves next to the Start button. Only the
+        // bar drawn on this monitor can host it: with a bar on every screen the
+        // lookup falls back to the selected bar, which may live elsewhere.
+        DockWindow? hostingBar = inBar ? App.Instance?.DockForMonitor(monitorIndex) : null;
+        if (hostingBar is not null && hostingBar.MonitorIndex != monitorIndex)
+            hostingBar = null;
 
         // An owned window is always drawn above its owner, so the capsule cannot
         // disappear behind the bar even though both windows are topmost.
@@ -460,11 +470,15 @@ public partial class IslandWindow : Window
             }
         }
 
-        double centerX = bounds.Left + bounds.Width / 2;
+        double widthPx = Width * monitorScale;
+        double heightPx = Height * monitorScale;
+        double compactHeightPx = _compactHeight * monitorScale;
+
+        double centerX = monitor.Left + monitor.Width / 2.0;
         if (hostingBar is not null && hostingBar.TryGetIslandSlotCenter(out double slotCenter))
             centerX = slotCenter;
 
-        Left = centerX - Width / 2;
+        double left = centerX - widthPx / 2;
 
         // Anchoring the capsule to the bottom keeps its screen position stable
         // while the panel grows upwards, which is what a bar at the bottom of
@@ -479,46 +493,47 @@ public partial class IslandWindow : Window
             // grant a strip flush with the monitor edge: while the native bar
             // still holds the bottom band the AppBar sits higher, and anchoring
             // to the monitor edge left the capsule behind the Windows taskbar.
-            double barTop;
-            double barHeight;
+            double barTopPx;
+            double barHeightPx;
             if (hostingBar is not null && hostingBar.TryGetBarScreenRect(out Rect barRect))
             {
-                barTop = barRect.Top;
-                barHeight = barRect.Height;
+                barTopPx = barRect.Top;
+                barHeightPx = barRect.Height;
             }
             else
             {
-                Rect fallback = settings.ReplaceWindowsTaskbar && settings.ReserveTaskbarSpace
-                    ? bounds
-                    : ScreenGeometry.WorkAreaDip(screen);
-                barHeight = Math.Max(44, settings.DockHeight);
-                barTop = settings.DockOnTop
-                    ? fallback.Top + settings.EdgeMargin
-                    : fallback.Bottom - settings.EdgeMargin - barHeight;
+                System.Drawing.Rectangle fallback = settings.ReplaceWindowsTaskbar && settings.ReserveTaskbarSpace
+                    ? monitor
+                    : screen.WorkingArea;
+                barHeightPx = Math.Max(44, settings.DockHeight) * monitorScale;
+                barTopPx = settings.DockOnTop
+                    ? fallback.Top + settings.EdgeMargin * monitorScale
+                    : fallback.Bottom - settings.EdgeMargin * monitorScale - barHeightPx;
             }
 
-            double capsuleCenterY = barTop + barHeight / 2;
-            Top = settings.DockOnTop
-                ? capsuleCenterY - _compactHeight / 2
-                : capsuleCenterY + _compactHeight / 2 - Height;
+            double capsuleCenterY = barTopPx + barHeightPx / 2;
+            double topPx = settings.DockOnTop
+                ? capsuleCenterY - compactHeightPx / 2
+                : capsuleCenterY + compactHeightPx / 2 - heightPx;
 
             // Never let the capsule (or the room its expanded panel needs) end
-            // up outside the monitor, whatever the bar rectangle reports.
-            Left = Math.Clamp(Left, bounds.Left + 4,
-                Math.Max(bounds.Left + 4, bounds.Right - Width - 4));
-            Top = Math.Clamp(Top, bounds.Top,
-                Math.Max(bounds.Top, bounds.Bottom - Height));
+            // up outside this monitor, whatever the bar rectangle reports.
+            left = Math.Clamp(left, monitor.Left + 4,
+                Math.Max(monitor.Left + 4, monitor.Right - widthPx - 4));
+            topPx = Math.Clamp(topPx, monitor.Top,
+                Math.Max(monitor.Top, monitor.Bottom - heightPx));
             Topmost = true;
+            PlacePhysical(left, topPx);
 
             // One line per distinct placement, so app.log shows where the bar and
             // the capsule ended up if it ever looks empty again.
-            string placement = $"{barTop:0}/{barHeight:0}/{Top:0}/{Left:0}";
+            string placement = $"{barTopPx:0}/{barHeightPx:0}/{topPx:0}/{left:0}";
             if (!string.Equals(placement, _lastBarPlacement, StringComparison.Ordinal))
             {
                 _lastBarPlacement = placement;
-                Log.Write("Island in bar: bar=" + $"{barTop:0}..{barTop + barHeight:0}" +
-                          $", capsule={Top + Height - _compactHeight:0}..{Top + Height:0}" +
-                          $", left={Left:0}, owner={(Owner is null ? "none" : "bar")}");
+                Log.Write("Dockbar in bar: bar=" + $"{barTopPx:0}..{barTopPx + barHeightPx:0}" +
+                          $", capsule={topPx + heightPx - compactHeightPx:0}..{topPx + heightPx:0}" +
+                          $", left={left:0}, monitor={monitorIndex}, owner={(Owner is null ? "none" : "bar")}");
             }
 
             // The bar and the island are both topmost windows: moving the
@@ -528,20 +543,46 @@ public partial class IslandWindow : Window
             return;
         }
 
-        double top = bounds.Top + settings.IslandTopMargin;
+        double top = monitor.Top + settings.IslandTopMargin * monitorScale;
         if (settings.ReplaceWindowsTaskbar && settings.DockOnTop)
-            top = bounds.Top + settings.DockHeight + 20 + settings.IslandTopMargin;
-        Top = top;
+            top = monitor.Top + (settings.DockHeight + 20 + settings.IslandTopMargin) * monitorScale;
+        PlacePhysical(left, top);
 
         // If the island stays at the top while the user chose the bar, this line
         // says exactly which prerequisite was off.
         string state = $"floating; placement={settings.IslandPlacement}; " +
                        $"replace={settings.ReplaceWindowsTaskbar}; fullWidth={settings.TaskbarFullWidth}; " +
-                       $"reserve={settings.ReserveTaskbarSpace}; top={Top:0}; left={Left:0}";
+                       $"reserve={settings.ReserveTaskbarSpace}; top={top:0}; left={left:0}; " +
+                       $"monitor={monitorIndex}";
         if (!string.Equals(state, _lastPositionState, StringComparison.Ordinal))
         {
             _lastPositionState = state;
-            Log.Write("Island position: " + state);
+            Log.Write("Dockbar position: " + state);
+        }
+    }
+
+    /// <summary>
+    /// Moves the window to a physical screen position. WPF converts Left/Top to
+    /// pixels with this window's own DPI, so a value computed with another
+    /// monitor's scale landed on the wrong screen.
+    /// </summary>
+    private void PlacePhysical(double leftPx, double topPx)
+    {
+        try
+        {
+            DpiScale dpi = VisualTreeHelper.GetDpi(this);
+            double left = leftPx / Math.Max(0.5, dpi.DpiScaleX);
+            double top = topPx / Math.Max(0.5, dpi.DpiScaleY);
+
+            if (Math.Abs(Left - left) < 0.5 && Math.Abs(Top - top) < 0.5)
+                return;
+
+            Left = left;
+            Top = top;
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Dockbar move failed: " + ex.Message);
         }
     }
 

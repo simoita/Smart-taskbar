@@ -391,6 +391,37 @@ public sealed class WindowTracker
                rect.Bottom >= bounds.Bottom - 1;
     }
 
+    /// <summary>
+    /// True when a visible top-level window covers this whole monitor, even if
+    /// it is not the foreground one: a fullscreen game on a second screen must
+    /// still put the bar on that screen into auto-hide while the user works on
+    /// another monitor.
+    /// </summary>
+    public bool IsFullscreenOnScreen(System.Drawing.Rectangle bounds)
+    {
+        if (IsForegroundFullscreen(bounds))
+            return true;
+
+        var rect = new NativeMethods.RECT();
+        foreach (AppGroup group in _groups)
+        {
+            foreach (TrackedWindow window in group.Windows)
+            {
+                if (!NativeMethods.IsWindowVisible(window.Handle) || NativeMethods.IsIconic(window.Handle))
+                    continue;
+
+                if (!NativeMethods.GetWindowRect(window.Handle, out rect))
+                    continue;
+
+                if (rect.Left <= bounds.Left + 1 && rect.Top <= bounds.Top + 1 &&
+                    rect.Right >= bounds.Right - 1 && rect.Bottom >= bounds.Bottom - 1)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     private static string ReadWindowText(IntPtr hwnd)
     {
         var sb = new StringBuilder(320);

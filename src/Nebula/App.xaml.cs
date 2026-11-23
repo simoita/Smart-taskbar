@@ -370,7 +370,7 @@ public partial class App : Application
 
     /// <summary>
     /// Reproducible real-session capture: opens two real Notepad windows, groups
-    /// them into a real tab bar, expands the Dynamic Island and writes the screen
+    /// them into a real tab bar, expands the dockbar and writes the screen
     /// rectangles the external capture script needs. It is a diagnostic mode,
     /// just like --selftest, and always restores the native taskbar on exit.
     /// </summary>

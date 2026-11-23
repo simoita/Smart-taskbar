@@ -340,7 +340,7 @@
                                                 <Border Style="{StaticResource Row}">
                                                     <Grid>
                                                         <StackPanel MaxWidth="520">
-                                                            <TextBlock Text="Dynamic Island" FontSize="13"
+                                                            <TextBlock Text="Dockbar" FontSize="13"
                                                                        Foreground="{DynamicResource C.Text}" />
                                                             <TextBlock Text="Capsula flottante con attività e controlli rapidi."
                                                                        Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
@@ -353,7 +353,7 @@
                                                 <Border Style="{StaticResource Row}">
                                                     <Grid>
                                                         <StackPanel MaxWidth="520">
-                                                            <TextBlock Text="Attività nell'isola" FontSize="13"
+                                                            <TextBlock Text="Attività nella dockbar" FontSize="13"
                                                                        Foreground="{DynamicResource C.Text}" />
                                                             <TextBlock Text="Download, copie, archivi, spostamenti e riproduzione media."
                                                                        Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
@@ -366,9 +366,9 @@
                                                 <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
                                                     <Grid>
                                                         <StackPanel MaxWidth="520">
-                                                            <TextBlock Text="Cassetto file nell'isola" FontSize="13"
+                                                            <TextBlock Text="Cassetto file nella dockbar" FontSize="13"
                                                                        Foreground="{DynamicResource C.Text}" />
-                                                            <TextBlock Text="Trascina un file sull'isola: resta lì finché non lo sposti o lo rimuovi."
+                                                            <TextBlock Text="Trascina un file sulla dockbar: resta lì finché non lo sposti o lo rimuovi."
                                                                        Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
                                                         </StackPanel>
                                                         <CheckBox Style="{StaticResource Switch}" HorizontalAlignment="Right"
@@ -881,7 +881,7 @@
                                         <Border Style="{StaticResource Card}" Margin="0,0,0,20">
                                             <StackPanel>
                                                 <TextBlock Text="MULTISCHERMO" Style="{StaticResource T.Section}" />
-                                                <TextBlock Text="La barra, l'isola e i pannelli rispettano DPI e area di lavoro del monitor scelto. Se scolleghi un display, Nebula riporta la barra su uno schermo disponibile senza perdere le impostazioni."
+                                                <TextBlock Text="La barra, la dockbar e i pannelli rispettano DPI e area di lavoro del monitor scelto. Se scolleghi un display, Nebula riporta la barra su uno schermo disponibile senza perdere le impostazioni."
                                                            Style="{StaticResource T.Caption}" Margin="0,0,0,10" TextWrapping="Wrap" />
                                                 <Border Style="{StaticResource Row}">
                                                     <Grid>
@@ -953,35 +953,35 @@
 
                                         <Border Style="{StaticResource Card}" Margin="0,0,0,20">
                                             <StackPanel>
-                                                <TextBlock Text="DYNAMIC ISLAND" Style="{StaticResource T.Section}" />
+                                                <TextBlock Text="DOCKBAR" Style="{StaticResource T.Section}" />
                                                 <TextBlock Text="Flottante in alto al centro oppure dentro la barra di Nebula: compatta a riposo, si espande con una molla fluida su hover o clic e mostra orologio, CPU/RAM, batteria, media, volume e spegnimento. Fuori dalla capsula i clic passano al desktop."
                                                            Style="{StaticResource T.Caption}" Margin="0,0,0,10" TextWrapping="Wrap" />
 
                                                 <Border Style="{StaticResource Row}">
                                                     <Grid>
                                                         <StackPanel MaxWidth="500" HorizontalAlignment="Left">
-                                                            <TextBlock Text="Mostra Dynamic Island" FontSize="13"
+                                                            <TextBlock Text="Mostra Dockbar" FontSize="13"
                                                                        Foreground="{DynamicResource C.Text}" />
                                                             <TextBlock Text="La capsula resta sopra le finestre e non aggiunge un processo separato."
                                                                        Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
                                                         </StackPanel>
                                                         <CheckBox Style="{StaticResource Switch}"
                                                                   HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                                  AutomationProperties.Name="Mostra Dynamic Island"
+                                                                  AutomationProperties.Name="Mostra Dockbar"
                                                                   IsChecked="{Binding Settings.ShowIsland, Mode=TwoWay}" />
                                                     </Grid>
                                                 </Border>
 
                                                 <Border Style="{StaticResource Row}">
                                                     <Grid>
-                                                        <TextBlock Text="Stile dell'isola" FontSize="13"
+                                                        <TextBlock Text="Stile della dockbar" FontSize="13"
                                                                    Foreground="{DynamicResource C.Text}"
                                                                    VerticalAlignment="Center" />
                                                         <ComboBox Width="226" Height="32" HorizontalAlignment="Right"
                                                                   ItemsSource="{Binding IslandStyleOptions}"
                                                                   SelectedValuePath="Id"
                                                                   SelectedValue="{Binding Settings.IslandStyle, Mode=TwoWay}"
-                                                                  AutomationProperties.Name="Stile Dynamic Island">
+                                                                  AutomationProperties.Name="Stile Dockbar">
                                                             <ComboBox.ItemTemplate>
                                                                 <DataTemplate>
                                                                     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
@@ -994,16 +994,16 @@
                                                 <Border Style="{StaticResource Row}">
                                                     <Grid>
                                                         <StackPanel MaxWidth="500" HorizontalAlignment="Left">
-                                                            <TextBlock Text="Posizione dell'isola" FontSize="13"
+                                                            <TextBlock Text="Posizione della dockbar" FontSize="13"
                                                                        Foreground="{DynamicResource C.Text}" />
-                                                            <TextBlock Text="Dentro la taskbar la capsula sta al centro della barra e si espande verso il desktop; la sostituzione della taskbar e la barra a tutta larghezza si attivano da sole."
+                                                            <TextBlock Text="Dentro la barra la capsula sta accanto al pulsante Start e si espande verso il desktop; la sostituzione della taskbar e la barra a tutta larghezza si attivano da sole."
                                                                        Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
                                                         </StackPanel>
                                                         <ComboBox Width="226" Height="32" HorizontalAlignment="Right"
                                                                   ItemsSource="{Binding IslandPlacementOptions}"
                                                                   SelectedValuePath="Id"
                                                                   SelectedValue="{Binding Settings.IslandPlacement, Mode=TwoWay}"
-                                                                  AutomationProperties.Name="Posizione Dynamic Island">
+                                                                  AutomationProperties.Name="Posizione Dockbar">
                                                             <ComboBox.ItemTemplate>
                                                                 <DataTemplate>
                                                                     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
@@ -1020,11 +1020,11 @@
                                                             <ColumnDefinition Width="Auto" />
                                                         </Grid.ColumnDefinitions>
                                                         <StackPanel>
-                                                            <TextBlock Text="Scala dell'isola" FontSize="13"
+                                                            <TextBlock Text="Scala della dockbar" FontSize="13"
                                                                        Foreground="{DynamicResource C.Text}" />
                                                             <Slider Style="{StaticResource SlimSlider}" Minimum="0.8"
                                                                     Maximum="1.3" Value="{Binding Settings.IslandScale, Mode=TwoWay}"
-                                                                    AutomationProperties.Name="Scala Dynamic Island"
+                                                                    AutomationProperties.Name="Scala Dockbar"
                                                                     Margin="0,8,120,0" />
                                                         </StackPanel>
                                                         <TextBlock Grid.Column="1" VerticalAlignment="Center"
@@ -1044,7 +1044,7 @@
                                                                        Foreground="{DynamicResource C.Text}" />
                                                             <Slider Style="{StaticResource SlimSlider}" Minimum="0"
                                                                     Maximum="36" Value="{Binding Settings.IslandTopMargin, Mode=TwoWay}"
-                                                                    AutomationProperties.Name="Margine superiore Dynamic Island"
+                                                                    AutomationProperties.Name="Margine superiore Dockbar"
                                                                     Margin="0,8,120,0" />
                                                         </StackPanel>
                                                         <TextBlock Grid.Column="1" VerticalAlignment="Center"
@@ -1063,7 +1063,7 @@
                                                         </StackPanel>
                                                         <CheckBox Style="{StaticResource Switch}"
                                                                   HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                                  AutomationProperties.Name="Controlli media e volume nell'isola"
+                                                                  AutomationProperties.Name="Controlli media e volume nella dockbar"
                                                                   IsChecked="{Binding Settings.IslandShowControls, Mode=TwoWay}" />
                                                     </Grid>
                                                 </Border>

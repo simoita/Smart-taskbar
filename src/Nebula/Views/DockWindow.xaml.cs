@@ -138,6 +138,25 @@ public partial class DockWindow : Window
     /// <summary>Monitor this bar draws on: its own index on multi-monitor bars.</summary>
     public int MonitorIndex => _forcedMonitor ?? ScreenGeometry.Clamp(_vm.Settings.MonitorIndex);
 
+    /// <summary>
+    /// True only on the bar that actually hosts the dockbar. With a bar on every
+    /// screen, reserving the capsule's slot on the other monitors left an empty
+    /// hole in their bars and pulled the selected bar's layout off-centre.
+    /// </summary>
+    public bool HostsIsland =>
+        _vm.IslandInBar && MonitorIndex == ScreenGeometry.Clamp(_vm.Settings.MonitorIndex);
+
+    /// <summary>Shows the dockbar slot only on the bar drawn on the capsule's monitor.</summary>
+    private void UpdateIslandSlot()
+    {
+        if (IslandSlot is null)
+            return;
+
+        Visibility wanted = HostsIsland ? Visibility.Visible : Visibility.Collapsed;
+        if (IslandSlot.Visibility != wanted)
+            IslandSlot.Visibility = wanted;
+    }
+
     /// <summary>Shell rectangle in window DIPs, excluding the transparent shadow.</summary>
     public Rect ShellBoundsDip
     {
@@ -301,10 +320,13 @@ public partial class DockWindow : Window
         }
 
         UpdateAppBar();
+        UpdateIslandSlot();
 
-        // The docked island is anchored to the slot next to Start, so it has to
-        // follow the bar whenever the bar itself moves or changes size.
-        if (_vm.IslandInBar)
+        // The docked dockbar is anchored to the slot next to Start, so it has to
+        // follow the bar whenever the bar itself moves or changes size. Only the
+        // hosting bar does it: the other screens' bars moved a capsule they do
+        // not own.
+        if (HostsIsland)
             Dispatcher.InvokeAsync(() => App.Instance?.RepositionIsland(), DispatcherPriority.Background);
     }
 
@@ -501,6 +523,7 @@ public partial class DockWindow : Window
 
         var settings = _vm.Settings;
         ApplyZoneChrome();
+        UpdateIslandSlot();
         var zones = new Dictionary<string, FrameworkElement>(StringComparer.OrdinalIgnoreCase)
         {
             ["apps"] = AppsZone,
@@ -655,11 +678,11 @@ public partial class DockWindow : Window
             return;
         }
 
-        // With the Dynamic Island docked inside the bar it sits next to Start,
-        // so the whole app group (Start, island, icons) is centred on the bar
-        // and the other zones keep the right edge. Only the bar that hosts the
-        // island does this; the bars on the other monitors use the full width.
-        if (_forcedMonitor is null && _vm.IslandInBar)
+        // With the dockbar docked inside the bar it sits next to Start, so the
+        // whole app group (Start, capsule, icons) is centred on the bar and the
+        // other zones keep the right edge. Only the bar that hosts the capsule
+        // does this; the bars on the other monitors use the full width.
+        if (HostsIsland)
         {
             int appsAt = blockKeys.FindIndex(key => key == "apps");
             if (appsAt < 0)
@@ -806,7 +829,7 @@ public partial class DockWindow : Window
 
         // A click on any window of the topmost band can push the docked island
         // behind the bar; keep it on top while it lives inside the bar.
-        if (_tick % 4 == 0 && _vm.IslandInBar && !_hidden)
+        if (_tick % 4 == 0 && HostsIsland && !_hidden)
             App.Instance?.RaiseIslandAboveDock();
 
         bool fullscreen = false;
@@ -818,7 +841,10 @@ public partial class DockWindow : Window
                 if (_screenBounds.Width < 1)
                     RefreshScreenGeometry();
 
-                fullscreen = _vm.Tracker.IsForegroundFullscreen(_screenBounds);
+                // Any fullscreen window on *this* monitor counts, not only the
+                // foreground one: a game on a second screen must still take the
+                // bar on that screen out of the way while the user works here.
+                fullscreen = _vm.Tracker.IsFullscreenOnScreen(_screenBounds);
             }
             catch
             {
@@ -840,10 +866,14 @@ public partial class DockWindow : Window
             UpdateAppBar();
         }
 
-        // The cursor poll only matters while auto-hide is active.
-        bool nearEdge = _vm.Settings.AutoHideDock && IsCursorNearEdge();
-        bool shouldHide = _userHidden || fullscreen ||
-                          (_vm.Settings.AutoHideDock && !IsMouseOver && !nearEdge);
+        // Fullscreen content puts the bar into auto-hide mode: it slides away
+        // instead of covering the content and comes back when the pointer reaches
+        // the edge, or when the fullscreen window closes. Only the bar on the
+        // screen with the fullscreen content does it, because the check runs
+        // against this bar's own bounds.
+        bool autoHide = _vm.Settings.AutoHideDock || fullscreen;
+        bool nearEdge = autoHide && IsCursorNearEdge();
+        bool shouldHide = _userHidden || (autoHide && !IsMouseOver && !nearEdge);
 
         // A bar without an AppBar reservation can sit above a maximized window;
         // never hide it silently while it is the only bar on that screen.
@@ -1303,7 +1333,7 @@ public partial class DockWindow : Window
     /// </summary>
     private void OnShellMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (_vm.IslandInBar)
+        if (HostsIsland)
             Dispatcher.InvokeAsync(() => App.Instance?.RaiseIslandAboveDock(), DispatcherPriority.Input);
     }
 
@@ -1311,10 +1341,12 @@ public partial class DockWindow : Window
     public IntPtr NativeHandle => _hwndSource?.Handle ?? IntPtr.Zero;
 
     /// <summary>
-    /// The bar's real screen rectangle in DIPs. Windows can grant an AppBar
-    /// strip that is not flush with the monitor edge (the native bar still
-    /// claims the bottom band for a moment), so the docked island must follow
-    /// this rectangle instead of the edge the user selected.
+    /// The bar's real screen rectangle in physical pixels. Windows can grant an
+    /// AppBar strip that is not flush with the monitor edge (the native bar still
+    /// claims the bottom band for a moment), so the docked capsule must follow
+    /// this rectangle instead of the edge the user selected. It is deliberately
+    /// device pixels: converting it with this bar's DPI and then again with the
+    /// capsule's put the capsule on the wrong monitor on mixed-DPI setups.
     /// </summary>
     public bool TryGetBarScreenRect(out Rect rect)
     {
@@ -1326,18 +1358,13 @@ public partial class DockWindow : Window
         {
             Point topLeft = Shell.PointToScreen(new Point(0, 0));
             Point bottomRight = Shell.PointToScreen(new Point(Shell.ActualWidth, Shell.ActualHeight));
-            DpiScale dpi = VisualTreeHelper.GetDpi(this);
-            double scaleX = Math.Max(0.5, dpi.DpiScaleX);
-            double scaleY = Math.Max(0.5, dpi.DpiScaleY);
 
-            double left = topLeft.X / scaleX;
-            double top = topLeft.Y / scaleY;
-            double width = Math.Max(0, bottomRight.X - topLeft.X) / scaleX;
-            double height = Math.Max(0, bottomRight.Y - topLeft.Y) / scaleY;
+            double width = Math.Max(0, bottomRight.X - topLeft.X);
+            double height = Math.Max(0, bottomRight.Y - topLeft.Y);
             if (width < 1 || height < 1)
                 return false;
 
-            rect = new Rect(left, top, width, height);
+            rect = new Rect(topLeft.X, topLeft.Y, width, height);
             return true;
         }
         catch
@@ -1347,21 +1374,22 @@ public partial class DockWindow : Window
     }
 
     /// <summary>
-    /// Screen X (in DIPs) of the point where the docked island must be centred:
-    /// the empty slot the bar reserves right next to the Start button.
+    /// Screen X in physical pixels where the docked capsule must be centred: the
+    /// empty slot the bar reserves right next to the Start button. Only the bar
+    /// that actually hosts the capsule answers.
     /// </summary>
     public bool TryGetIslandSlotCenter(out double centerX)
     {
         centerX = 0;
-        if (!_vm.IslandInBar || IslandSlot is null || !IsVisible || IslandSlot.ActualWidth < 1)
+        if (!HostsIsland || IslandSlot is null || IslandSlot.Visibility != Visibility.Visible ||
+            !IsVisible || IslandSlot.ActualWidth < 1)
             return false;
 
         try
         {
             Point point = IslandSlot.PointToScreen(
                 new Point(IslandSlot.ActualWidth / 2, IslandSlot.ActualHeight / 2));
-            double scale = Math.Max(0.5, VisualTreeHelper.GetDpi(this).DpiScaleX);
-            centerX = point.X / scale;
+            centerX = point.X;
             return true;
         }
         catch
