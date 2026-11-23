@@ -405,6 +405,42 @@ public partial class App
             Capture(island.Capsule, Path.Combine(outputDir, "island-bottom-expanded.png"));
             island.CollapseForTest();
             await Task.Delay(250);
+
+            // 8b-bis. Con la capsula dentro la barra l'ordine delle zone resta
+            // libero: widgets e azioni chiesti prima delle app devono stare a
+            // sinistra dello slot della capsula, non essere spinti a destra.
+            string previousOrder = settings.DockZoneOrder;
+            settings.DockZoneOrder = "system,actions,apps";
+            dock.ApplySettings();
+            dock.Reposition();
+            await Task.Delay(700);
+            island.ApplySettings();
+            await Task.Delay(300);
+            dock.UpdateLayout();
+
+            var systemZone = dock.FindName("SystemZone") as FrameworkElement;
+            var actionsZone = dock.FindName("ActionsZone") as FrameworkElement;
+            bool slotFound = dock.TryGetIslandSlotCenter(out double slotCenterX);
+            double systemRight = systemZone is null
+                ? double.MaxValue
+                : systemZone.PointToScreen(new Point(systemZone.ActualWidth, 0)).X;
+            double actionsRight = actionsZone is null
+                ? double.MaxValue
+                : actionsZone.PointToScreen(new Point(actionsZone.ActualWidth, 0)).X;
+            bool widgetsLeft = slotFound &&
+                               systemZone is { IsVisible: true, ActualWidth: > 0 } &&
+                               systemRight <= slotCenterX;
+            bool actionsLeft = slotFound &&
+                               (actionsZone is not { IsVisible: true } || actionsRight <= slotCenterX);
+            Add(checks, "island.left_zones", widgetsLeft && actionsLeft,
+                $"slot={slotCenterX:0}; systemRight={systemRight:0}; actionsRight={actionsRight:0}; " +
+                $"systemVisible={systemZone?.IsVisible}; actionsVisible={actionsZone?.IsVisible}");
+
+            settings.DockZoneOrder = previousOrder;
+            dock.ApplySettings();
+            dock.Reposition();
+            await Task.Delay(300);
+
             settings.IslandPlacement = "floating";
             island.ApplySettings();
 

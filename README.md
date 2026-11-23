@@ -6,6 +6,8 @@ L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminan
 
 **Novità 1.2:** pannello **Icone di sistema** con stili applicabili a collegamenti `.lnk`, tipi file e cartelle utente del profilo, icone personali dal dialog di Windows, ICO multi-size 16–256 px, backup esatto e recovery dopo chiusura forzata. Dettagli in [docs/icone-sistema.md](docs/icone-sistema.md).
 
+**Novità 1.7.5:** anche con la **Dockbar dentro la barra** ora puoi mettere **widget e pulsanti azioni a sinistra**: l'ordine scelto in Studio vale per davvero, perché le zone richieste prima delle app restano a sinistra e quelle dopo restano a destra, mentre il gruppo con Start e la capsula resta centrato.
+
 **Novità 1.7.4:** la capsula ora si chiama **Dockbar** e con **più monitor** resta sullo schermo giusto: la sua posizione è calcolata in pixel reali, quindi anche con DPI diversi non finisce più sul monitor sbagliato, e solo la barra che la ospita le riserva lo spazio accanto a Start (le altre non mostrano più un buco vuoto); quando su uno schermo c'è un contenuto in **schermo intero**, la barra di *quello* schermo passa in **nascondimento automatico** e ricompare appena porti il puntatore sul bordo, senza toccare le barre degli altri monitor.
 
 **Novità 1.7.3:** gli aggiornamenti ora si riavviano davvero: il Setup chiude anche una copia portatile aperta da un'altra cartella prima di sostituire i file, la nuova versione prende il posto di quella vecchia invece di uscire sulla copia già aperta, e i collegamenti del menu Start restano sulla build più recente; un errore di layout della barra non blocca più l'avvio né lascia la taskbar di Windows al suo posto, e il ripristino dopo un aggiornamento fallito rimette prima la barra di Windows e poi chiude il watchdog.

@@ -679,18 +679,25 @@ public partial class DockWindow : Window
         }
 
         // With the dockbar docked inside the bar it sits next to Start, so the
-        // whole app group (Start, capsule, icons) is centred on the bar and the
-        // other zones keep the right edge. Only the bar that hosts the capsule
-        // does this; the bars on the other monitors use the full width.
-        if (HostsIsland)
+        // whole app group (Start, capsule, icons) is centred on the bar. Every
+        // other zone still follows the order the user chose: the zones asked
+        // for before apps sit on the left, the ones after it on the right, so
+        // widgets and action buttons can live on the left even with the
+        // capsule inside the bar. Only the bar that hosts the capsule does
+        // this; the bars on the other monitors use the full width.
+        int appsAt = HostsIsland ? blockKeys.FindIndex(key => key == "apps") : -1;
+        if (appsAt >= 0)
         {
-            int appsAt = blockKeys.FindIndex(key => key == "apps");
-            if (appsAt < 0)
-                appsAt = 0;
-
             FrameworkElement appsBlock = blocks[appsAt];
             appsBlock.HorizontalAlignment = HorizontalAlignment.Center;
             appsBlock.Margin = new Thickness(0);
+
+            var left = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
+            };
 
             var right = new StackPanel
             {
@@ -704,8 +711,16 @@ public partial class DockWindow : Window
                 if (i == appsAt)
                     continue;
 
-                blocks[i].Margin = new Thickness(gap, 0, 0, 0);
-                right.Children.Add(blocks[i]);
+                if (i < appsAt)
+                {
+                    blocks[i].Margin = new Thickness(0, 0, gap, 0);
+                    left.Children.Add(blocks[i]);
+                }
+                else
+                {
+                    blocks[i].Margin = new Thickness(gap, 0, 0, 0);
+                    right.Children.Add(blocks[i]);
+                }
             }
 
             ZoneHost.ColumnDefinitions.Clear();
@@ -719,8 +734,19 @@ public partial class DockWindow : Window
             Grid.SetColumn(appsBlock, 1);
             ZoneHost.Children.Add(appsBlock);
 
-            Grid.SetColumn(right, 2);
-            ZoneHost.Children.Add(right);
+            // A side only gets its container when it actually holds a zone.
+            if (left.Children.Count > 0)
+            {
+                Grid.SetColumn(left, 0);
+                ZoneHost.Children.Add(left);
+            }
+
+            if (right.Children.Count > 0)
+            {
+                Grid.SetColumn(right, 2);
+                ZoneHost.Children.Add(right);
+            }
+
             return;
         }
 
