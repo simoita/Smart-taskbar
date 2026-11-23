@@ -3,12 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Nebula.Controls"
         Title="Nebula Widgets" Width="440" SizeToContent="Height"
-        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
+        WindowStyle="SingleBorderWindow" AllowsTransparency="False"
+        Background="{DynamicResource C.Bg}"
+        ShowInTaskbar="True" ResizeMode="NoResize"
         WindowStartupLocation="Manual" UseLayoutRounding="True" SnapsToDevicePixels="True"
         FontFamily="{DynamicResource S.FontFamily}">
 
-    <Border x:Name="Card" Margin="20"
+    <Border x:Name="Card" Margin="10"
             CornerRadius="{DynamicResource S.CardRadius}"
             Padding="{DynamicResource S.CardPadding}"
             Background="{DynamicResource S.CardBg}" BorderBrush="{DynamicResource S.CardBorder}"

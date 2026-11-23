@@ -521,6 +521,50 @@ public partial class App
             await WaitUntilAsync(() => studio.IsLoaded, 4000);
             await Task.Delay(500);
 
+            // 9a. Le pagine dell'app sono finestre classiche di Windows:
+            // cornice e barra del titolo native, nessuna finestra trasparente
+            // senza bordo che non si può spostare.
+            Add(checks, "studio.classic_window",
+                studio.WindowStyle == WindowStyle.SingleBorderWindow && !studio.AllowsTransparency,
+                $"style={studio.WindowStyle}; transparent={studio.AllowsTransparency}; " +
+                $"resize={studio.ResizeMode}; taskbar={studio.ShowInTaskbar}");
+
+            // 9b. Anche le altre pagine che si aprono dall'app sono finestre
+            // classiche: crearle qui verifica che la cornice nativa non rompa
+            // il caricamento di nessuna di esse.
+            var pages = new List<(string Name, Window Window)>();
+            try
+            {
+                if (App.Instance is { } appInstance)
+                {
+                    pages.Add(("launcher", new LauncherWindow(
+                        appInstance.Catalog ?? new AppCatalog(), null, settings)));
+                    pages.Add(("widgets", new WidgetsWindow(dockVm)));
+
+                    // Start reads the app catalog owner, which the self-test
+                    // host creates later; check it only when the app is fully
+                    // started.
+                    if (appInstance.Catalog is not null)
+                        pages.Add(("start", new StartPanelWindow()));
+                }
+
+                bool classicPages = pages.Count >= 2 && pages.All(page =>
+                    page.Window.WindowStyle == WindowStyle.SingleBorderWindow &&
+                    !page.Window.AllowsTransparency);
+                Add(checks, "pages.classic_windows", classicPages,
+                    pages.Count == 0
+                        ? "App.Instance non disponibile"
+                        : string.Join(", ", pages.Select(page =>
+                            $"{page.Name}={page.Window.WindowStyle}/transparent={page.Window.AllowsTransparency}")));
+            }
+            finally
+            {
+                foreach ((string _, Window page) in pages)
+                {
+                    try { page.Close(); } catch { }
+                }
+            }
+
             await MeasureStudioAsync(studio, 1280, 720, "1280x720", outputDir, checks);
             await MeasureStudioAsync(studio, 1920, 1080, "1920x1080", outputDir, checks);
         }

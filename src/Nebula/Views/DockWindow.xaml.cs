@@ -270,7 +270,14 @@ public partial class DockWindow : Window
             double cap = Math.Max(260, work.Width * 0.55);
             if (fullWidth && ZoneHost.ColumnDefinitions.Count == 3)
             {
-                double column = ZoneHost.ColumnDefinitions[1].ActualWidth;
+                // With the dockbar in the bar the widget zone lives in a side
+                // column (the centre one only holds Start and the capsule), so
+                // the strip is capped by the room that side really has. That is
+                // what keeps it from running over the neighbouring zones.
+                double column = HostsIsland
+                    ? Math.Min(ZoneHost.ColumnDefinitions[0].ActualWidth,
+                               ZoneHost.ColumnDefinitions[2].ActualWidth)
+                    : ZoneHost.ColumnDefinitions[1].ActualWidth;
                 if (column > 1)
                     cap = Math.Min(cap, Math.Max(200, column - 6));
             }
@@ -692,19 +699,34 @@ public partial class DockWindow : Window
             appsBlock.HorizontalAlignment = HorizontalAlignment.Center;
             appsBlock.Margin = new Thickness(0);
 
+            // Each side lives in a wrapper that is clipped to its own column:
+            // a wide widget strip or a long action row can never paint over the
+            // centred app group (and the capsule inside it).
+            var leftHost = new Grid
+            {
+                ClipToBounds = true,
+                VerticalAlignment = VerticalAlignment.Center
+            };
             var left = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
             };
+            leftHost.Children.Add(left);
 
+            var rightHost = new Grid
+            {
+                ClipToBounds = true,
+                VerticalAlignment = VerticalAlignment.Center
+            };
             var right = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center
             };
+            rightHost.Children.Add(right);
 
             for (int i = 0; i < blocks.Count; i++)
             {
@@ -737,14 +759,14 @@ public partial class DockWindow : Window
             // A side only gets its container when it actually holds a zone.
             if (left.Children.Count > 0)
             {
-                Grid.SetColumn(left, 0);
-                ZoneHost.Children.Add(left);
+                Grid.SetColumn(leftHost, 0);
+                ZoneHost.Children.Add(leftHost);
             }
 
             if (right.Children.Count > 0)
             {
-                Grid.SetColumn(right, 2);
-                ZoneHost.Children.Add(right);
+                Grid.SetColumn(rightHost, 2);
+                ZoneHost.Children.Add(rightHost);
             }
 
             return;

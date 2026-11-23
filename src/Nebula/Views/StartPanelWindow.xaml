@@ -1,11 +1,13 @@
 <Window x:Class="Nebula.Views.StartPanelWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Nebula Start" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
-        WindowStartupLocation="Manual" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        Title="Nebula Start" WindowStyle="SingleBorderWindow" AllowsTransparency="False"
+        Background="{DynamicResource C.Bg}"
+        ShowInTaskbar="True" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        SizeToContent="WidthAndHeight"
         FontFamily="Segoe UI Variable Text, Segoe UI"
-        PreviewKeyDown="OnPreviewKeyDown" Deactivated="OnDeactivated">
+        PreviewKeyDown="OnPreviewKeyDown">
 
     <Window.Resources>
         <DataTemplate x:Key="StartTileTemplate">
@@ -42,10 +44,8 @@
     </Window.Resources>
 
     <Grid>
-        <Border x:Name="Dim" Background="#C9060711" Opacity="0" MouseLeftButtonDown="OnDimClick" />
-
         <Border x:Name="Panel" Width="790" Height="640" HorizontalAlignment="Center"
-                VerticalAlignment="Bottom" Margin="0,0,0,24"
+                VerticalAlignment="Center"
                 CornerRadius="24" Background="#F4120F1C"
                 BorderBrush="{DynamicResource C.DockStroke}" BorderThickness="1"
                 Opacity="0" RenderTransformOrigin="0.5,1">

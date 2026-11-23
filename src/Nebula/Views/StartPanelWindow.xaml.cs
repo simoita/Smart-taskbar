@@ -50,13 +50,12 @@ public partial class StartPanelWindow : Window
     private readonly List<AppEntry> _quick = new();
     private string _quickQuery = "\u0000";
     private int _searchVersion;
-    private DateTime _shownAt;
-    private bool _suppressDeactivate;
     private bool _closing;
 
     public StartPanelWindow()
     {
         InitializeComponent();
+        TitleBarTheme.Apply(this);
 
         DataContext = App.Instance?.Dock;
         PinnedItems.ItemTemplate = (DataTemplate)FindResource("StartTileTemplate");
@@ -87,29 +86,7 @@ public partial class StartPanelWindow : Window
             app.Files.IndexReady += OnFilesReady;
         }
 
-        // The panel is already full-screen and correctly sized before it is
-        // shown, so it does not appear small and then jump into place.
-        ApplyScreenGeometry();
         PanelDrag.AttachCard(HeaderDragArea, Panel, PanelDragShift);
-    }
-
-    private void ApplyScreenGeometry()
-    {
-        var appSettings = App.Instance?.Settings;
-        Rect work = ScreenGeometry.BoundsDip(ScreenGeometry.PanelTarget(
-            appSettings?.MonitorIndex ?? 0,
-            appSettings?.PanelsFollowDock ?? true));
-        Left = work.Left;
-        Top = work.Top;
-        Width = work.Width;
-        Height = work.Height;
-
-        double bottom = appSettings is { ReplaceWindowsTaskbar: true, DockOnTop: false } settings
-            ? settings.DockHeight + 18
-            : 24;
-
-        Panel.Margin = new Thickness(0, 0, 0, bottom);
-        Panel.Height = Math.Clamp(work.Height - bottom - 54, 420, 680);
     }
 
     private void OnClosed(object? sender, EventArgs e)
@@ -300,12 +277,9 @@ public partial class StartPanelWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        ApplyScreenGeometry();
-
         // Un programma installato durante la sessione compare senza riavvio.
         App.Instance?.Catalog.LoadAsync();
 
-        _shownAt = DateTime.UtcNow;
         SearchBox.Focus();
         Keyboard.Focus(SearchBox);
         AnimateIn();
@@ -316,15 +290,12 @@ public partial class StartPanelWindow : Window
     {
         if (App.Instance?.Settings.AnimationsEnabled == false)
         {
-            Dim.Opacity = 1;
             Panel.Opacity = 1;
             PanelShift.Y = 0;
             return;
         }
 
         double speed = Math.Clamp(App.Instance?.Settings.AnimationSpeed ?? 1, 0.5, 2);
-        Dim.BeginAnimation(OpacityProperty,
-            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(170 / speed)));
         Panel.BeginAnimation(OpacityProperty,
             new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(210 / speed))
             {
@@ -703,13 +674,11 @@ public partial class StartPanelWindow : Window
     private void OnPowerClick(object sender, RoutedEventArgs e)
     {
         var menu = new ContextMenu();
-        bool actionPicked = false;
 
         void Add(string header, string glyph, string action)
         {
             menu.Items.Add(MenuFactory.Item(header, glyph, () =>
             {
-                actionPicked = true;
                 Dismiss();
                 App.Instance?.RunPowerAction(action);
             }));
@@ -723,12 +692,6 @@ public partial class StartPanelWindow : Window
         menu.Items.Add(new Separator());
         Add("Esci da Nebula", "\uE711", "exit");
 
-        _suppressDeactivate = true;
-        menu.Closed += (_, _) =>
-        {
-            if (!actionPicked)
-                _suppressDeactivate = false;
-        };
         menu.PlacementTarget = sender as Button;
         menu.IsOpen = true;
     }
@@ -775,15 +738,6 @@ public partial class StartPanelWindow : Window
     {
         Dismiss();
         App.Instance?.ShowGroupPicker();
-    }
-
-    private void OnDeactivated(object? sender, EventArgs e)
-    {
-        if (_closing || _suppressDeactivate ||
-            DateTime.UtcNow - _shownAt < TimeSpan.FromMilliseconds(300))
-            return;
-
-        Dismiss();
     }
 
     private void Dismiss()

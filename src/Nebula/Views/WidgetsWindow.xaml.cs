@@ -45,6 +45,7 @@ public partial class WidgetsWindow : Window
     {
         _dock = dock;
         InitializeComponent();
+        TitleBarTheme.Apply(this);
         DataContext = dock;
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -122,6 +123,10 @@ public partial class WidgetsWindow : Window
         ApplyAvailability();
         RefreshControls();
         Dispatcher.InvokeAsync(PositionPanel, DispatcherPriority.Loaded);
+
+        // The first placement is the one next to the dock; after that the panel
+        // is a classic window and keeps wherever the user dragged it.
+        Dispatcher.InvokeAsync(() => _userMoved = true, DispatcherPriority.ApplicationIdle);
         AnimateIn();
     }
 
@@ -207,12 +212,14 @@ public partial class WidgetsWindow : Window
             WidgetsPanel.Controls => "Volume, media, rete e luminosità",
             _ => "Collega reti e dispositivi in un clic"
         };
+        // The native frame takes a few pixels on each side; the extra width
+        // keeps the page contents at the size they were designed for.
         Width = _panel switch
         {
             WidgetsPanel.Controls when _dock.Settings.QuickControlsCompact => 400,
             WidgetsPanel.Network => 470,
             _ => 445
-        };
+        } + 16;
 
         StyleTab(WidgetTab, _panel == WidgetsPanel.Widget);
         StyleTab(ControlsTab, _panel == WidgetsPanel.Controls);

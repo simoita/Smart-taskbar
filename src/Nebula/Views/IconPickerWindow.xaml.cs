@@ -11,6 +11,7 @@ using Microsoft.Win32;
 using Nebula.Interop;
 using Nebula.Models;
 using Nebula.Services;
+using Nebula.Utilities;
 using Nebula.ViewModels;
 
 namespace Nebula.Views;
@@ -64,6 +65,7 @@ public partial class IconPickerWindow : Window
     public IconPickerWindow(SystemIconTarget target, SystemIconService icons, string style, string shape)
     {
         InitializeComponent();
+        TitleBarTheme.Apply(this);
 
         _target = target;
         _icons = icons;

@@ -3,19 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:Nebula.Views"
         Title="Nebula Taskbar Studio" Width="1160" Height="780"
-        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+        WindowStyle="SingleBorderWindow" AllowsTransparency="False"
+        Background="{DynamicResource C.Bg}"
+        ResizeMode="CanResize" WindowStartupLocation="CenterScreen"
         ShowInTaskbar="True" UseLayoutRounding="True" SnapsToDevicePixels="True"
         FontFamily="Segoe UI Variable Text, Segoe UI">
 
-    <Grid Margin="12">
-        <Border CornerRadius="20" Background="#000000" Margin="0,8,0,0" Opacity="0.65">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="42" ShadowDepth="16" Direction="270" Opacity="0.55"
-                                  Color="#000000" RenderingBias="Performance" />
-            </Border.Effect>
-        </Border>
-
+    <Grid>
         <Border x:Name="Chrome" CornerRadius="20" Background="{DynamicResource C.Bg}"
                 BorderBrush="{DynamicResource C.Stroke}" BorderThickness="1"
                 SizeChanged="OnChromeSizeChanged" Opacity="0" RenderTransformOrigin="0.5,0.5">
@@ -23,45 +17,11 @@
                 <ScaleTransform x:Name="WindowScale" ScaleX="0.985" ScaleY="0.985" />
             </Border.RenderTransform>
 
+            <!-- The window keeps the classic Windows frame and its title bar:
+                 the page content starts right below it, with no duplicate
+                 custom caption. -->
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="48" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <!-- Title bar -->
-                <Grid x:Name="TitleBar" Grid.Row="0" Background="Transparent"
-                      MouseLeftButtonDown="OnTitleBarDrag">
-                    <StackPanel Orientation="Horizontal" Margin="20,0,0,0" VerticalAlignment="Center">
-                        <Border Width="24" Height="24" CornerRadius="7"
-                                Background="{DynamicResource C.AccentGrad}">
-                            <UniformGrid Rows="2" Columns="2" Width="11" Height="11">
-                                <Ellipse Width="3" Height="3" Fill="{DynamicResource C.OnAccent}" Margin="1" />
-                                <Ellipse Width="3" Height="3" Fill="{DynamicResource C.OnAccent}" Margin="1" />
-                                <Ellipse Width="3" Height="3" Fill="{DynamicResource C.OnAccent}" Margin="1" />
-                                <Ellipse Width="3" Height="3" Fill="{DynamicResource C.OnAccent}" Margin="1" />
-                            </UniformGrid>
-                        </Border>
-                        <TextBlock Text="Nebula" FontSize="13" FontWeight="SemiBold" Margin="9,0,0,0"
-                                   VerticalAlignment="Center" Foreground="{DynamicResource C.Text}" />
-                        <TextBlock Text="Taskbar Studio" FontSize="10.5" Margin="7,1,0,0"
-                                   VerticalAlignment="Center" Foreground="{DynamicResource C.TextMuted}" />
-                    </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,10,0"
-                                VerticalAlignment="Center">
-                        <Button Style="{StaticResource IconButton}" Width="30" Height="30"
-                                Click="OnMinimize" ToolTip="Riduci a icona">
-                            <TextBlock Text="&#xE921;" FontFamily="Segoe Fluent Icons" FontSize="10" />
-                        </Button>
-                        <Button Style="{StaticResource IconButton}" Width="30" Height="30"
-                                Click="OnClose" ToolTip="Chiudi">
-                            <TextBlock Text="&#xE8BB;" FontFamily="Segoe Fluent Icons" FontSize="10" />
-                        </Button>
-                    </StackPanel>
-                </Grid>
-
-                <Grid Grid.Row="1">
+                <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="232" />
                         <ColumnDefinition Width="*" />

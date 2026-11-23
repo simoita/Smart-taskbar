@@ -3,8 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Aggiornamento Nebula"
         Width="500" SizeToContent="Height"
-        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        ShowInTaskbar="False" Topmost="True"
+        WindowStyle="SingleBorderWindow" AllowsTransparency="False"
+        Background="{DynamicResource C.Bg}"
+        ShowInTaskbar="True"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
         UseLayoutRounding="True" SnapsToDevicePixels="True"
         FontFamily="Segoe UI Variable Text, Segoe UI">

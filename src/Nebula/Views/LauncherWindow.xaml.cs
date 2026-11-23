@@ -27,7 +27,6 @@ public partial class LauncherWindow : Window
     private readonly List<AppEntry> _quick = new();
     private string _quickQuery = "\u0000";
     private int _searchVersion;
-    private DateTime _shownAt;
     private bool _closing;
     private bool _settingsOpen;
 
@@ -49,6 +48,7 @@ public partial class LauncherWindow : Window
         _onPicked = onPicked;
 
         InitializeComponent();
+        TitleBarTheme.Apply(this);
         ResultList.ItemsSource = _results;
 
         // Typing stays native: keystrokes are coalesced into one search per
@@ -96,10 +96,13 @@ public partial class LauncherWindow : Window
         Rect work = ScreenGeometry.BoundsDip(ScreenGeometry.PanelTarget(
             appSettings?.MonitorIndex ?? 0,
             appSettings?.PanelsFollowDock ?? true));
-        Left = work.Left;
-        Top = work.Top;
-        Width = work.Width;
-        Height = work.Height;
+        // A classic Windows window sized around the search card: it opens on
+        // the screen with the dock and the user can move it anywhere from its
+        // title bar, like any other window.
+        Width = Card.Width + 24;
+        UpdateLayout();
+        Left = work.Left + Math.Max(0, (work.Width - ActualWidth) / 2);
+        Top = work.Top + Math.Max(40, (work.Height - ActualHeight) * 0.22);
 
         AnimateIn();
 
@@ -107,7 +110,6 @@ public partial class LauncherWindow : Window
         // durante la sessione deve comparire senza riavviare Nebula.
         _catalog.LoadAsync();
 
-        _shownAt = DateTime.UtcNow;
         SearchBox.Focus();
         Keyboard.Focus(SearchBox);
         RefreshResults();
@@ -163,9 +165,6 @@ public partial class LauncherWindow : Window
             return;
 
         double speed = Math.Clamp(_settings?.AnimationSpeed ?? 1, 0.5, 2);
-        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(170 / speed));
-        Dim.BeginAnimation(OpacityProperty, fade);
-
         var cardFade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200 / speed))
         {
             BeginTime = TimeSpan.FromMilliseconds(40 / speed),
@@ -184,11 +183,9 @@ public partial class LauncherWindow : Window
 
     private void StopMotion()
     {
-        Dim.BeginAnimation(OpacityProperty, null);
         Card.BeginAnimation(OpacityProperty, null);
         CardScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         CardScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-        Dim.Opacity = 1;
         Card.Opacity = 1;
         CardScale.ScaleX = 1;
         CardScale.ScaleY = 1;
@@ -532,31 +529,20 @@ public partial class LauncherWindow : Window
 
     private void OnResultDoubleClick(object sender, MouseButtonEventArgs e) => LaunchSelected();
 
-    private void OnDimClick(object sender, MouseButtonEventArgs e) => Dismiss();
-
-    private void OnDeactivated(object? sender, EventArgs e)
-    {
-        if (_closing || _settingsOpen || DateTime.UtcNow - _shownAt < TimeSpan.FromMilliseconds(350))
-            return;
-        Dismiss();
-    }
-
     private void OnOpenStudio(object sender, RoutedEventArgs e) => App.Instance?.ShowSettings();
 
     /// <summary>Keeps the search open while Studio is used, so theme resources can update it live.</summary>
-    public void PrepareForStudio()
-    {
-        _settingsOpen = true;
-        Topmost = false;
-    }
+    public void PrepareForStudio() => _settingsOpen = true;
 
     public void RestoreAfterStudio()
     {
+        if (!_settingsOpen)
+            return;
+
         _settingsOpen = false;
         if (!IsVisible)
             return;
 
-        Topmost = true;
         Activate();
         SearchBox.Focus();
     }

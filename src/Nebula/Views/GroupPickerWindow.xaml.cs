@@ -35,6 +35,7 @@ public partial class GroupPickerWindow : Window
     public GroupPickerWindow(IReadOnlyList<WindowCandidate> candidates, IEnumerable<IntPtr> preselected)
     {
         InitializeComponent();
+        TitleBarTheme.Apply(this);
 
         var selected = new HashSet<IntPtr>(preselected);
         foreach (WindowCandidate candidate in candidates)

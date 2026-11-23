@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Windows;
 using Nebula.Services;
+using Nebula.Utilities;
 
 namespace Nebula.Views;
 
@@ -12,6 +13,7 @@ public partial class UpdateWindow : Window
     public UpdateWindow(UpdateManifest manifest, string currentVersion)
     {
         InitializeComponent();
+        TitleBarTheme.Apply(this);
 
         VersionText.Text = $"Nebula {manifest.Version} è pronta per l'installazione.";
         CurrentText.Text = $"Versione installata: {currentVersion}";

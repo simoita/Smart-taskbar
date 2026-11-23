@@ -271,6 +271,7 @@ public partial class IslandWindow : Window
         bool glow = style != "minimal" && settings.ShowGlow;
         IslandGlow.Visibility = glow ? Visibility.Visible : Visibility.Collapsed;
         IslandGlow2.Visibility = glow ? Visibility.Visible : Visibility.Collapsed;
+        UpdatePinChrome();
 
         CompactView.Opacity = _expanded ? 0 : 1;
         ExpandedView.Opacity = _expanded ? 1 : 0;
@@ -386,21 +387,29 @@ public partial class IslandWindow : Window
         else
         {
             double speed = Math.Clamp(_dock.Settings.AnimationSpeed, 0.5, 2);
-            double seconds = 0.28 / speed;
-            var sizeEase = new BackEase { Amplitude = 0.10, EasingMode = EasingMode.EaseOut };
+            double seconds = 0.24 / speed;
+
+            // One smooth ease for size and content together. The old BackEase
+            // overshoot made the capsule wobble past its final size and the
+            // panel appeared in a jump, which read as a glitch rather than an
+            // expansion.
+            var sizeEase = new QuarticEase { EasingMode = EasingMode.EaseOut };
             Capsule.BeginAnimation(WidthProperty,
                 new DoubleAnimation(width, TimeSpan.FromSeconds(seconds)) { EasingFunction = sizeEase });
             Capsule.BeginAnimation(HeightProperty,
                 new DoubleAnimation(height, TimeSpan.FromSeconds(seconds)) { EasingFunction = sizeEase });
 
             CompactView.BeginAnimation(OpacityProperty,
-                new DoubleAnimation(expand ? 0 : 1, TimeSpan.FromSeconds(0.14))
+                new DoubleAnimation(expand ? 0 : 1, TimeSpan.FromSeconds(expand ? 0.12 : 0.18))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 });
 
-            var expandedFade = new DoubleAnimation(expand ? 1 : 0, TimeSpan.FromSeconds(0.18))
+            // The expanding page fades in only once the capsule has room for it,
+            // so the content never spills outside the rounded panel.
+            var expandedFade = new DoubleAnimation(expand ? 1 : 0, TimeSpan.FromSeconds(expand ? 0.16 : 0.1))
             {
+                BeginTime = expand ? TimeSpan.FromSeconds(seconds * 0.35) : TimeSpan.Zero,
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
             };
             expandedFade.Completed += (_, _) =>
@@ -414,6 +423,34 @@ public partial class IslandWindow : Window
         Capsule.CornerRadius = new CornerRadius(radius);
         IslandGlow.CornerRadius = new CornerRadius(radius);
         IslandGlow2.CornerRadius = new CornerRadius(radius);
+        UpdatePinChrome();
+    }
+
+    /// <summary>
+    /// Accent ring while the capsule is pinned open: clicking the panel keeps
+    /// it on screen, and the ring is what says so at a glance.
+    /// </summary>
+    private void UpdatePinChrome()
+    {
+        if (Capsule is null)
+            return;
+
+        if (_pinned)
+        {
+            Capsule.BorderBrush = FindBrush("C.Accent", Brushes.MediumPurple);
+            Capsule.BorderThickness = new Thickness(2);
+            IslandGlow.Opacity = 0.55;
+            IslandGlow2.Opacity = 0.4;
+            return;
+        }
+
+        bool minimal = AppliedStyleKey == "minimal";
+        Capsule.BorderBrush = minimal
+            ? FindBrush("C.StrokeSoft", Brushes.Gray)
+            : FindBrush("C.DockStroke", Brushes.White);
+        Capsule.BorderThickness = new Thickness(minimal ? 1 : 1.2);
+        IslandGlow.Opacity = 0.34;
+        IslandGlow2.Opacity = 0.22;
     }
 
     private void PositionIsland()

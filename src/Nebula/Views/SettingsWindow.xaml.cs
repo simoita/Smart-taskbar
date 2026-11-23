@@ -47,6 +47,7 @@ public partial class SettingsWindow : Window
         _store = store;
 
         InitializeComponent();
+        TitleBarTheme.Apply(this);
         DataContext = viewModel;
 
         Loaded += OnLoaded;
