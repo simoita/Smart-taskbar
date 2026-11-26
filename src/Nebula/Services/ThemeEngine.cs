@@ -81,22 +81,25 @@ public sealed class ThemeEngine
     private Brush BuildStroke()
     {
         // Light presets declare a white stroke, which vanished on their light
-        // glass. A dark accent-tinted hairline is what makes the border of the
-        // bar and of the cards readable there.
+        // glass. The hairline is now neutral in both directions: a light preset
+        // gets a slate line, a dark one a white-lavender line, and the accent
+        // only tints the middle. Modern means present, not painted on.
         Color baseColor = Preset.IsLight
-            ? ColorUtil.Mix(ColorUtil.Parse("#0F172A"), AccentA, 0.35)
-            : ColorUtil.Parse(Preset.Stroke);
+            ? ColorUtil.Mix(ColorUtil.Parse("#101828"), AccentA, 0.18)
+            : ColorUtil.Mix(ColorUtil.Parse(Preset.Stroke), Colors.White, 0.55);
+        byte strokeStart = (byte)(Preset.IsLight ? 60 : 104);
+        byte strokeMiddle = (byte)(Preset.IsLight ? 38 : 50);
+        byte strokeEnd = (byte)(Preset.IsLight ? 28 : 34);
         var brush = new LinearGradientBrush
         {
             StartPoint = new Point(0, 0),
             EndPoint = new Point(1, 1)
         };
-        // The old 36 alpha end faded to nothing over a bright wallpaper: a
-        // border that disappears is not a border. The outline stays readable
-        // along the whole edge and keeps its lit top-left corner.
-        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(baseColor, (byte)190), 0));
-        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(AccentA, (byte)110), 0.55));
-        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(baseColor, (byte)70), 1));
+        // The line stays readable along the whole edge, but it is a hairline:
+        // no glowing rim, no saturated outline around the bar and the cards.
+        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(baseColor, strokeStart), 0));
+        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(AccentA, strokeMiddle), 0.55));
+        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(baseColor, strokeEnd), 1));
         brush.Freeze();
         return brush;
     }
@@ -250,12 +253,14 @@ public sealed class ThemeEngine
             ? ColorUtil.Mix(glassBottom, Colors.White, 0.55)
             : glassBottom;
         r["C.DockShell"] = Solid(ColorUtil.WithAlpha(dockShell, (byte)(p.IsLight ? 238 : 232)));
+        // The bevel is a whisper: enough to read the top light and the bottom
+        // depth, not enough to look like a second border.
         r["C.DockHighlight"] = Solid(p.IsLight
-            ? Color.FromArgb(120, 255, 255, 255)
-            : Color.FromArgb(30, 255, 255, 255));
+            ? Color.FromArgb(55, 255, 255, 255)
+            : Color.FromArgb(18, 255, 255, 255));
         r["C.DockShade"] = Solid(p.IsLight
-            ? Color.FromArgb(34, 15, 23, 42)
-            : Color.FromArgb(96, 0, 0, 0));
+            ? Color.FromArgb(26, 15, 23, 42)
+            : Color.FromArgb(48, 0, 0, 0));
         // The soft StrokeSoft line is white-ish on light presets, so the 1 px
         // separators between Start and the icons vanished there. This one is a
         // real line in both directions.

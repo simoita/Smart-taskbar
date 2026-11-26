@@ -66,7 +66,7 @@
                         BorderThickness="0,0,0,1" BorderBrush="{DynamicResource C.DockShade}" />
 
                 <Border CornerRadius="{Binding InnerRadius}" Margin="1" IsHitTestVisible="False"
-                        BorderThickness="0,0,0,1" BorderBrush="{DynamicResource C.AccentGrad}" Opacity="0.28"
+                        BorderThickness="0,0,0,1" BorderBrush="{DynamicResource C.AccentGrad}" Opacity="0.16"
                         Visibility="{Binding ChromeShimmerVisibility}" />
 
                 <Border x:Name="LiquidSheen" Width="280" HorizontalAlignment="Left"

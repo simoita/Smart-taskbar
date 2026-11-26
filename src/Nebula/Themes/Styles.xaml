@@ -47,8 +47,8 @@
          base and its bevel. ThemeEngine replaces them live, so a light preset
          gets a light bar instead of dark text on a hard-coded near-black one. -->
     <SolidColorBrush x:Key="C.DockShell" Color="#E80A0617" />
-    <SolidColorBrush x:Key="C.DockHighlight" Color="#1EFFFFFF" />
-    <SolidColorBrush x:Key="C.DockShade" Color="#60000000" />
+    <SolidColorBrush x:Key="C.DockHighlight" Color="#12FFFFFF" />
+    <SolidColorBrush x:Key="C.DockShade" Color="#30000000" />
     <SolidColorBrush x:Key="C.Separator" Color="#22FFFFFF" />
 
     <!-- Surface-specific resources; ThemeEngine replaces these live for the three presets. -->
@@ -78,9 +78,9 @@
         <GradientStop Color="#E60A0617" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="C.DockStroke" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#969F8CFF" Offset="0" />
-        <GradientStop Color="#3C8B5CF6" Offset="0.55" />
-        <GradientStop Color="#249F8CFF" Offset="1" />
+        <GradientStop Color="#689F8CFF" Offset="0" />
+        <GradientStop Color="#328B5CF6" Offset="0.55" />
+        <GradientStop Color="#229F8CFF" Offset="1" />
     </LinearGradientBrush>
     <SolidColorBrush x:Key="C.ItemHover" Color="#1AFFFFFF" />
 
