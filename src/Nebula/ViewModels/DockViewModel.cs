@@ -190,9 +190,10 @@ public sealed class DockViewModel : ObservableObject
         ? Visibility.Visible
         : Visibility.Collapsed;
 
-    // Icons fill more of the bar than before: a slim margin keeps them off the
-    // bar edges while the artwork stays large and readable.
-    public double ItemSize => Math.Max(32, Settings.DockHeight - 6);
+    // The slot follows the artwork: choosing smaller icons must also bring them
+    // closer, instead of shrinking the glyph inside the same old gaps. The bar
+    // height still caps the slot so an icon never outgrows the bar.
+    public double ItemSize => Math.Clamp(Settings.IconSize + 10, 28, Math.Max(28, Settings.DockHeight - 6));
     public double IconSize => Math.Min(Settings.IconSize, Math.Max(18, ItemSize - 4));
     public Thickness ItemMargin => new(Settings.ItemSpacing / 2, 0, Settings.ItemSpacing / 2, 0);
 
