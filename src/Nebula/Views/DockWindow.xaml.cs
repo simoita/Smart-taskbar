@@ -78,6 +78,10 @@ public partial class DockWindow : Window
         _watchTimer.Tick += OnWatchTick;
         _watchTimer.Start();
 
+        // A failed re-apply after ABN_POSCHANGED must reach the guard, otherwise
+        // the dock would believe the strip is still reserved.
+        _appBar.ReapplyFailed += () => AppBarApplySucceeded = false;
+
         SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
         SizeChanged += OnSizeChanged;

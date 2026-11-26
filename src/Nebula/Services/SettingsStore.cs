@@ -80,7 +80,7 @@ public sealed class SettingsStore : IDisposable
     {
         s.GlassOpacity = Math.Clamp(s.GlassOpacity, 0.3, 1.0);
         s.CornerRadius = Math.Clamp(s.CornerRadius, 4, 36);
-        s.IconSize = Math.Clamp(s.IconSize, 36, 52);
+        s.IconSize = Math.Clamp(s.IconSize, 20, 36);
         s.DockHeight = Math.Clamp(s.DockHeight, 44, 92);
         s.ItemSpacing = Math.Clamp(s.ItemSpacing, -4, 12);
         s.EdgeMargin = Math.Clamp(s.EdgeMargin, 0, 48);

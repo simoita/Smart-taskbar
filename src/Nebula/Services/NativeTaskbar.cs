@@ -22,6 +22,7 @@ public sealed class NativeTaskbarController
     private readonly string _session = Guid.NewGuid().ToString("N");
     private Process? _watchdog;
     private int? _watchdogTimeoutSeconds;
+    private IntPtr _shellHandle;
     private bool _canHide;
     private NativeMethods.WinEventDelegate? _showCallback;
     private IntPtr _showHook;
@@ -70,6 +71,7 @@ public sealed class NativeTaskbarController
         }
 
         OriginalState = GetState();
+        _shellHandle = NativeMethods.FindWindow("Shell_TrayWnd", null);
 
         if (!WritePending())
         {
@@ -121,12 +123,46 @@ public sealed class NativeTaskbarController
 
         InstallHideHook();
 
+        // Explorer can replace Shell_TrayWnd at any moment (restart from Task
+        // Manager, shell update, primary DPI change). The new window comes back
+        // with the user's saved state, so auto-hide has to be set again before
+        // it reclaims the strip our own AppBar owns.
+        IntPtr shell = NativeMethods.FindWindow("Shell_TrayWnd", null);
+        if (shell != _shellHandle)
+        {
+            _shellHandle = shell;
+            if (shell == IntPtr.Zero)
+            {
+                // Explorer is between the old and the new bar. Do not restore on
+                // an empty shell: the watchdog is still armed and the next tick
+                // will find the new window.
+                return;
+            }
+
+            SetState(AbsAutoHide);
+            HideTray();
+            if (!TrayHidden())
+            {
+                Log.Write("Taskbar guard lost the new shell bar; restoring.");
+                Restore();
+                ProtectionLost?.Invoke();
+                return;
+            }
+
+            Log.Write("Explorer restarted: native taskbar re-hidden and auto-hide re-asserted.");
+            return;
+        }
+
         // The WinEvent hook hides a bar as soon as Explorer shows it. The timer is
         // only the safety net, so most ticks do one cheap lookup; the full sweep
-        // that covers secondary monitors runs every four seconds.
+        // that covers secondary monitors and re-asserts the shell state runs every
+        // four seconds.
         _protectionTicks++;
         if (_protectionTicks % FullSweepTicks == 0)
         {
+            if ((GetState() & AbsAutoHide) == 0)
+                SetState(AbsAutoHide);
+
             HideTray();
             if (!TrayHidden())
             {

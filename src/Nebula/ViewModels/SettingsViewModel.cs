@@ -265,22 +265,22 @@ public sealed class SettingsViewModel : ObservableObject
     };
     public IReadOnlyList<IconSizeOptionViewModel> IconSizeOptions { get; } = new List<IconSizeOptionViewModel>
     {
-        new("small", "Piccole (36 px)"),
-        new("medium", "Medie (42 px)"),
-        new("large", "Grandi (48 px)")
+        new("small", "Piccole (24 px)"),
+        new("medium", "Medie (30 px)"),
+        new("large", "Grandi (36 px)")
     };
 
     /// <summary>Three explicit icon sizes, independent of the bar height.</summary>
     public string IconSizePreset
     {
-        get => Settings.IconSize >= 46 ? "large" : Settings.IconSize >= 39 ? "medium" : "small";
+        get => Settings.IconSize >= 33 ? "large" : Settings.IconSize >= 27 ? "medium" : "small";
         set
         {
             Settings.IconSize = value switch
             {
-                "large" => 48,
-                "medium" => 42,
-                _ => 36
+                "large" => 36,
+                "medium" => 30,
+                _ => 24
             };
             OnPropertyChanged();
         }

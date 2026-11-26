@@ -8,7 +8,7 @@ public sealed class AppSettings : ObservableObject
     private string _accentHex = "";
     private double _glassOpacity = 0.78;
     private double _cornerRadius = 22;
-    private double _iconSize = 40;
+    private double _iconSize = 30;
     private double _dockHeight = 62;
     private double _itemSpacing = 2;
     private double _edgeMargin = 0;

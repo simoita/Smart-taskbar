@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Threading;
 using Nebula.Interop;
 using Nebula.Utilities;
 
@@ -21,8 +22,15 @@ public sealed class TaskbarAppBar : IDisposable
     private bool _top;
     private int _heightPixels;
     private int _monitorIndex = -1;
+    private bool _reapplyPending;
 
     public bool IsRegistered => _registered;
+
+    /// <summary>
+    /// Raised when a re-apply triggered by the shell failed, so the dock can
+    /// mark its reservation as unhealthy and retry on the next guard tick.
+    /// </summary>
+    public event Action? ReapplyFailed;
 
     /// <summary>
     /// The strip Windows actually granted, in physical pixels. The shell can move
@@ -50,6 +58,31 @@ public sealed class TaskbarAppBar : IDisposable
         System.Windows.Forms.Screen screen = ScreenGeometry.Target(monitorIndex);
         double scale = ScreenGeometry.Scale(screen);
         int height = Math.Max(24, (int)Math.Round(Math.Max(24, heightDip) * scale));
+
+        bool announce = _monitorIndex != monitorIndex || _top != top || _heightPixels != height;
+        if (!Place(handle, top, height, monitorIndex))
+            return false;
+
+        _top = top;
+        _heightPixels = height;
+        _monitorIndex = monitorIndex;
+        if (announce)
+        {
+            Log.Write($"AppBar reserved: edge={(top ? "top" : "bottom")}, {height}px on screen {monitorIndex + 1} " +
+                      $"(granted {AppliedBounds.Top}..{AppliedBounds.Bottom}).");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Asks the shell for the strip and verifies that the work area really
+    /// changed. ABM_SETPOS can answer success on a shell that has just restarted
+    /// but has not re-registered this HWND, so the reply alone is not trusted.
+    /// </summary>
+    private bool Place(IntPtr handle, bool top, int height, int monitorIndex)
+    {
+        System.Windows.Forms.Screen screen = ScreenGeometry.Target(monitorIndex);
         System.Drawing.Rectangle bounds = screen.Bounds;
 
         var data = NewData(handle);
@@ -89,14 +122,11 @@ public sealed class TaskbarAppBar : IDisposable
             return false;
         }
 
-        // ABM_SETPOS can return success on a shell that has just restarted but
-        // has not re-registered this HWND. Verify the actual reserved work area:
-        // a maximized window only stops at the bar if Windows changed it.
+        // GetMonitorInfo is live and per-monitor; Screen.WorkingArea may be
+        // cached and SPI_GETWORKAREA is only the primary monitor.
         bool reserved = false;
         for (int attempt = 0; attempt < 6; attempt++)
         {
-            // GetMonitorInfo is live and per-monitor; Screen.WorkingArea may be
-            // cached and SPI_GETWORKAREA is only the primary monitor.
             var center = new NativeMethods.POINT
             {
                 X = bounds.Left + bounds.Width / 2,
@@ -126,18 +156,32 @@ public sealed class TaskbarAppBar : IDisposable
         }
 
         AppliedBounds = granted;
-
-        bool announce = _monitorIndex != monitorIndex || _top != top || _heightPixels != height;
-        _top = top;
-        _heightPixels = height;
-        _monitorIndex = monitorIndex;
-        if (announce)
-        {
-            Log.Write($"AppBar reserved: edge={(top ? "top" : "bottom")}, {height}px on screen {monitorIndex + 1} " +
-                      $"(granted {granted.Top}..{granted.Bottom}).");
-        }
-
         return true;
+    }
+
+    /// <summary>
+    /// Re-applies the cached strip after an ABN_POSCHANGED notification. The
+    /// call is deferred to the dispatcher so the shell notification never
+    /// re-enters ABM_SETPOS, and it is coalesced when several arrive together.
+    /// </summary>
+    private void ScheduleReapply()
+    {
+        if (!_registered || _source is null || _reapplyPending)
+            return;
+
+        _reapplyPending = true;
+        _source.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            _reapplyPending = false;
+            if (!_registered || _heightPixels < 24)
+                return;
+
+            if (!Place(_handle, _top, _heightPixels, _monitorIndex))
+            {
+                Log.Write("AppBar re-apply after ABN_POSCHANGED failed; the dock guard will retry.");
+                ReapplyFailed?.Invoke();
+            }
+        }));
     }
 
     private bool Register(IntPtr handle)
@@ -167,14 +211,41 @@ public sealed class TaskbarAppBar : IDisposable
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == (int)CallbackMessage && wParam.ToInt32() == NotificationPosChanged)
+        if (msg == (int)CallbackMessage)
         {
-            // Another appbar moved the work area. The dock recalculates and
-            // re-applies its own rectangle on the next guard tick.
-            handled = false;
+            if (wParam.ToInt32() == NotificationPosChanged)
+            {
+                // Another appbar changed the edge, or the shell moved or
+                // resized ours: Microsoft requires a fresh QUERYPOS/SETPOS.
+                ScheduleReapply();
+            }
+
+            return IntPtr.Zero;
+        }
+
+        // The AppBar protocol also expects the window to forward activation and
+        // position changes, so the shell keeps the z-order of auto-hide appbars
+        // on the same edge correct.
+        switch (msg)
+        {
+            case NativeMethods.WM_ACTIVATE:
+                NotifyShell(NativeMethods.ABM_ACTIVATE);
+                break;
+            case NativeMethods.WM_WINDOWPOSCHANGED:
+                NotifyShell(NativeMethods.ABM_WINDOWPOSCHANGED);
+                break;
         }
 
         return IntPtr.Zero;
+    }
+
+    private void NotifyShell(uint message)
+    {
+        if (!_registered)
+            return;
+
+        var data = NewData(_handle);
+        NativeMethods.SHAppBarMessage(message, ref data);
     }
 
     private static NativeMethods.APPBARDATA NewData(IntPtr handle) => new()
@@ -204,6 +275,7 @@ public sealed class TaskbarAppBar : IDisposable
         _source = null;
         _handle = IntPtr.Zero;
         _registered = false;
+        _reapplyPending = false;
         AppliedBounds = System.Drawing.Rectangle.Empty;
     }
 

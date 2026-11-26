@@ -38,6 +38,7 @@ public static class NativeMethods
     public const int TokenIntegrityLevel = 25;
 
     public const uint WM_GETICON = 0x007F;
+    public const int WM_WINDOWPOSCHANGED = 0x0047;
     public const int ICON_BIG = 1;
     public const int GCLP_HICON = -14;
 
@@ -52,6 +53,8 @@ public static class NativeMethods
     public const uint ABM_REMOVE = 0x00000001;
     public const uint ABM_QUERYPOS = 0x00000002;
     public const uint ABM_SETPOS = 0x00000003;
+    public const uint ABM_ACTIVATE = 0x00000006;
+    public const uint ABM_WINDOWPOSCHANGED = 0x00000009;
     public const uint ABM_SETSTATE = 0x0000000A;
     public const int ABS_AUTOHIDE = 0x0000001;
     public const int ABS_ALWAYSONTOP = 0x0000002;

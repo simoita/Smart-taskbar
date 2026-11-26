@@ -127,6 +127,34 @@ volta per migrare la configurazione esistente, poi la lista è l'unica fonte di
 verità. I widget sono indipendenti dall'ordine delle zone e possono stare anche
 in una dock non a tutta larghezza.
 
+## Come fanno le app che sostituiscono la taskbar
+
+Esistono due famiglie di soluzioni.
+
+| Approccio | Esempi | Come funziona | Rischio |
+| --- | --- | --- | --- |
+| Patch di Explorer | StartAllBack, ExplorerPatcher, mod di Windhawk | Iniettano codice o stili XAML in `explorer.exe` e ridisegnano `Shell_TrayWnd` dall'interno | Si rompe a ogni aggiornamento di Windows, richiede injection e può interferire con Start, ricerca e sicurezza |
+| Barra separata + shell nascosta | RetroBar, dock e barre AppBar come Nebula | Un processo proprio crea la barra, nasconde `Shell_TrayWnd` e le `Shell_SecondaryTrayWnd` e riserva il bordo con l'API AppBar | Va gestito il riavvio di Explorer, la visibilità della barra nativa e il ripristino dopo un crash |
+
+Nebula usa la seconda famiglia: nessuna iniezione, nessun file di sistema modificato, nessun privilegio di amministratore. RetroBar, la sostituzione open source più diffusa, fa lo stesso e nelle sue note dichiara che gli aggiornamenti recenti di Windows 11 possono rendere più difficile nascondere la barra nativa: è la conferma che il punto critico non è disegnare la barra, ma **restare proprietari del bordo** mentre la shell cambia sotto.
+
+### Cosa rende affidabile la sostituzione
+
+1. **AppBar completa, non solo una finestra sopra la barra.** `ABM_NEW`, `ABM_QUERYPOS` e `ABM_SETPOS` riservano la striscia; la verifica legge `rcWork` con `GetMonitorInfo`, perché `ABM_SETPOS` può rispondere "ok" senza aver davvero cambiato l'area di lavoro.
+2. **Protocollo di notifica.** Microsoft chiede di rispondere ad `ABN_POSCHANGED` con una nuova coppia `ABM_QUERYPOS`/`ABM_SETPOS` e di inviare `ABM_ACTIVATE` su `WM_ACTIVATE` e `ABM_WINDOWPOSCHANGED` su `WM_WINDOWPOSCHANGED`. Senza queste risposte un'altra AppBar sullo stesso bordo può far perdere la prenotazione.
+3. **Riavvio di Explorer.** `Shell_TrayWnd` viene distrutta e ricreata: la registrazione AppBar muore con la vecchia shell e la barra nativa ricompare. Nebula ascolta il messaggio broadcast `TaskbarCreated` e, indipendentemente da quello, confronta l'HWND a ogni tick del guard: sulla nuova barra rimette `ABS_AUTOHIDE`, la nasconde e lascia che la dock riregistri l'AppBar.
+4. **Auto-hide della barra nativa.** `ABM_SETSTATE` con `ABS_AUTOHIDE` toglie alla barra nativa la striscia riservata, così non compete con quella di Nebula. Lo stato viene riasserito nella scansione completa ogni quattro secondi, perché Explorer può ripristinarlo.
+5. **Hook + timer.** `EVENT_OBJECT_SHOW` nasconde subito la barra nativa quando la shell la mostra (hover sul bordo, riavvio di Explorer); un guard da un secondo e una scansione completa ogni quattro secondi coprono i casi in cui l'evento non arrivi e i monitor secondari.
+6. **Watchdog e stato pendente.** `Nebula.Watchdog.exe` ripristina la barra nativa se il processo muore; `taskbar.pending` dice al watchdog quale sessione possiede la barra. Il preflight impedisce di nasconderla se il watchdog o lo stato non sono disponibili.
+7. **Un solo proprietario.** Un mutex impedisce a due istanze di contendersi AppBar, bordo e watchdog; due barre sullo stesso bordo si sposterebbero a vicenda.
+
+### Cosa non si può garantire
+
+- Durante il riavvio di Explorer la barra nativa può comparire per meno di un tick (circa un secondo) prima di essere richiusa: la finestra la crea la shell, non Nebula.
+- Start, ricerca, centro notifiche e flyout restano di Windows; Nebula li apre tramite scorciatoie o superfici proprie.
+- Se un altro programma registra un'AppBar sullo stesso bordo, Windows può spostare o ridurre la striscia; Nebula segue il rettangolo concesso e riprova.
+- Le patch di Explorer possono convivere male con una barra separata: meglio usare una sola soluzione per volta.
+
 ## Serve l'amministratore?
 
 No: Windows non ha un'impostazione, un criterio di gruppo o una chiave di
@@ -205,7 +233,9 @@ visibile (senza auto-hide).
 ## Riavvio di Explorer
 
 Se Explorer si riavvia mentre Nebula è attiva, la vecchia registrazione AppBar
-muore con la shell. Il selftest ha riprodotto un riavvio reale di Explorer: la
+muore con la shell. Oltre al messaggio `TaskbarCreated`, il guard confronta a
+ogni tick l'HWND di `Shell_TrayWnd`: se cambia, rimette `ABS_AUTOHIDE`, nasconde
+la nuova barra e lascia che la dock riregistri l'AppBar. Il selftest ha riprodotto un riavvio reale di Explorer: la
 work area è passata da 1008 a 1032 e la barra nativa è ricomparsa. Nebula ha
 rilevato che `ABM_SETPOS` non aveva riservato l'area, ha forzato
 `ABM_REMOVE`/`ABM_NEW`, ha richiuso la nuova barra nativa e la work area è
