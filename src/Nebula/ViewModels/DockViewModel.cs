@@ -178,26 +178,48 @@ public sealed class DockViewModel : ObservableObject
         Settings.ReplaceWindowsTaskbar &&
         Settings.TaskbarFullWidth;
 
-    public double IslandSlotWidth => IslandInBar
-        ? 208 * Math.Clamp(Settings.IslandScale, 0.8, 1.3)
-        : 0;
+    public double IslandSlotWidth => IslandInBar ? CapsuleCompactWidth : 0;
 
-    public Thickness IslandSlotMargin => IslandInBar
-        ? new Thickness(6, 0, 6, 0)
-        : new Thickness(0);
+    public Thickness IslandSlotMargin
+    {
+        get
+        {
+            // Same gutter on both sides of the capsule, tied to the bar's corners.
+            double side = Math.Round(Math.Clamp(ShellInset * 0.75, 5, 8));
+            return IslandInBar ? new Thickness(side, 0, side, 0) : new Thickness(0);
+        }
+    }
 
     public Visibility IslandSlotVisibility => IslandInBar
         ? Visibility.Visible
         : Visibility.Collapsed;
 
-    // The slot follows the artwork: choosing smaller icons must also bring them
-    // closer, instead of shrinking the glyph inside the same old gaps. The bar
-    // height still caps the slot so an icon never outgrows the bar.
-    public double ItemSize => Math.Clamp(Settings.IconSize + 10, 28, Math.Max(28, Settings.DockHeight - 6));
-    public double IconSize => Math.Min(Settings.IconSize, Math.Max(18, ItemSize - 4));
-    public Thickness ItemMargin => new(Settings.ItemSpacing / 2, 0, Settings.ItemSpacing / 2, 0);
+    // One metric set for the bar *and* for the dockbar docked inside it. Every
+    // value is rounded: a fractional box, radius or border is what made the
+    // edges look chewed at some sizes.
+    public double ItemSize =>
+        Math.Round(Math.Clamp(Settings.IconSize + 10, 28, Math.Max(28, Settings.DockHeight - 6)));
 
-    public CornerRadius ShellRadius
+    /// <summary>Lane under the icons that hosts the open/minimized indicator.</summary>
+    public double IndicatorLane => 5;
+    public GridLength IndicatorLaneLength => new(IndicatorLane);
+
+    // The glyph always leaves the indicator lane and a 2 px gap inside its own
+    // slot. Before this a 36 px icon in a 44 px bar covered the indicator and
+    // touched the neighbouring icon.
+    public double IconSize =>
+        Math.Round(Math.Min(Settings.IconSize, Math.Max(16, ItemSize - IndicatorLane - 2)));
+
+    public Thickness ItemMargin
+    {
+        get
+        {
+            double half = Math.Round(Settings.ItemSpacing / 2);
+            return new Thickness(half, 0, half, 0);
+        }
+    }
+
+    public double ShellRadiusValue
     {
         get
         {
@@ -210,11 +232,48 @@ public sealed class DockViewModel : ObservableObject
             if (Settings.ReplaceWindowsTaskbar && Settings.TaskbarFullWidth)
                 radius = Math.Min(radius, 18);
 
-            return new CornerRadius(radius);
+            return Math.Round(Math.Clamp(radius, 6, 42));
         }
     }
 
-    public CornerRadius ItemRadius => new(Math.Min(ItemSize / 3.4, 16));
+    public CornerRadius ShellRadius => new(ShellRadiusValue);
+
+    /// <summary>Concentric radius for anything painted just inside the 1 px stroke.</summary>
+    public CornerRadius InnerRadius => new(Math.Max(0, ShellRadiusValue - 1));
+
+    /// <summary>
+    /// Gutter between the shell edge and the first control. It follows the
+    /// corner, so a bar with wide corners never shows icons squeezed into them.
+    /// </summary>
+    public double ShellInset => Math.Round(Math.Clamp(ShellRadiusValue * 0.45, 6, 10));
+    public Thickness ZoneHostMargin => new(ShellInset, 0, ShellInset, 0);
+
+    public double ItemRadiusValue => Math.Round(Math.Min(ItemSize / 3.4, 16));
+    public CornerRadius ItemRadius => new(ItemRadiusValue);
+
+    public double SeparatorHeight => Math.Round(Math.Clamp(ItemSize * 0.55, 16, 28));
+
+    public Thickness SeparatorMargin
+    {
+        get
+        {
+            double side = Math.Round(Math.Clamp(Settings.ItemSpacing + 4, 6, 12));
+            return new Thickness(side, 0, side, 0);
+        }
+    }
+
+    public double ActionButtonSize => Math.Round(Math.Clamp(ItemSize * 0.8, 26, 34));
+    public double StartGlyphSize => Math.Round(Math.Clamp(ItemSize * 0.42, 14, 20));
+
+    // The dockbar docked in the bar is sized by the same metrics: it becomes the
+    // icon row itself instead of a shorter pill with its own proportions.
+    public double CapsuleHeight => Math.Max(26, Math.Round(ItemSize));
+
+    public double CapsuleCompactWidth =>
+        Math.Max(200, Math.Round(208 * Math.Clamp(Settings.IslandScale, 0.8, 1.3)));
+
+    public double CapsuleRadiusValue =>
+        Math.Round(Math.Min(ItemRadiusValue + 2, CapsuleHeight / 2));
 
     public bool ShowPinned => Settings.ShowPinned;
     public bool ShowRunning => Settings.ShowRunning;
@@ -227,13 +286,43 @@ public sealed class DockViewModel : ObservableObject
         StrokeBrush = Theme.DockStrokeBrush;
         GlowBrush = Theme.GlowBrush;
         OnPropertyChanged(nameof(FlatFillBrush));
-        OnPropertyChanged(nameof(ShellRadius));
-        OnPropertyChanged(nameof(ItemRadius));
-        OnPropertyChanged(nameof(ItemSize));
-        OnPropertyChanged(nameof(IconSize));
-        OnPropertyChanged(nameof(ItemMargin));
+        RaiseBarMetrics();
         if (_lastAspect > 0.1)
             Backdrop = BackdropFactory.Get(_lastAspect);
+    }
+
+    /// <summary>
+    /// Pushes every derived metric at once. The bar and the dockbar read the
+    /// same values, so a change of height, icon size or corner cannot leave one
+    /// surface with the geometry of the previous setting.
+    /// </summary>
+    private void RaiseBarMetrics()
+    {
+        OnPropertyChanged(nameof(ShellRadiusValue));
+        OnPropertyChanged(nameof(ShellRadius));
+        OnPropertyChanged(nameof(InnerRadius));
+        OnPropertyChanged(nameof(ShellInset));
+        OnPropertyChanged(nameof(ZoneHostMargin));
+        OnPropertyChanged(nameof(ItemSize));
+        OnPropertyChanged(nameof(IndicatorLane));
+        OnPropertyChanged(nameof(IndicatorLaneLength));
+        OnPropertyChanged(nameof(IconSize));
+        OnPropertyChanged(nameof(ItemMargin));
+        OnPropertyChanged(nameof(ItemRadiusValue));
+        OnPropertyChanged(nameof(ItemRadius));
+        OnPropertyChanged(nameof(SeparatorHeight));
+        OnPropertyChanged(nameof(SeparatorMargin));
+        OnPropertyChanged(nameof(ActionButtonSize));
+        OnPropertyChanged(nameof(StartGlyphSize));
+        OnPropertyChanged(nameof(CapsuleHeight));
+        OnPropertyChanged(nameof(CapsuleCompactWidth));
+        OnPropertyChanged(nameof(CapsuleRadiusValue));
+        OnPropertyChanged(nameof(IslandSlotWidth));
+        OnPropertyChanged(nameof(IslandSlotMargin));
+
+        double icon = IconSize;
+        foreach (DockItemViewModel item in Items)
+            item.SetVisualIconSize(icon);
     }
 
     public void SetDockSize(double width, double height)
@@ -444,6 +533,7 @@ public sealed class DockViewModel : ObservableObject
                 if (item.Icon is null)
                     item.Icon = FindCachedIcon(item);
 
+                item.SetVisualIconSize(IconSize);
                 Items.Add(item);
                 _ = LoadIconAsync(item);
             }
@@ -457,6 +547,7 @@ public sealed class DockViewModel : ObservableObject
             DockItemViewModel item = Items[i];
             AppGroup? group = specs[i].Group;
             item.UpdateGroup(group);
+            item.SetVisualIconSize(IconSize);
             if (item.Icon is null)
                 item.Icon = FindCachedIcon(item);
             if (item.Icon is null)
@@ -642,26 +733,21 @@ public sealed class DockViewModel : ObservableObject
             case nameof(AppSettings.CornerRadius):
             case nameof(AppSettings.IconSize):
             case nameof(AppSettings.ItemSpacing):
-                OnPropertyChanged(nameof(ItemSize));
-                OnPropertyChanged(nameof(IconSize));
-                OnPropertyChanged(nameof(ItemMargin));
-                OnPropertyChanged(nameof(ShellRadius));
-                OnPropertyChanged(nameof(ItemRadius));
+                RaiseBarMetrics();
                 ItemsChanged?.Invoke();
                 break;
             case nameof(AppSettings.TaskbarFullWidth):
             case nameof(AppSettings.ReserveTaskbarSpace):
             case nameof(AppSettings.ReplaceWindowsTaskbar):
-                OnPropertyChanged(nameof(ShellRadius));
+                RaiseBarMetrics();
                 OnPropertyChanged(nameof(IslandInBar));
-                OnPropertyChanged(nameof(IslandSlotWidth));
-                OnPropertyChanged(nameof(IslandSlotMargin));
                 OnPropertyChanged(nameof(IslandSlotVisibility));
                 break;
             case nameof(AppSettings.IslandPlacement):
             case nameof(AppSettings.ShowIsland):
             case nameof(AppSettings.IslandScale):
                 OnPropertyChanged(nameof(IslandInBar));
+                OnPropertyChanged(nameof(CapsuleCompactWidth));
                 OnPropertyChanged(nameof(IslandSlotWidth));
                 OnPropertyChanged(nameof(IslandSlotMargin));
                 OnPropertyChanged(nameof(IslandSlotVisibility));

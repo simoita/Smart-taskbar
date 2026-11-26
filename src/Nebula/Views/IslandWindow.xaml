@@ -14,10 +14,26 @@
             <TranslateTransform x:Name="IslandSlide" Y="-8" />
         </Grid.RenderTransform>
 
+        <!-- The shadow lives on a caster behind the capsule. An effect on the
+             capsule itself rasterises its text and moves the rendered bounds by
+             the blur radius, which also shifted the selftest screenshot. -->
+        <Border x:Name="CapsuleShadow"
+                Width="{Binding ActualWidth, ElementName=Capsule}"
+                Height="{Binding ActualHeight, ElementName=Capsule}"
+                CornerRadius="{Binding CornerRadius, ElementName=Capsule}"
+                HorizontalAlignment="Center"
+                VerticalAlignment="{Binding VerticalAlignment, ElementName=Capsule}"
+                Background="#FF06040E" IsHitTestVisible="False" Visibility="Collapsed">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="26" ShadowDepth="5" Direction="270"
+                                  Opacity="0.38" Color="Black" RenderingBias="Performance" />
+            </Border.Effect>
+        </Border>
+
         <Border x:Name="Capsule" Width="250" Height="42"
                 HorizontalAlignment="Center" VerticalAlignment="Top"
-                CornerRadius="21" ClipToBounds="True"
-                Background="{DynamicResource C.TooltipBg}"
+                CornerRadius="21"
+                Background="{DynamicResource C.DockShell}"
                 BorderBrush="{DynamicResource C.DockStroke}" BorderThickness="1"
                 AllowDrop="True" DragOver="OnIslandDragOver" Drop="OnIslandDrop"
                 DragLeave="OnIslandDragLeave"
@@ -25,6 +41,11 @@
                 MouseLeftButtonUp="OnCapsuleClick">
 
             <Grid>
+                <!-- Same glass, tint and bevel as the bar: the dockbar is a piece
+                     of the bar, not an opaque tooltip with its own colours. -->
+                <Border x:Name="IslandTint" CornerRadius="21" IsHitTestVisible="False"
+                        Background="{DynamicResource C.DockGlass}" />
+
                 <Border x:Name="IslandGlow" CornerRadius="21" IsHitTestVisible="False" Opacity="0.34">
                     <Border.Background>
                         <RadialGradientBrush Center="0.16,0" GradientOrigin="0.16,0"
@@ -45,10 +66,17 @@
                     </Border.Background>
                 </Border>
 
-                <Border Height="1" VerticalAlignment="Top" Margin="18,0"
-                        Background="#40FFFFFF" IsHitTestVisible="False" />
+                <Border x:Name="IslandGrain" CornerRadius="21" IsHitTestVisible="False"
+                        Background="{StaticResource GrainBrush}"
+                        Visibility="{Binding Settings.ShowGrain, Converter={StaticResource BoolVis}}" />
 
-                <Grid Margin="14,0">
+                <Border x:Name="IslandHighlight" CornerRadius="20" IsHitTestVisible="False"
+                        BorderThickness="0,1,0,0" BorderBrush="{DynamicResource C.DockHighlight}" />
+
+                <Border x:Name="IslandShade" CornerRadius="20" IsHitTestVisible="False"
+                        BorderThickness="0,0,0,1" BorderBrush="{DynamicResource C.DockShade}" />
+
+                <Grid Margin="12,0">
                     <!-- COMPACT -->
                     <Grid x:Name="CompactView" VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
@@ -99,7 +127,7 @@
                                        Foreground="{DynamicResource C.TextMuted}"
                                        VerticalAlignment="Center" />
                             <Border Width="1" Height="10" Margin="6,0"
-                                    Background="{DynamicResource C.StrokeSoft}"
+                                    Background="{DynamicResource C.Separator}"
                                     VerticalAlignment="Center" />
                             <TextBlock Text="{Binding Monitor.BatteryText}" FontSize="9"
                                        Foreground="{DynamicResource C.TextMuted}"

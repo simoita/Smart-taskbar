@@ -43,6 +43,14 @@
     <SolidColorBrush x:Key="C.Shadow" Color="#78000000" />
     <SolidColorBrush x:Key="C.WallpaperTint" Color="#20000000" />
 
+    <!-- Dock surface: the bar and the dockbar that lives inside it share this
+         base and its bevel. ThemeEngine replaces them live, so a light preset
+         gets a light bar instead of dark text on a hard-coded near-black one. -->
+    <SolidColorBrush x:Key="C.DockShell" Color="#E80A0617" />
+    <SolidColorBrush x:Key="C.DockHighlight" Color="#1EFFFFFF" />
+    <SolidColorBrush x:Key="C.DockShade" Color="#60000000" />
+    <SolidColorBrush x:Key="C.Separator" Color="#22FFFFFF" />
+
     <!-- Surface-specific resources; ThemeEngine replaces these live for the three presets. -->
     <SolidColorBrush x:Key="S.CardBg" Color="#1A1626" />
     <SolidColorBrush x:Key="S.CardBorder" Color="#348B5CF6" />

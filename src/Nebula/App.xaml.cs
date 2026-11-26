@@ -728,6 +728,7 @@ public partial class App : Application
             or nameof(AppSettings.CornerRadius)
             or nameof(AppSettings.IconSize)
             or nameof(AppSettings.ItemSpacing)
+            or nameof(AppSettings.DockFinish)
             or nameof(AppSettings.EdgeMargin)
             or nameof(AppSettings.DockOnTop)
             or nameof(AppSettings.AutoHideDock)

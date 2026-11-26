@@ -13,10 +13,33 @@ public sealed class DockItemViewModel : ObservableObject
     private ImageSource? _icon;
     private AppGroup? _group;
     private readonly AppSettings _settings;
+    private double _visualIconSize;
 
     private DockItemViewModel(AppSettings settings)
     {
         _settings = settings;
+    }
+
+    /// <summary>
+    /// Icon box the bar finally gives this item. The bar caps the glyph when the
+    /// chosen size cannot fit together with the indicator lane, and the item has
+    /// to know it: with the raw setting the picture and its clip were larger
+    /// than the box, so it covered the indicator and the next icon.
+    /// </summary>
+    public double VisualIconSize => _visualIconSize > 1 ? _visualIconSize : _settings.IconSize;
+
+    public void SetVisualIconSize(double size)
+    {
+        double clamped = Math.Max(16, Math.Round(size));
+        if (_visualIconSize > 1 && Math.Abs(clamped - _visualIconSize) < 0.01)
+            return;
+
+        _visualIconSize = clamped;
+        OnPropertyChanged(nameof(VisualIconSize));
+        OnPropertyChanged(nameof(IconDisplaySize));
+        OnPropertyChanged(nameof(IconClip));
+        OnPropertyChanged(nameof(IconPlateCornerRadius));
+        OnPropertyChanged(nameof(IconCornerRadius));
     }
 
     public string Key { get; init; } = "";
@@ -97,12 +120,24 @@ public sealed class DockItemViewModel : ObservableObject
     public CornerRadius IconPlateCornerRadius => IconStyle switch
     {
         "circle" => new CornerRadius(999),
-        "tile" => new CornerRadius(Math.Max(6, _settings.IconSize * 0.24)),
-        "neon" => new CornerRadius(Math.Max(6, _settings.IconSize * 0.2)),
+        "tile" => new CornerRadius(Math.Max(6, VisualIconSize * 0.24)),
+        "neon" => new CornerRadius(Math.Max(6, VisualIconSize * 0.2)),
         _ => new CornerRadius(0)
     };
 
-    public double IconDisplaySize => Math.Max(8, _settings.IconSize - (IconStyle == "native" ? 0 : 2));
+    /// <summary>
+    /// Picture inside the icon box. A plated style pads the glyph by 3 px per
+    /// side; before this the picture was only 2 px smaller than the plate, so it
+    /// spilled over the plate edge instead of sitting inside it.
+    /// </summary>
+    public double IconDisplaySize
+    {
+        get
+        {
+            double inset = IconStyle == "native" ? 0 : 6;
+            return Math.Max(8, Math.Round(VisualIconSize - inset));
+        }
+    }
 
     public Geometry? IconClip
     {
@@ -124,8 +159,8 @@ public sealed class DockItemViewModel : ObservableObject
     {
         "circle" => new CornerRadius(999),
         "square" => new CornerRadius(2),
-        "squircle" => new CornerRadius(Math.Max(4, _settings.IconSize * 0.28)),
-        _ => new CornerRadius(Math.Max(4, _settings.IconSize * 0.16))
+        "squircle" => new CornerRadius(Math.Max(4, VisualIconSize * 0.28)),
+        _ => new CornerRadius(Math.Max(4, VisualIconSize * 0.16))
     };
 
     public string Initial => Name.Length > 0 ? Name[..1].ToUpperInvariant() : "?";

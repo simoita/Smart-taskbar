@@ -589,11 +589,13 @@ public partial class DockWindow : Window
                 divider = new Border
                 {
                     Width = 1,
-                    Height = 24,
+                    // The divider follows the icons: a fixed 24 px line was
+                    // taller than the bar itself on a short dock.
+                    Height = _vm.SeparatorHeight,
                     Margin = new Thickness(settings.DockZoneSpacing / 2, 0, settings.DockZoneSpacing / 2, 0),
                     VerticalAlignment = VerticalAlignment.Center
                 };
-                divider.SetResourceReference(BackgroundProperty, "C.StrokeSoft");
+                divider.SetResourceReference(BackgroundProperty, "C.Separator");
             }
 
             double scale = key switch
@@ -794,23 +796,26 @@ public partial class DockWindow : Window
     /// </summary>
     private Border CreateZonePill(FrameworkElement content)
     {
-        Models.AppSettings settings = _vm.Settings;
         var pill = new Border
         {
             VerticalAlignment = VerticalAlignment.Center,
-            CornerRadius = new CornerRadius(Math.Clamp(settings.CornerRadius + 6, 12, 26)),
-            Padding = new Thickness(10, 2, 10, 2),
+            // Same corner and same gutter as the bar: the separate capsules are
+            // the bar cut into blocks, not a second visual language.
+            CornerRadius = _vm.ShellRadius,
+            Padding = new Thickness(_vm.ShellInset, 2, _vm.ShellInset, 2),
             BorderThickness = new Thickness(_vm.DockFinish == "flat" ? 0 : 1),
             Child = content
         };
 
         // The simple finishes stay monochrome even with separate zone capsules.
         if (_vm.DockFinish == "glass")
-            pill.SetResourceReference(BackgroundProperty, "DockShellBackground");
+            pill.SetResourceReference(BackgroundProperty, "C.DockShell");
         else
             pill.Background = _vm.FlatFillBrush;
 
-        pill.SetResourceReference(BorderBrushProperty, "C.StrokeSoft");
+        // A soft stroke disappeared on light presets; DockStroke is the same
+        // theme-aware hairline the shell itself uses.
+        pill.SetResourceReference(BorderBrushProperty, "C.DockStroke");
         return pill;
     }
 
@@ -826,11 +831,10 @@ public partial class DockWindow : Window
         // The flat finish is a single full colour: no border, no glass shell.
         bool borderless = separate || _vm.DockFinish == "flat";
         Shell.BorderThickness = borderless ? new Thickness(0) : new Thickness(1);
-        Shell.Background = _vm.DockFinish != "glass"
-            ? Brushes.Transparent
-            : separate
-                ? Brushes.Transparent
-                : (Brush)FindResource("DockShellBackground");
+        if (_vm.DockFinish == "glass" && !separate)
+            Shell.SetResourceReference(BackgroundProperty, "C.DockShell");
+        else
+            Shell.Background = Brushes.Transparent;
     }
 
     private double VisibleTop()

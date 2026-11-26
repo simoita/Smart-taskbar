@@ -80,15 +80,23 @@ public sealed class ThemeEngine
 
     private Brush BuildStroke()
     {
-        Color baseColor = ColorUtil.Parse(Preset.Stroke);
+        // Light presets declare a white stroke, which vanished on their light
+        // glass. A dark accent-tinted hairline is what makes the border of the
+        // bar and of the cards readable there.
+        Color baseColor = Preset.IsLight
+            ? ColorUtil.Mix(ColorUtil.Parse("#0F172A"), AccentA, 0.35)
+            : ColorUtil.Parse(Preset.Stroke);
         var brush = new LinearGradientBrush
         {
             StartPoint = new Point(0, 0),
             EndPoint = new Point(1, 1)
         };
-        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(baseColor, (byte)150), 0));
-        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(AccentA, (byte)60), 0.55));
-        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(baseColor, (byte)36), 1));
+        // The old 36 alpha end faded to nothing over a bright wallpaper: a
+        // border that disappears is not a border. The outline stays readable
+        // along the whole edge and keeps its lit top-left corner.
+        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(baseColor, (byte)190), 0));
+        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(AccentA, (byte)110), 0.55));
+        brush.GradientStops.Add(new GradientStop(ColorUtil.WithAlpha(baseColor, (byte)70), 1));
         brush.Freeze();
         return brush;
     }
@@ -234,6 +242,26 @@ public sealed class ThemeEngine
         r["C.TooltipBg"] = Solid(tooltipBg);
         r["C.DockGlass"] = TintBrush;
         r["C.DockStroke"] = DockStrokeBrush;
+
+        // One shell for the bar and for the dockbar docked inside it. The bevel
+        // is light on top and dark at the bottom so the surface reads as a solid
+        // object on any wallpaper, in both dark and light presets.
+        Color dockShell = p.IsLight
+            ? ColorUtil.Mix(glassBottom, Colors.White, 0.55)
+            : glassBottom;
+        r["C.DockShell"] = Solid(ColorUtil.WithAlpha(dockShell, (byte)(p.IsLight ? 238 : 232)));
+        r["C.DockHighlight"] = Solid(p.IsLight
+            ? Color.FromArgb(120, 255, 255, 255)
+            : Color.FromArgb(30, 255, 255, 255));
+        r["C.DockShade"] = Solid(p.IsLight
+            ? Color.FromArgb(34, 15, 23, 42)
+            : Color.FromArgb(96, 0, 0, 0));
+        // The soft StrokeSoft line is white-ish on light presets, so the 1 px
+        // separators between Start and the icons vanished there. This one is a
+        // real line in both directions.
+        r["C.Separator"] = Solid(p.IsLight
+            ? Color.FromArgb(46, 15, 23, 42)
+            : Color.FromArgb(34, 255, 255, 255));
         r["C.DockGlow"] = GlowBrush;
         r["C.ItemHover"] = ItemHoverBrush;
         r["C.Shadow"] = Solid(Color.FromArgb(120, 0, 0, 0));

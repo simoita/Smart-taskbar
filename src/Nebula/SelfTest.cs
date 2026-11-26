@@ -238,6 +238,56 @@ public partial class App
 
             Capture(dock.Shell, Path.Combine(outputDir, "taskbar.png"));
 
+            // 6b. Light presets: the shell used to be hard-coded near-black, so
+            // a preset like Porcelain showed dark text on a dark bar and its
+            // white stroke disappeared. The shell, the stroke and the bevel now
+            // come from the theme; this check keeps them readable.
+            string previousTheme = settings.ThemeId;
+            settings.ThemeId = "porcelain";
+            dockVm.Theme.Reload();
+            dock.ApplySettings();
+            await Task.Delay(350);
+            dock.UpdateLayout();
+            Color lightShell = dock.Shell.Background is SolidColorBrush shellBrush
+                ? shellBrush.Color
+                : default;
+            double shellLuminance =
+                (0.2126 * lightShell.R + 0.7152 * lightShell.G + 0.0722 * lightShell.B) / 255.0;
+            bool lightReadable = dockVm.Theme.IsLight && shellLuminance > 0.55 &&
+                                 (0.2126 * dockVm.Theme.TextColor.R +
+                                  0.7152 * dockVm.Theme.TextColor.G +
+                                  0.0722 * dockVm.Theme.TextColor.B) / 255.0 < 0.45;
+            Add(checks, "dock.light_theme_shell", lightReadable,
+                $"theme={settings.ThemeId}; shell={lightShell}; luminance={shellLuminance:0.00}; " +
+                $"text={dockVm.Theme.TextColor}");
+            Capture(dock.Shell, Path.Combine(outputDir, "taskbar-light.png"));
+            settings.ThemeId = previousTheme;
+            dockVm.Theme.Reload();
+            dock.ApplySettings();
+            await Task.Delay(300);
+
+            // 6c. Short bar with the largest icons: the glyph must stay inside
+            // its slot, above the indicator lane. Before the shared metrics a
+            // 36 px icon overflowed a 44 px bar and touched its neighbours.
+            double previousHeight = settings.DockHeight;
+            double previousIcon = settings.IconSize;
+            settings.DockHeight = 44;
+            settings.IconSize = 36;
+            dock.ApplySettings();
+            await Task.Delay(300);
+            dock.UpdateLayout();
+            bool iconsFit = dockVm.IconSize <= dockVm.ItemSize - dockVm.IndicatorLane - 2 + 0.01 &&
+                            dockVm.Items.All(item => item.IconDisplaySize <=
+                                dockVm.IconSize - (item.IconStyle == "native" ? 0 : 6) + 0.01);
+            Add(checks, "dock.icon_fit", iconsFit,
+                $"height={settings.DockHeight}; item={dockVm.ItemSize}; icon={dockVm.IconSize}; " +
+                $"lane={dockVm.IndicatorLane}; items={dockVm.Items.Count}; " +
+                $"max={dockVm.Items.Select(item => item.IconDisplaySize).DefaultIfEmpty(0).Max()}");
+            settings.DockHeight = previousHeight;
+            settings.IconSize = previousIcon;
+            dock.ApplySettings();
+            await Task.Delay(300);
+
             // 7. Widget mutation, persistence and visual refresh.
             settings.TaskbarWidgets = new List<string> { "battery", "separator", "clock", "cpu", "network" };
             store.SaveNow();
@@ -390,6 +440,15 @@ public partial class App
             bool islandInFront = islandZ >= 0 && dockZ >= 0 && islandZ < dockZ;
             Add(checks, "island.bottom_in_bar", capsuleInBar && islandInFront && island.IsVisible,
                 $"capsule={compactPx}; bar={barRect}; screen={screenPx}; z(island)={islandZ}; z(dock)={dockZ}; visible={island.IsVisible}");
+            bool barMetricsShared = Math.Abs(island.CapsuleWidth - dockVm.CapsuleCompactWidth) < 1.0 &&
+                                    Math.Abs(island.CapsuleHeight - dockVm.CapsuleHeight) < 1.0 &&
+                                    Math.Abs(island.CapsuleCornerRadius - dockVm.CapsuleRadiusValue) < 0.51 &&
+                                    Math.Abs(island.CapsuleBorderWidth - 1.0) < 0.01;
+            Add(checks, "island.bar_metrics", barMetricsShared,
+                $"capsule={island.CapsuleWidth:0.#}x{island.CapsuleHeight:0.#}; " +
+                $"bar={dockVm.CapsuleCompactWidth:0.#}x{dockVm.CapsuleHeight:0.#}; " +
+                $"radius={island.CapsuleCornerRadius:0.#}/{dockVm.CapsuleRadiusValue:0.#}; " +
+                $"border={island.CapsuleBorderWidth:0.#}");
             Capture(island.Capsule, Path.Combine(outputDir, "island-bottom-compact.png"));
 
             island.ExpandForTest();

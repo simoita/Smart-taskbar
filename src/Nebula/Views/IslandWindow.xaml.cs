@@ -100,6 +100,7 @@ public partial class IslandWindow : Window
     public double CapsuleWidth => Capsule.ActualWidth;
     public double CapsuleHeight => Capsule.ActualHeight;
     public double CapsuleCornerRadius => Capsule.CornerRadius.TopLeft;
+    public double CapsuleBorderWidth => Capsule.BorderThickness.Left;
     public Brush? CapsuleBackground => Capsule.Background;
 
     public Rect CapsuleScreenRect
@@ -233,12 +234,16 @@ public partial class IslandWindow : Window
 
         double scale = Math.Clamp(settings.IslandScale, 0.8, 1.3);
         bool inBar = InTaskbar;
-        _compactWidth = (inBar ? 208 : 250) * scale;
-        _compactHeight = inBar
-            ? Math.Clamp(settings.DockHeight - 18, 26, 44)
-            : 42 * scale;
+        // Inside the bar the capsule uses the bar's own slot width and a height
+        // equal to the icon row: a shorter pill with a different radius read as
+        // a control from another app. Floating keeps its own footprint.
+        _compactWidth = inBar ? _dock.CapsuleCompactWidth : 250 * scale;
+        _compactHeight = inBar ? _dock.CapsuleHeight : 42 * scale;
 
-        _expandedWidth = 440 * scale;
+        // The expanded content does not scale with the font: its labels are
+        // fixed DIPs. Scaling the panel down clipped the action row, scaling it
+        // up left a void under the controls, so the panel keeps a floor.
+        _expandedWidth = Math.Max(440 * scale, 420);
         _expandedHeight = ComputeExpandedHeight();
         AppliedStyleKey = style;
 
@@ -247,30 +252,24 @@ public partial class IslandWindow : Window
         Capsule.Width = _expanded ? _expandedWidth : _compactWidth;
         Capsule.Height = _expanded ? _expandedHeight : _compactHeight;
 
-        double radius = style switch
-        {
-            "pill" => _expanded ? 30 * scale : _compactHeight / 2,
-            "minimal" => (_expanded ? 14 : 10) * scale,
-            _ => (_expanded ? 24 : 20) * scale
-        };
-        if (inBar)
-            radius = _expanded ? 24 * scale : _compactHeight / 2;
+        // One whole pixel, shared with the bar. The old 1.2 px stroke was
+        // anti-aliased into a soft grey edge next to the bar's crisp one.
+        Capsule.BorderBrush = FindBrush("C.DockStroke", Brushes.White);
+        Capsule.BorderThickness = new Thickness(1);
 
-        Capsule.CornerRadius = new CornerRadius(radius);
-        IslandGlow.CornerRadius = new CornerRadius(radius);
-        IslandGlow2.CornerRadius = new CornerRadius(radius);
-
-        Capsule.Background = style == "minimal"
-            ? FindBrush("C.Bg", Brushes.Black)
-            : FindBrush("C.TooltipBg", Brushes.Black);
-        Capsule.BorderBrush = style == "minimal"
-            ? FindBrush("C.StrokeSoft", Brushes.Gray)
-            : FindBrush("C.DockStroke", Brushes.White);
-        Capsule.BorderThickness = new Thickness(style == "minimal" ? 1 : 1.2);
-
-        bool glow = style != "minimal" && settings.ShowGlow;
+        // Inside the bar the accent glow is already painted by the bar itself:
+        // repeating it on the capsule turned the rounded rect into a purple
+        // patch that had nothing to do with the surface behind it.
+        bool glow = style != "minimal" && settings.ShowGlow && !inBar;
         IslandGlow.Visibility = glow ? Visibility.Visible : Visibility.Collapsed;
         IslandGlow2.Visibility = glow ? Visibility.Visible : Visibility.Collapsed;
+
+        // The floating capsule is the only dock surface hovering over windows,
+        // so it is the only one that casts a shadow; inside the bar it sits
+        // flush with the icons and a shadow would just smear the row.
+        CapsuleShadow.Visibility = inBar ? Visibility.Collapsed : Visibility.Visible;
+
+        ApplyCapsuleShape();
         UpdatePinChrome();
 
         CompactView.Opacity = _expanded ? 0 : 1;
@@ -282,6 +281,46 @@ public partial class IslandWindow : Window
         RefreshShelfSummary();
     }
 
+    /// <summary>
+    /// Corner of the capsule for the current state. Inside the bar it nests in
+    /// the shell (the bar's own radius, one pixel less on the inner layers);
+    /// floating it keeps the shape the chosen style asks for.
+    /// </summary>
+    private double CapsuleCornerFor(bool expanded)
+    {
+        if (InTaskbar)
+            return expanded ? _dock.ShellRadiusValue : _dock.CapsuleRadiusValue;
+
+        double scale = Math.Clamp(_dock.Settings.IslandScale, 0.8, 1.3);
+        double height = expanded ? _expandedHeight : _compactHeight;
+        double radius = AppliedStyleKey switch
+        {
+            "pill" => expanded ? 30 * scale : _compactHeight / 2,
+            "minimal" => (expanded ? 14 : 10) * scale,
+            _ => (expanded ? 24 : 20) * scale
+        };
+
+        return Math.Min(radius, height / 2);
+    }
+
+    /// <summary>
+    /// Applies one radius to the shell and the concentric radius (one pixel
+    /// smaller) to every layer painted just inside its 1 px stroke.
+    /// </summary>
+    private void ApplyCapsuleShape()
+    {
+        double radius = CapsuleCornerFor(_expanded);
+        double inner = Math.Max(0, radius - 1);
+
+        Capsule.CornerRadius = new CornerRadius(radius);
+        IslandGlow.CornerRadius = new CornerRadius(radius);
+        IslandGlow2.CornerRadius = new CornerRadius(radius);
+        IslandTint.CornerRadius = new CornerRadius(inner);
+        IslandGrain.CornerRadius = new CornerRadius(inner);
+        IslandHighlight.CornerRadius = new CornerRadius(inner);
+        IslandShade.CornerRadius = new CornerRadius(inner);
+    }
+
     /// <summary>Only sections with something to show take space in the island.</summary>
     private bool ActivitiesVisible =>
         _dock.Settings.IslandShowActivities && _activities.Activities.Count > 0;
@@ -291,7 +330,6 @@ public partial class IslandWindow : Window
 
     private double ComputeExpandedHeight()
     {
-        double scale = Math.Clamp(_dock.Settings.IslandScale, 0.8, 1.3);
         double content = 150;
 
         // Sections grow with what they actually contain: one download does not
@@ -308,9 +346,10 @@ public partial class IslandWindow : Window
         if (_dock.Settings.IslandShowControls)
             content += 42;
 
-        // The minimum only guards the controls row: an island with nothing to
-        // report stays short instead of showing empty space.
-        return Math.Max(210, content) * scale;
+        // The content is measured in DIPs and does not scale, so scaling the
+        // height left empty bands at 1.3 and clipped rows at 0.8. The minimum
+        // guards the header and the controls row instead.
+        return Math.Max(200, content);
     }
 
     /// <summary>
@@ -353,15 +392,6 @@ public partial class IslandWindow : Window
 
         double width = expand ? _expandedWidth : _compactWidth;
         double height = expand ? _expandedHeight : _compactHeight;
-        double scale = Math.Clamp(_dock.Settings.IslandScale, 0.8, 1.3);
-        double radius = AppliedStyleKey switch
-        {
-            "pill" => expand ? 30 * scale : _compactHeight / 2,
-            "minimal" => (expand ? 14 : 10) * scale,
-            _ => (expand ? 24 : 20) * scale
-        };
-        if (InTaskbar)
-            radius = expand ? 24 * scale : _compactHeight / 2;
 
         if (expand)
         {
@@ -420,9 +450,7 @@ public partial class IslandWindow : Window
             ExpandedView.BeginAnimation(OpacityProperty, expandedFade);
         }
 
-        Capsule.CornerRadius = new CornerRadius(radius);
-        IslandGlow.CornerRadius = new CornerRadius(radius);
-        IslandGlow2.CornerRadius = new CornerRadius(radius);
+        ApplyCapsuleShape();
         UpdatePinChrome();
     }
 
@@ -444,11 +472,8 @@ public partial class IslandWindow : Window
             return;
         }
 
-        bool minimal = AppliedStyleKey == "minimal";
-        Capsule.BorderBrush = minimal
-            ? FindBrush("C.StrokeSoft", Brushes.Gray)
-            : FindBrush("C.DockStroke", Brushes.White);
-        Capsule.BorderThickness = new Thickness(minimal ? 1 : 1.2);
+        Capsule.BorderBrush = FindBrush("C.DockStroke", Brushes.White);
+        Capsule.BorderThickness = new Thickness(1);
         IslandGlow.Opacity = 0.34;
         IslandGlow2.Opacity = 0.22;
     }
@@ -1039,7 +1064,12 @@ public partial class IslandWindow : Window
             or nameof(AppSettings.IslandShowShelf)
             or nameof(AppSettings.IslandShowControls)
             or nameof(AppSettings.ReplaceWindowsTaskbar)
-            or nameof(AppSettings.TaskbarFullWidth))
+            or nameof(AppSettings.TaskbarFullWidth)
+            or nameof(AppSettings.DockHeight)
+            or nameof(AppSettings.IconSize)
+            or nameof(AppSettings.CornerRadius)
+            or nameof(AppSettings.ShowGlow)
+            or nameof(AppSettings.ShowGrain))
         {
             ApplyAppearance();
             if (IsLoaded)
@@ -1047,10 +1077,7 @@ public partial class IslandWindow : Window
         }
         else if (e.PropertyName is nameof(AppSettings.MonitorIndex)
                  or nameof(AppSettings.DockOnTop)
-                 or nameof(AppSettings.DockHeight)
-                 or nameof(AppSettings.TaskbarFullWidth)
-                 or nameof(AppSettings.EdgeMargin)
-                 or nameof(AppSettings.ReplaceWindowsTaskbar))
+                 or nameof(AppSettings.EdgeMargin))
         {
             if (IsLoaded)
                 PositionIsland();

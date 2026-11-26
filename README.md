@@ -4,6 +4,8 @@ Dock e pannello di personalizzazione per Windows, scritto in WPF su .NET 8. Nebu
 
 L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminando Nebula forzatamente, le finestre raggruppate e la taskbar di Windows devono tornare disponibili senza rilanciare nulla.
 
+**Novità 1.7.9:** barra e **Dockbar** sono ora la stessa superficie — stesso vetro, stesso bordo da 1 px, stesso smusso e stesso raggio — e condividono misure intere, quindi **bordi, separatori e spazi restano identici** cambiando altezza, dimensione delle icone, spaziatura, scala dell'isola o tema: le icone non coprono più l'indicatore né il riquadro accanto, la capsula dentro la barra è alta come la riga delle icone invece di essere una pillola più corta con un alone suo, l'isola espansa non lascia più vuoti né righe tagliate e i **temi chiari** hanno una barra chiara con testo scuro e un bordo visibile.
+
 **Novità 1.2:** pannello **Icone di sistema** con stili applicabili a collegamenti `.lnk`, tipi file e cartelle utente del profilo, icone personali dal dialog di Windows, ICO multi-size 16–256 px, backup esatto e recovery dopo chiusura forzata. Dettagli in [docs/icone-sistema.md](docs/icone-sistema.md).
 
 **Novità 1.7.8:** le **icone più piccole occupano meno spazio**: il riquadro di ogni icona segue la dimensione scelta, quindi passando da 36 a 30 o 24 px le icone si **avvicinano davvero** invece di restare nei vecchi spazi; anche Start si stringe con loro e la barra mantiene l'altezza scelta.

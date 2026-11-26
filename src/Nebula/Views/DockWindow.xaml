@@ -7,17 +7,13 @@
         ResizeMode="NoResize" UseLayoutRounding="True" SnapsToDevicePixels="True"
         FontFamily="Segoe UI Variable Text, Segoe UI">
 
-    <Window.Resources>
-        <SolidColorBrush x:Key="DockShellBackground" Color="#E60B0716" />
-    </Window.Resources>
-
     <Grid x:Name="Root" Margin="26,22,26,26" Opacity="0">
         <Grid.RenderTransform>
             <TranslateTransform x:Name="DockSlide" Y="24" />
         </Grid.RenderTransform>
 
         <Border x:Name="Shell" CornerRadius="{Binding ShellRadius}"
-                Background="{StaticResource DockShellBackground}"
+                Background="{DynamicResource C.DockShell}"
                 BorderBrush="{Binding StrokeBrush}" BorderThickness="1"
                 MinHeight="{Binding Settings.DockHeight}"
                 MouseMove="OnShellMouseMove" MouseLeave="OnShellMouseLeave"
@@ -59,15 +55,22 @@
                         IsHitTestVisible="False"
                         Visibility="{Binding ChromeGrainVisibility}" />
 
-                <Border Height="1" VerticalAlignment="Top" Margin="20,0,20,0"
-                        Background="#26FFFFFF" IsHitTestVisible="False" />
+                <!-- Bevel: a light line just inside the top stroke and a dark one
+                     just above the bottom stroke. Both are rounded, so no line
+                     stops in mid-air over a corner, and both are theme-aware: on
+                     a light preset a white line used to disappear. -->
+                <Border CornerRadius="{Binding InnerRadius}" IsHitTestVisible="False"
+                        BorderThickness="0,1,0,0" BorderBrush="{DynamicResource C.DockHighlight}" />
 
-                <Border Height="1" VerticalAlignment="Bottom" Margin="26,0,26,0"
-                        Background="{DynamicResource C.AccentGrad}" Opacity="0.28"
-                        IsHitTestVisible="False"
+                <Border CornerRadius="{Binding InnerRadius}" IsHitTestVisible="False"
+                        BorderThickness="0,0,0,1" BorderBrush="{DynamicResource C.DockShade}" />
+
+                <Border CornerRadius="{Binding InnerRadius}" Margin="1" IsHitTestVisible="False"
+                        BorderThickness="0,0,0,1" BorderBrush="{DynamicResource C.AccentGrad}" Opacity="0.28"
                         Visibility="{Binding ChromeShimmerVisibility}" />
 
                 <Border x:Name="LiquidSheen" Width="280" HorizontalAlignment="Left"
+                        CornerRadius="{Binding ShellRadius}"
                         IsHitTestVisible="False" Opacity="0.16"
                         Visibility="{Binding ChromeSheenVisibility}">
                     <Border.Background>
@@ -89,24 +92,21 @@
                         Visibility="{Binding FlatFillVisibility}" />
                 </Grid>
 
-                <Grid x:Name="ZoneHost" VerticalAlignment="Center" Margin="6,0">
+                <Grid x:Name="ZoneHost" VerticalAlignment="Center" Margin="{Binding ZoneHostMargin}">
                     <StackPanel x:Name="AppsZone" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="StartButton" Width="{Binding ItemSize}" Height="{Binding ItemSize}"
                             Style="{StaticResource DockOrbButton}" Click="OnStartClick"
                             ToolTip="Start di Nebula  ·  tasto Windows">
-                        <UniformGrid Rows="2" Columns="2" Width="16" Height="16">
-                            <Border Width="6.4" Height="6.4" CornerRadius="2"
-                                    Background="{DynamicResource C.AccentGrad}"
-                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Width="6.4" Height="6.4" CornerRadius="2"
-                                    Background="{DynamicResource C.AccentGrad}"
-                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Width="6.4" Height="6.4" CornerRadius="2"
-                                    Background="{DynamicResource C.AccentGrad}"
-                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <Border Width="6.4" Height="6.4" CornerRadius="2"
-                                    Background="{DynamicResource C.AccentGrad}"
-                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <UniformGrid Rows="2" Columns="2"
+                                     Width="{Binding StartGlyphSize}" Height="{Binding StartGlyphSize}">
+                            <Border Margin="1" CornerRadius="2"
+                                    Background="{DynamicResource C.AccentGrad}" />
+                            <Border Margin="1" CornerRadius="2"
+                                    Background="{DynamicResource C.AccentGrad}" />
+                            <Border Margin="1" CornerRadius="2"
+                                    Background="{DynamicResource C.AccentGrad}" />
+                            <Border Margin="1" CornerRadius="2"
+                                    Background="{DynamicResource C.AccentGrad}" />
                         </UniformGrid>
                     </Button>
 
@@ -119,8 +119,9 @@
                             Visibility="Collapsed"
                             Background="Transparent" />
 
-                    <Border Width="1" Height="24" Margin="8,0,6,0" VerticalAlignment="Center"
-                            Background="{DynamicResource C.StrokeSoft}" />
+                    <Border Width="1" Height="{Binding SeparatorHeight}"
+                            Margin="{Binding SeparatorMargin}" VerticalAlignment="Center"
+                            Background="{DynamicResource C.Separator}" />
 
                     <ItemsControl x:Name="DockItems" ItemsSource="{Binding Items}" VerticalAlignment="Center">
                         <ItemsControl.ItemsPanel>
@@ -142,20 +143,25 @@
                                         DragOver="OnItemDragOver" DragLeave="OnItemDragLeave"
                                         Drop="OnItemDrop">
                                     <Grid>
+                                        <!-- The indicator lane exists for every icon, running or
+                                             not: an Auto row was removed only when an app was open
+                                             and shifted that icon 1.5 px off the others. -->
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="*" />
-                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="{Binding DataContext.IndicatorLaneLength, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
                                         </Grid.RowDefinitions>
-                                        <Border x:Name="ActiveGlow" Grid.RowSpan="2" CornerRadius="11"
+                                        <Border x:Name="ActiveGlow" Grid.RowSpan="2"
+                                                CornerRadius="{Binding DataContext.ItemRadius, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 Background="{DynamicResource C.AccentFaint}" Opacity="0" />
-                                        <Border Margin="1"
+                                        <Border Grid.Row="0" Margin="1"
                                                 CornerRadius="{Binding IconPlateCornerRadius}"
                                                 Background="{DynamicResource C.AccentSoft}"
                                                 Opacity="{Binding IconPlateOpacity}"
                                                 Visibility="{Binding IconPlateVisibility}" />
-                                        <Border x:Name="IconShell"
+                                        <Border x:Name="IconShell" Grid.Row="0"
                                                 Width="{Binding DataContext.IconSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                 Height="{Binding DataContext.IconSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                                 CornerRadius="{Binding IconCornerRadius}"
                                                 Background="Transparent" Padding="0"
                                                 Visibility="{Binding HasIcon, Converter={StaticResource BoolVis}}">
@@ -167,7 +173,7 @@
                                                    Opacity="{Binding StateOpacity}"
                                                    RenderOptions.BitmapScalingMode="HighQuality" />
                                         </Border>
-                                        <Border CornerRadius="11" Margin="1"
+                                        <Border Grid.Row="0" CornerRadius="{Binding IconCornerRadius}" Margin="1"
                                                 Background="{DynamicResource C.AccentSoft}"
                                                 Visibility="{Binding HasIcon, Converter={StaticResource InverseBoolVis}}">
                                             <TextBlock Text="{Binding Initial}" FontSize="16" FontWeight="SemiBold"
@@ -306,7 +312,7 @@
                                                 </Grid>
                                                 <ProgressBar Style="{StaticResource MiniBar}" Maximum="100"
                                                              Value="{Binding Value, Mode=OneWay}"
-                                                             Margin="0,3,0,3" />
+                                                             Margin="0,2,0,2" />
                                                 <Grid Visibility="{Binding HasSecondBar, Converter={StaticResource BoolVis}}">
                                                     <TextBlock Text="{Binding Label2}" FontSize="8.5"
                                                                Foreground="{DynamicResource C.TextMuted}" />
@@ -316,7 +322,7 @@
                                                 </Grid>
                                                 <ProgressBar Style="{StaticResource MiniBar}" Maximum="100"
                                                              Value="{Binding Value2, Mode=OneWay}"
-                                                             Margin="0,3,0,0"
+                                                             Margin="0,2,0,0"
                                                              Visibility="{Binding HasSecondBar, Converter={StaticResource BoolVis}}" />
                                             </StackPanel>
 
@@ -408,6 +414,7 @@
                     <StackPanel x:Name="ActionsZone" Orientation="Horizontal" VerticalAlignment="Center">
 
                         <Button Style="{StaticResource DockIconButton}" Click="OnTabsClick"
+                                Width="{Binding ActionButtonSize}" Height="{Binding ActionButtonSize}"
                                 ToolTip="Raggruppa finestre in schede"
                                 AutomationProperties.Name="Schede"
                                 Visibility="{Binding Settings.EnableTabs, Converter={StaticResource BoolVis}}">
@@ -423,6 +430,7 @@
                         </Button>
 
                         <Button Style="{StaticResource DockIconButton}" Click="OnSearchClick"
+                                Width="{Binding ActionButtonSize}" Height="{Binding ActionButtonSize}"
                                 ToolTip="Cerca app e finestre  ·  Ctrl+Alt+Spazio"
                                 AutomationProperties.Name="Cerca"
                                 Visibility="{Binding Settings.ShowSearch, Converter={StaticResource BoolVis}}">
@@ -430,6 +438,7 @@
                         </Button>
 
                         <Button Style="{StaticResource DockIconButton}" Click="OnWidgetsClick"
+                                Width="{Binding ActionButtonSize}" Height="{Binding ActionButtonSize}"
                                 ToolTip="Pannello widget  ·  Ctrl+Alt+W"
                                 AutomationProperties.Name="Widget"
                                 Visibility="{Binding Settings.ShowWidgets, Converter={StaticResource BoolVis}}">
@@ -437,6 +446,7 @@
                         </Button>
 
                         <Button Style="{StaticResource DockIconButton}" Click="OnControlsClick"
+                                Width="{Binding ActionButtonSize}" Height="{Binding ActionButtonSize}"
                                 ToolTip="Controlli rapidi"
                                 AutomationProperties.Name="Controlli rapidi"
                                 Visibility="{Binding Settings.ShowQuickControls, Converter={StaticResource BoolVis}}">
@@ -455,6 +465,7 @@
                         </Button>
 
                         <Button Style="{StaticResource DockIconButton}" Click="OnSettingsClick"
+                                Width="{Binding ActionButtonSize}" Height="{Binding ActionButtonSize}"
                                 ToolTip="Impostazioni Nebula"
                                 AutomationProperties.Name="Impostazioni"
                                 Visibility="{Binding Settings.ShowSettingsButton, Converter={StaticResource BoolVis}}">
