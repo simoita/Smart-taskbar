@@ -1,8 +1,10 @@
 # Nebula Taskbar Studio
 
-Dock e pannello di personalizzazione per Windows, scritto in WPF su .NET 8. Nebula sostituisce la taskbar con una dock in vetro, animazioni fluide, ricerca di app e finestre, widget, controlli rapidi, **schede delle finestre** e uno studio di impostazioni interamente in italiano.
+Dock e pannello di personalizzazione per Windows, scritto in WPF su .NET 8. Nebula sostituisce la taskbar con una dock in vetro, animazioni fluide, una **barra di ricerca intelligente** in basso, widget, controlli rapidi, **schede delle finestre** e uno studio di impostazioni interamente in italiano.
 
 L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminando Nebula forzatamente, le finestre raggruppate e la taskbar di Windows devono tornare disponibili senza rilanciare nulla.
+
+**Novità 1.10.0:** in basso arriva la **barra intelligente**: il campo **Cerca o chiedi…** nella dock (o `Ctrl+Alt+Spazio`) apre una superficie sopra la barra che non serve solo a cercare app, finestre e azioni. Capisce la **matematica** (`12*(3+4)-5`, `15% di 240`), esegue **comandi in italiano** per Nebula e per Windows — spostare la dock, cambiare tema, icone o altezza, attivare l'auto-hide, sostituire o ripristinare la taskbar, regolare volume e luminosità, aprire pannelli, spegnere o riavviare con conferma, aprire le pagine di Impostazioni — e per le domande libere può rispondere con un **assistente AI** compatibile OpenAI, configurato in **Studio → Ricerca**. Senza chiave AI restano ricerca, comandi e calcoli; nessuna ricerca Google e nessuna azione eseguita dall'AI: le risposte si leggono e si copiano, i comandi li esegue solo la barra.
 
 **Novità 1.9.1:** il pannello Start risponde subito: la finestra viene preparata in anticipo e riusata, e il cursore è già nella ricerca quando il pannello compare, così i primi caratteri digitati dopo il tasto Windows non vanno più persi.
 

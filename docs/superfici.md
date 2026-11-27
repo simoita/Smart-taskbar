@@ -14,7 +14,7 @@ Nebula usa le superfici già presenti nella dock, non processi o finestre WPF ag
 | Widget | icona **Widget** | **Widget → Apri pannello widget** | `Ctrl+Alt+W` |
 | Controlli rapidi | icona **Controlli rapidi** | **Controlli → Apri controlli rapidi** | — |
 | Rete | widget **Wi-Fi**, **Bluetooth** o **Rete** | **Controlli → Apri controlli rapidi** | — |
-| Ricerca | icona **Cerca** | **Ricerca → Apri ricerca** | `Ctrl+Alt+Spazio` |
+| Ricerca | campo **Cerca o chiedi…** nella dock | **Ricerca → Apri ricerca** | `Ctrl+Alt+Spazio` |
 
 Le icone della dock compaiono solo se la superficie è attiva. Il menu contestuale della dock offre le stesse voci. `Esc` chiude il pannello o la ricerca; un clic fuori dalla ricerca la chiude.
 
@@ -55,23 +55,42 @@ In **Studio → Controlli** si trovano:
 - **Layout compatto controlli**: larghezza 370 px invece di 410 px, applicata dal vivo.
 - I pulsanti **Apri controlli rapidi**.
 
-## Ricerca
+## Ricerca e barra intelligente
 
-La ricerca parte dalla dock, dallo studio o da `Ctrl+Alt+Spazio`. Mostra:
+La barra parte dal campo **Cerca o chiedi…** nella dock, dallo Studio o da `Ctrl+Alt+Spazio`, e si apre **in basso sopra la dock** (sotto, se la dock è in alto). La dock non prende il fuoco per non rubare i tasti alle finestre: il campo è una porta d'ingresso, il testo si digita nella superficie che si apre. Mostra:
 
 - applicazioni installate nel menu Start, con nome e icona;
 - finestre aperte, con titolo, processo e sottotitolo **finestra aperta**;
-- azioni della dock, ad esempio aprire widget o controlli.
+- azioni della dock, ad esempio aprire widget o controlli;
+- una **card intelligente** sopra i risultati per calcoli, comandi e risposte AI.
 
-La tastiera è il percorso principale: le frecce scorrono i risultati, `Invio` apre l'app o porta in primo piano la finestra selezionata, `Esc` chiude. L'ingranaggio in alto a destra (**Apri Studio dalla ricerca**) apre lo Studio lasciando la ricerca aperta: le modifiche di tema e preset superficie si applicano mentre la ricerca è visibile; chiudendo lo Studio, la ricerca torna in primo piano con il focus sulla casella.
+La tastiera è il percorso principale: le frecce scorrono i risultati, `Invio` apre l'app o porta in primo piano la finestra selezionata, `Esc` chiude. Se la card è un comando, `Invio` lo esegue; se è un calcolo o una risposta, `Invio` copia il testo. L'ingranaggio in alto a destra (**Apri Studio dalla ricerca**) apre lo Studio lasciando la ricerca aperta: le modifiche di tema e preset superficie si applicano mentre la ricerca è visibile; chiudendo lo Studio, la ricerca torna in primo piano con il focus sulla casella.
+
+### Cosa capisce in locale
+
+- **Matematica**: `+ − × ÷ ^`, parentesi, decimali con virgola o punto, percentuali come `15% di 240`. Il risultato compare come `= 36` e si copia con `Invio`.
+- **Nebula**: dock in alto o in basso, auto-hide on/off, sostituzione o ripristino della taskbar di Windows, barra a tutta larghezza o compatta, icone e altezza della barra (anche con valori), schede on/off, temi per nome (`tema aurora`, `tema scuro`, `tema chiaro`), pannelli e azioni (`apri widget`, `screenshot`, `terminale`, `cestino`, `notifiche`, `blocca`).
+- **Windows**: pagine di Impostazioni riconosciute per parola chiave (`impostazioni bluetooth`, `impostazioni schermo`, `impostazioni aggiornamenti`, `ms-settings:...`), volume (`volume al 35`, `alza il volume`, `muto`), luminosità dove il monitor la espone (`luminosità 70`), alimentazione (`spegni`, `riavvia`, `sospendi`, `disconnetti`). Spegnimento, riavvio e disconnessione chiedono sempre conferma. Non vengono inviate scorciatoie per eseguire azioni che l'utente non ha chiesto.
+- **App**: `apri <nome>` usa lo stesso catalogo della ricerca e avvia l'app; senza verbo, l'app resta un normale risultato della lista.
+
+L'AI non esegue comandi: risponde e basta. Le azioni le esegue solo il parser locale deterministico.
+
+### Assistente AI (opzionale)
+
+In **Studio → Ricerca → Assistente AI** si configurano endpoint compatibile OpenAI, modello e chiave. L'endpoint predefinito è un punto di partenza modificabile: il client aggiunge `/chat/completions` se manca. La chiave è salvata in `settings.json` nel profilo dell'utente, non viene mostrata nella barra, non finisce nei log né nei report del selftest.
+
+La richiesta parte **solo per una domanda** (punto interrogativo o verbo di domanda) e solo dopo qualche parola, mai per un comando o un calcolo; una nuova digitazione annulla la richiesta precedente. Senza endpoint, modello o chiave la card spiega cosa manca e tutto il resto continua a funzionare. Non c'è alcuna ricerca web: la risposta arriva dal modello scelto.
+
+### Impostazioni
 
 In **Studio → Ricerca**:
 
 - **Abilita ricerca**: interruttore della superficie e della scorciatoia.
 - **Cerca finestre aperte**: include o esclude le finestre dai risultati.
 - **Larghezza ricerca**: 560–900 px, applicata alla finestra di ricerca.
+- **Risposte AI nella barra**, **Endpoint**, **Modello**, **Chiave API**.
 
-La larghezza e l'inclusione delle finestre sono state verificate impostandole, riaprendo la ricerca e dopo il riavvio.
+La larghezza e l'inclusione delle finestre sono state verificate impostandole, riaprendo la ricerca e dopo il riavvio. La barra intelligente è verificata dal selftest per calcoli, comandi, pagina Windows e client AI (con una risposta HTTP finta): una chiamata reale a un provider richiede la chiave dell'utente e non viene eseguita dai test.
 
 ## Misure di questa release
 
