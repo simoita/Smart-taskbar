@@ -1213,6 +1213,9 @@ public partial class DockWindow : Window
     /// passano entrambi di qui: una sola implementazione per ogni funzione, così
     /// le due superfici non possono divergere.
     /// </summary>
+    /// <summary>Voce pubblica per la barra intelligente, che vive in un'altra finestra.</summary>
+    public void RunDockAction(string id) => RunQuickAction(id);
+
     private void RunQuickAction(string id)
     {
         switch (id)

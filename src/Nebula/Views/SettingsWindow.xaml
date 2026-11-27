@@ -1961,10 +1961,84 @@
                                             </StackPanel>
                                         </Border>
 
+                                        <Border Style="{StaticResource Card}" Margin="0,0,0,20">
+                                            <StackPanel>
+                                                <TextBlock Text="ASSISTENTE AI" Style="{StaticResource T.Section}" />
+                                                <TextBlock Text="La barra può rispondere alle domande usando il tuo endpoint compatibile OpenAI. La chiave resta nel profilo locale, viaggia solo verso l'endpoint scelto e non viene registrata nei log. Senza chiave restano ricerca, comandi e calcoli."
+                                                           Style="{StaticResource T.Caption}" Margin="0,0,0,12" TextWrapping="Wrap" />
+
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Risposte AI nella barra" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Per le domande (non per comandi o calcoli) la barra chiede una risposta al modello."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <CheckBox Style="{StaticResource Switch}" HorizontalAlignment="Right"
+                                                                  VerticalAlignment="Center"
+                                                                  AutomationProperties.Name="Risposte AI nella barra"
+                                                                  IsChecked="{Binding Settings.SmartAiEnabled, Mode=TwoWay}" />
+                                                    </Grid>
+                                                </Border>
+
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="420" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Endpoint" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Base URL compatibile OpenAI: /chat/completions viene aggiunto se manca."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <TextBox x:Name="AiEndpointBox" Style="{StaticResource Input}" Width="300" Height="34"
+                                                                 Padding="10,4" HorizontalAlignment="Right" FontSize="12"
+                                                                 AutomationProperties.Name="Endpoint AI"
+                                                                 Text="{Binding Settings.SmartAiEndpoint, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                    </Grid>
+                                                </Border>
+
+                                                <Border Style="{StaticResource Row}">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="500" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Modello" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Il nome del modello accettato dal tuo provider."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <TextBox x:Name="AiModelBox" Style="{StaticResource Input}" Width="300" Height="34"
+                                                                 Padding="10,4" HorizontalAlignment="Right" FontSize="12"
+                                                                 AutomationProperties.Name="Modello AI"
+                                                                 Text="{Binding Settings.SmartAiModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                    </Grid>
+                                                </Border>
+
+                                                <Border Style="{StaticResource Row}" BorderThickness="0" Padding="0" Margin="0">
+                                                    <Grid>
+                                                        <StackPanel MaxWidth="420" HorizontalAlignment="Left">
+                                                            <TextBlock Text="Chiave API" FontSize="13"
+                                                                       Foreground="{DynamicResource C.Text}" />
+                                                            <TextBlock Text="Salvata in settings.json nel tuo profilo; non compare nella barra né nei report."
+                                                                       Style="{StaticResource T.Caption}" Margin="0,2,0,0" />
+                                                        </StackPanel>
+                                                        <PasswordBox x:Name="AiKeyBox" Width="300" Height="32"
+                                                                     HorizontalAlignment="Right" FontSize="12"
+                                                                     Padding="8,4" PasswordChar="●"
+                                                                     Background="{DynamicResource S.InnerBg}"
+                                                                     Foreground="{DynamicResource C.Text}"
+                                                                     BorderBrush="{DynamicResource S.InnerBorder}"
+                                                                     BorderThickness="1"
+                                                                     AutomationProperties.Name="Chiave API AI"
+                                                                     Loaded="OnAiKeyLoaded"
+                                                                     PasswordChanged="OnAiKeyChanged" />
+                                                    </Grid>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+
                                         <Border Style="{StaticResource Card}">
                                             <StackPanel>
                                                 <TextBlock Text="APRI LA RICERCA" Style="{StaticResource T.Section}" />
-                                                <TextBlock Text="Cerca app installate, finestre aperte e azioni di Nebula. Frecce per navigare, Invio per aprire, Esc per chiudere."
+                                                <TextBlock Text="La barra vive in basso, sopra la dock, e apre con Invio o con Ctrl+Alt+Spazio. Cerca app, finestre e azioni, calcola espressioni, esegue comandi in italiano per la barra e per Windows, e risponde alle domande con l'AI configurata qui sopra."
                                                            Style="{StaticResource T.Caption}" Margin="0,0,0,12" TextWrapping="Wrap" />
                                                 <Button Content="Apri ricerca" Style="{StaticResource PrimaryButton}"
                                                         HorizontalAlignment="Left" Click="OnOpenSearch" />

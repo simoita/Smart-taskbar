@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -843,6 +845,85 @@ public partial class App
                 }
             }
 
+            // 9c-bis. I campi AI dello Studio mostrano i valori salvati (e non
+            // solo l'interruttore): un TextBox troppo basso con il padding
+            // grande del tema poteva tagliare il testo.
+            string endpointText = (studio.FindName("AiEndpointBox") as TextBox)?.Text ?? "<assente>";
+            string modelText = (studio.FindName("AiModelBox") as TextBox)?.Text ?? "<assente>";
+            bool aiFieldsBound = endpointText == studioVm.Settings.SmartAiEndpoint &&
+                                 modelText == studioVm.Settings.SmartAiModel &&
+                                 endpointText.Length > 0 && modelText.Length > 0;
+            Add(checks, "studio.ai_fields", aiFieldsBound,
+                $"endpoint='{endpointText}'; model='{modelText}'; " +
+                $"settings='{studioVm.Settings.SmartAiEndpoint}'/'{studioVm.Settings.SmartAiModel}'");
+
+            // 9d. Barra intelligente: il parser locale riconosce calcoli e
+            // comandi italiani, il client AI compone la richiesta giusta e la
+            // card compare nella barra in basso con il risultato.
+            bool mathOk = SmartSearchService.TryEvaluate("12*(3+4)-5", out double mathValue, out string mathText) &&
+                          Math.Abs(mathValue - 79) < 0.001;
+            bool percentOk = SmartSearchService.TryEvaluate("15% di 240", out double percentValue, out string percentText) &&
+                             Math.Abs(percentValue - 36) < 0.001;
+            SmartCommand? dockTop = SmartSearchService.Suggest("metti la dock in alto")?.Command;
+            SmartCommand? themeCmd = SmartSearchService.Suggest("tema aurora")?.Command;
+            SmartCommand? bluetooth = SmartSearchService.Suggest("impostazioni bluetooth")?.Command;
+            SmartCommand? volumeCmd = SmartSearchService.Suggest("volume al 35")?.Command;
+            bool parseOk = dockTop?.Id == "dock.top" &&
+                           themeCmd?.Id == "theme.set" && themeCmd.Argument == "aurora" &&
+                           bluetooth?.Id == "windows.settings" && bluetooth.Argument == "ms-settings:bluetooth" &&
+                           volumeCmd?.Id == "volume.set" && volumeCmd.Argument == "35";
+            Add(checks, "smart.local_engine", mathOk && percentOk && parseOk,
+                $"math={mathText}; percent={percentText}; dock={dockTop?.Id}; " +
+                $"theme={themeCmd?.Id}/{themeCmd?.Argument}; windows={bluetooth?.Id}/{bluetooth?.Argument}; " +
+                $"volume={volumeCmd?.Id}/{volumeCmd?.Argument}");
+
+            var stubSettings = new AppSettings
+            {
+                SmartAiEndpoint = "http://127.0.0.1:9/v1",
+                SmartAiModel = "mock-model",
+                SmartAiKey = "test-key"
+            };
+            var stub = new StubAiHandler();
+            AiReply aiReply = await SmartSearchService.AskAiAsync(
+                stubSettings, "Quanto fa 2+2?", CancellationToken.None, stub);
+            bool aiOk = aiReply.Error is null && aiReply.Text == "Quarantadue" &&
+                        stub.Authorization == "Bearer test-key" &&
+                        stub.Body?.Contains("\"model\":\"mock-model\"") == true &&
+                        stub.Target?.AbsolutePath.EndsWith("/chat/completions") == true;
+            Add(checks, "smart.ai_client", aiOk,
+                $"answer={aiReply.Text ?? aiReply.Error}; auth={(stub.Authorization is null ? "no" : "Bearer ***")}; " +
+                $"uri={stub.Target}");
+
+            var smartLauncher = new LauncherWindow(
+                App.Instance?.Catalog ?? new AppCatalog(), null, settings);
+            try
+            {
+                smartLauncher.Show();
+                await WaitUntilAsync(() => smartLauncher.IsLoaded, 4000);
+                await Task.Delay(250);
+                smartLauncher.SearchBox.Text = "12*(3+4)-5";
+                await Task.Delay(700);
+
+                var smartCard = (FrameworkElement?)smartLauncher.FindName("SmartCard");
+                var smartTitle = (TextBlock?)smartLauncher.FindName("SmartTitle");
+                Rect smartWork = ScreenGeometry.BoundsDip(ScreenGeometry.PanelTarget(
+                    settings.MonitorIndex, settings.PanelsFollowDock));
+                bool cardVisible = smartCard?.Visibility == Visibility.Visible &&
+                                   smartCard.ActualHeight > 10;
+                bool answerShown = smartTitle?.Text.Contains("79") == true;
+                bool placedBottom = smartLauncher.Top > smartWork.Top + smartWork.Height * 0.5;
+                Add(checks, "smart.bar_card", cardVisible && answerShown && placedBottom,
+                    $"visible={cardVisible}; title={smartTitle?.Text}; " +
+                    $"top={smartLauncher.Top:0}; workBottom={smartWork.Bottom:0}");
+
+                if (smartLauncher.FindName("Card") is FrameworkElement smartShell)
+                    Capture(smartShell, Path.Combine(outputDir, "smart-bar.png"));
+            }
+            finally
+            {
+                try { smartLauncher.Close(); } catch { }
+            }
+
             await MeasureStudioAsync(studio, 1280, 720, "1280x720", outputDir, checks);
             await MeasureStudioAsync(studio, 1920, 1080, "1920x1080", outputDir, checks);
         }
@@ -1072,6 +1153,31 @@ public partial class App
         {
             await Task.Delay(50);
             waited += 50;
+        }
+    }
+
+    /// <summary>Risposta HTTP finta per verificare il client AI senza rete.</summary>
+    private sealed class StubAiHandler : HttpMessageHandler
+    {
+        public string? Authorization { get; private set; }
+        public string? Body { get; private set; }
+        public Uri? Target { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Authorization = request.Headers.Authorization?.ToString();
+            Target = request.RequestUri;
+            Body = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+
+            const string json =
+                "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Quarantadue\"}}]}";
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
         }
     }
 

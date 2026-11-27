@@ -1143,6 +1143,151 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Esegue un comando della barra intelligente. Restituisce null quando è
+    /// andato a buon fine, altrimenti un messaggio da mostrare all'utente.
+    /// </summary>
+    public string? RunSmartCommand(SmartCommand command)
+    {
+        try
+        {
+            switch (command.Id)
+            {
+                case "dock.top":
+                    Settings.DockOnTop = true;
+                    return null;
+                case "dock.bottom":
+                    Settings.DockOnTop = false;
+                    return null;
+                case "dock.autohide.on":
+                    Settings.AutoHideDock = true;
+                    return null;
+                case "dock.autohide.off":
+                    Settings.AutoHideDock = false;
+                    return null;
+                case "dock.replace.on":
+                    Settings.ReplaceWindowsTaskbar = true;
+                    return null;
+                case "dock.replace.off":
+                    Settings.ReplaceWindowsTaskbar = false;
+                    return null;
+                case "dock.width.on":
+                    Settings.TaskbarFullWidth = true;
+                    return null;
+                case "dock.width.off":
+                    Settings.TaskbarFullWidth = false;
+                    return null;
+                case "theme.set":
+                    if (!string.IsNullOrWhiteSpace(command.Argument) &&
+                        ThemePreset.All.Any(preset => preset.Id == command.Argument))
+                        Settings.ThemeId = command.Argument;
+                    return null;
+                case "icons.plus":
+                    Settings.IconSize = Math.Clamp(Settings.IconSize + 4, 20, 36);
+                    return null;
+                case "icons.minus":
+                    Settings.IconSize = Math.Clamp(Settings.IconSize - 4, 20, 36);
+                    return null;
+                case "icons.set":
+                    if (int.TryParse(command.Argument, out int iconSize))
+                        Settings.IconSize = Math.Clamp(iconSize, 20, 36);
+                    return null;
+                case "dock.height.plus":
+                    Settings.DockHeight = Math.Clamp(Settings.DockHeight + 6, 44, 92);
+                    return null;
+                case "dock.height.minus":
+                    Settings.DockHeight = Math.Clamp(Settings.DockHeight - 6, 44, 92);
+                    return null;
+                case "dock.height.set":
+                    if (int.TryParse(command.Argument, out int barHeight))
+                        Settings.DockHeight = Math.Clamp(barHeight, 44, 92);
+                    return null;
+                case "tabs.on":
+                    Settings.EnableTabs = true;
+                    return null;
+                case "tabs.off":
+                    Settings.EnableTabs = false;
+                    return null;
+                case "quick":
+                    RunCatalogAction(command.Argument ?? "");
+                    return null;
+                case "volume.set":
+                    return int.TryParse(command.Argument, out int volume)
+                        ? ApplyVolume(volume)
+                        : "Volume non valido.";
+                case "volume.up":
+                    return ApplyVolume(Dock.Controls.VolumePercent + 5);
+                case "volume.down":
+                    return ApplyVolume(Dock.Controls.VolumePercent - 5);
+                case "volume.mute":
+                case "volume.unmute":
+                    if (Dock.Controls.Muted == (command.Id == "volume.mute"))
+                        return null;
+                    Dock.Controls.ToggleMute(out _, out string? muteError);
+                    Dock.Controls.RefreshVolumeOnly();
+                    Dock.UpdateTaskbarWidgetValues();
+                    return muteError;
+                case "brightness.set":
+                    return int.TryParse(command.Argument, out int brightness)
+                        ? ApplyBrightness(brightness)
+                        : "Luminosità non valida.";
+                case "brightness.up":
+                    return ApplyBrightness((Dock.Controls.BrightnessPercent < 0 ? 50 : Dock.Controls.BrightnessPercent) + 10);
+                case "brightness.down":
+                    return ApplyBrightness((Dock.Controls.BrightnessPercent < 0 ? 50 : Dock.Controls.BrightnessPercent) - 10);
+                case "power":
+                    RunPowerAction(command.Argument ?? "");
+                    return null;
+                case "windows.settings":
+                    if (string.IsNullOrWhiteSpace(command.Argument))
+                        return "Pagina di Windows non valida.";
+                    Process.Start(new ProcessStartInfo(command.Argument) { UseShellExecute = true });
+                    return null;
+                case "app.launch":
+                    if (string.IsNullOrWhiteSpace(command.Argument))
+                        return "App non valida.";
+                    if (!AppLauncher.Launch(command.Argument, out string? launchError))
+                        return launchError ?? "Impossibile avviare l'app.";
+                    RecordRecent(command.Argument);
+                    return null;
+                default:
+                    return "Comando non riconosciuto.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Smart command failed: " + ex.Message);
+            return "Comando non riuscito: " + ex.Message;
+        }
+    }
+
+    /// <summary>Instrada le azioni del catalogo alle superfici reali della dock.</summary>
+    public void RunCatalogAction(string actionId)
+    {
+        if (!string.IsNullOrWhiteSpace(actionId))
+            _dockWindow?.RunDockAction(actionId);
+    }
+
+    private string? ApplyVolume(int percent)
+    {
+        if (!Dock.Controls.SetVolume(percent, out string? error))
+            return error;
+
+        Dock.Controls.RefreshVolumeOnly();
+        Dock.UpdateTaskbarWidgetValues();
+        return null;
+    }
+
+    private string? ApplyBrightness(int percent)
+    {
+        if (!Dock.Controls.SetBrightness(percent, out string? error))
+            return error;
+
+        Dock.Controls.RefreshBrightnessOnly();
+        Dock.UpdateTaskbarWidgetValues();
+        return null;
+    }
+
     /// <summary>Play/pause from the taskbar media widget.</summary>
     public void ToggleMediaPlayback()
     {

@@ -101,6 +101,15 @@ public sealed class SettingsStore : IDisposable
             s.ReserveTaskbarSpace = true;
         }
         s.SearchCardWidth = Math.Clamp(s.SearchCardWidth, 560, 900);
+        s.SmartAiEndpoint = (s.SmartAiEndpoint ?? "").Trim();
+        s.SmartAiModel = (s.SmartAiModel ?? "").Trim();
+        s.SmartAiKey = (s.SmartAiKey ?? "").Trim();
+        if (s.SmartAiEndpoint.Length > 400)
+            s.SmartAiEndpoint = s.SmartAiEndpoint[..400];
+        if (s.SmartAiModel.Length > 120)
+            s.SmartAiModel = s.SmartAiModel[..120];
+        if (s.SmartAiKey.Length > 400)
+            s.SmartAiKey = s.SmartAiKey[..400];
         s.TabsBarHeight = Math.Clamp(s.TabsBarHeight, 34, 64);
         if (s.TabsStyle is not ("glass" or "minimal" or "neon" or "soft" or "mono" or "liquid"))
             s.TabsStyle = "glass";

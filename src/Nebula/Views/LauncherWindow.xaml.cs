@@ -24,11 +24,16 @@ public partial class LauncherWindow : Window
     private readonly Action<string>? _onPicked;
     private readonly ObservableCollection<AppEntry> _results = new();
     private readonly DispatcherTimer _searchTimer;
+    private readonly DispatcherTimer _smartTimer;
     private readonly List<AppEntry> _quick = new();
     private string _quickQuery = "\u0000";
     private int _searchVersion;
     private bool _closing;
     private bool _settingsOpen;
+    private SmartSuggestion? _smart;
+    private string _smartQuery = "\u0000";
+    private CancellationTokenSource? _aiCts;
+    private Rect _workArea;
 
     public LauncherWindow(AppCatalog catalog, bool pickMode = false, Action<string>? onPicked = null)
         : this(catalog, null, null, null, pickMode, onPicked)
@@ -63,6 +68,18 @@ public partial class LauncherWindow : Window
             RefreshResults();
         };
 
+        // La parte intelligente parte dopo la ricerca locale, così la lista di
+        // app e finestre non aspetta mai il parser o la rete.
+        _smartTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(260)
+        };
+        _smartTimer.Tick += (_, _) =>
+        {
+            _smartTimer.Stop();
+            RefreshSmart();
+        };
+
         if (_settings is not null)
         {
             Card.Width = Math.Clamp(_settings.SearchCardWidth, 560, 900);
@@ -82,6 +99,7 @@ public partial class LauncherWindow : Window
         }
 
         Loaded += OnLoaded;
+        SizeChanged += OnSizeChanged;
         _catalog.Loaded += OnCatalogLoaded;
         Closed += OnClosed;
 
@@ -96,13 +114,12 @@ public partial class LauncherWindow : Window
         Rect work = ScreenGeometry.BoundsDip(ScreenGeometry.PanelTarget(
             appSettings?.MonitorIndex ?? 0,
             appSettings?.PanelsFollowDock ?? true));
-        // A classic Windows window sized around the search card: it opens on
-        // the screen with the dock and the user can move it anywhere from its
-        // title bar, like any other window.
+        // La barra vive in basso, subito sopra la dock: è lì che l'utente la
+        // cerca, e resta un classico window spostabile dalla sua intestazione.
         Width = Card.Width + 24;
         UpdateLayout();
-        Left = work.Left + Math.Max(0, (work.Width - ActualWidth) / 2);
-        Top = work.Top + Math.Max(40, (work.Height - ActualHeight) * 0.22);
+        _workArea = work;
+        PlaceBottomBar(appSettings);
 
         AnimateIn();
 
@@ -118,6 +135,8 @@ public partial class LauncherWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         _searchTimer.Stop();
+        _smartTimer.Stop();
+        CancelAi();
         _catalog.Loaded -= OnCatalogLoaded;
         if (_files is not null)
             _files.IndexReady -= OnFilesReady;
@@ -211,6 +230,229 @@ public partial class LauncherWindow : Window
         // Coalesce keystrokes: the text box never waits for a result set.
         _searchTimer.Stop();
         _searchTimer.Start();
+        _smartTimer.Stop();
+        _smartTimer.Start();
+    }
+
+    /// <summary>Posiziona la barra sopra la dock, o sotto se la dock è in alto.</summary>
+    private void PlaceBottomBar(AppSettings? appSettings)
+    {
+        if (_workArea.Width <= 0)
+            return;
+
+        double gap = appSettings is { ReplaceWindowsTaskbar: true, ReserveTaskbarSpace: true }
+            ? 16
+            : (appSettings?.DockHeight ?? 62) + 18;
+
+        Left = _workArea.Left + Math.Max(0, (_workArea.Width - ActualWidth) / 2);
+        double top = appSettings?.DockOnTop == true
+            ? _workArea.Top + gap
+            : _workArea.Bottom - ActualHeight - gap;
+
+        Top = Math.Clamp(top, _workArea.Top + 8,
+            Math.Max(_workArea.Top + 8, _workArea.Bottom - ActualHeight - 8));
+    }
+
+    /// <summary>
+    /// La finestra cresce con i risultati: se il bordo inferiore uscirebbe dallo
+    /// schermo, sale quel tanto che basta senza spostare una barra già mossa.
+    /// </summary>
+    private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (_workArea.Width <= 0 || !IsVisible)
+            return;
+
+        AppSettings? appSettings = _settings ?? App.Instance?.Settings;
+        double gap = appSettings is { ReplaceWindowsTaskbar: true, ReserveTaskbarSpace: true }
+            ? 16
+            : (appSettings?.DockHeight ?? 62) + 18;
+        double limit = _workArea.Bottom - gap;
+        if (Top + ActualHeight > limit)
+            Top = Math.Max(_workArea.Top + 8, limit - ActualHeight);
+    }
+
+    /// <summary>
+    /// Calcola il suggerimento locale e, se serve, chiede la risposta all'AI.
+    /// La chiamata di rete parte solo per una domanda e solo se l'utente ha
+    /// configurato un modello: nessuna richiesta silenziosa.
+    /// </summary>
+    private void RefreshSmart()
+    {
+        _smartTimer.Stop();
+        string query = SearchBox.Text.Trim();
+        if (query.Length < 2)
+        {
+            CancelAi();
+            ClearSmart();
+            return;
+        }
+
+        if (string.Equals(query, _smartQuery, StringComparison.Ordinal) && _smart is not null)
+            return;
+
+        _smartQuery = query;
+        CancelAi();
+
+        SmartSuggestion? local = SmartSearchService.Suggest(query, _catalog);
+        if (local is not null)
+        {
+            ShowSmart(local);
+            return;
+        }
+
+        AppSettings? settings = _settings ?? App.Instance?.Settings;
+        if (settings is null || !settings.SmartAiEnabled)
+        {
+            ClearSmart();
+            return;
+        }
+
+        if (!SmartSearchService.IsAiConfigured(settings))
+        {
+            if (SmartSearchService.LooksLikeQuestion(query))
+            {
+                ShowSmart(new SmartSuggestion(SmartSuggestionKind.Answer,
+                    "Assistente AI non configurato",
+                    "Aggiungi endpoint, modello e chiave in Studio → Ricerca. Senza AI la barra continua a cercare app, finestre e azioni e a fare i calcoli.",
+                    "\uE946"));
+            }
+            else
+            {
+                ClearSmart();
+            }
+
+            return;
+        }
+
+        // Una domanda appena iniziata ("come ") non vale una richiesta: si
+        // aspetta qualche parola in più, così non si spendono token a ogni pausa.
+        if (query.Length < 12 || !SmartSearchService.LooksLikeQuestion(query))
+        {
+            ClearSmart();
+            return;
+        }
+
+        ShowSmart(new SmartSuggestion(SmartSuggestionKind.Answer, "Sto pensando…",
+            "Chiedo all'assistente AI.", "\uE946"));
+
+        var cts = new CancellationTokenSource();
+        _aiCts = cts;
+        _ = AskSmartAiAsync(settings, query, cts.Token);
+    }
+
+    private async Task AskSmartAiAsync(AppSettings settings, string question, CancellationToken token)
+    {
+        AiReply reply;
+        try
+        {
+            reply = await SmartSearchService.AskAiAsync(settings, question, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (token.IsCancellationRequested || _closing)
+            return;
+
+        // Una query più recente possiede già la barra.
+        if (!string.Equals(SearchBox.Text.Trim(), question, StringComparison.Ordinal))
+            return;
+
+        _aiCts = null;
+        if (reply.Error is not null)
+        {
+            ShowSmart(new SmartSuggestion(SmartSuggestionKind.Answer,
+                "Assistente non disponibile", reply.Error, "\uE946"));
+            return;
+        }
+
+        ShowSmart(new SmartSuggestion(SmartSuggestionKind.Answer, "Risposta AI",
+            reply.Text ?? "", "\uE946", CopyText: reply.Text));
+    }
+
+    private void ShowSmart(SmartSuggestion suggestion)
+    {
+        _smart = suggestion;
+        SmartGlyph.Text = suggestion.Glyph;
+        SmartTitle.Text = suggestion.Title;
+        SmartDetail.Text = suggestion.Detail;
+        SmartHint.Text = suggestion.Command is not null ? "Invio esegue" : "Invio copia";
+        SmartCard.Visibility = Visibility.Visible;
+    }
+
+    private void ClearSmart()
+    {
+        _smart = null;
+        _smartQuery = "\u0000";
+        SmartCard.Visibility = Visibility.Collapsed;
+        SmartTitle.Text = "";
+        SmartDetail.Text = "";
+    }
+
+    private void CancelAi()
+    {
+        if (_aiCts is null)
+            return;
+
+        _aiCts.Cancel();
+        _aiCts.Dispose();
+        _aiCts = null;
+    }
+
+    /// <summary>Invio o clic sulla card: esegue il comando o copia la risposta.</summary>
+    private bool TryRunSmart()
+    {
+        if (_smart is not { } smart)
+            return false;
+
+        if (smart.Command is { } command)
+        {
+            if (command.Confirm)
+            {
+                string question = command.Argument switch
+                {
+                    "restart" => "Riavviare il PC?",
+                    "signout" => "Disconnettere l'utente?",
+                    _ => "Spegnere il PC?"
+                };
+                if (MessageBox.Show(this, question, "Nebula", MessageBoxButton.YesNo,
+                        MessageBoxImage.Question) != MessageBoxResult.Yes)
+                    return true;
+            }
+
+            string? error = App.Instance?.RunSmartCommand(command);
+            if (error is not null)
+            {
+                ShowSmart(new SmartSuggestion(SmartSuggestionKind.Answer,
+                    "Comando non riuscito", error, "\uE783"));
+                return true;
+            }
+
+            Dismiss();
+            return true;
+        }
+
+        if (!string.IsNullOrEmpty(smart.CopyText))
+        {
+            try
+            {
+                Clipboard.SetText(smart.CopyText);
+                SmartHint.Text = "Copiato";
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Smart copy failed: " + ex.Message);
+            }
+        }
+
+        return true;
+    }
+
+    private void OnSmartCardClick(object sender, MouseButtonEventArgs e)
+    {
+        TryRunSmart();
+        e.Handled = true;
     }
 
     private void RefreshResults()
@@ -361,7 +603,7 @@ public partial class LauncherWindow : Window
         foreach (AppEntry entry in final)
             IconLoader.Request(entry);
 
-        EmptyText.Text = "Nessun risultato. Prova con il nome di un'app, di un file o di un'impostazione.";
+        EmptyText.Text = "Nessun risultato. Prova un'app, un calcolo come 15% di 240, un comando come «dock in alto» o una domanda.";
         EmptyText.Visibility = _results.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         CountText.Text = _results.Count == 0 ? "" : _results.Count == 1 ? "1 risultato" : $"{_results.Count} risultati";
     }
@@ -456,7 +698,15 @@ public partial class LauncherWindow : Window
                     RefreshResults();
                 }
 
-                LaunchSelected();
+                if (_smartTimer.IsEnabled)
+                {
+                    _smartTimer.Stop();
+                    RefreshSmart();
+                }
+
+                if (!TryRunSmart())
+                    LaunchSelected();
+
                 e.Handled = true;
                 break;
         }
@@ -500,7 +750,15 @@ public partial class LauncherWindow : Window
 
         if (!string.IsNullOrWhiteSpace(entry.ActionId))
         {
-            App.Instance?.RunQuickAction(entry.ActionId);
+            string? actionError = App.Instance?.RunSmartCommand(
+                new SmartCommand("quick", entry.ActionId));
+            if (actionError is not null)
+            {
+                EmptyText.Text = actionError;
+                EmptyText.Visibility = Visibility.Visible;
+                return;
+            }
+
             Dismiss();
             return;
         }

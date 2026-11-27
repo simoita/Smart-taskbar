@@ -38,6 +38,10 @@ public sealed class AppSettings : ObservableObject
     private bool _searchIncludeWindows = true;
     private bool _searchIncludeFiles = true;
     private double _searchCardWidth = 720;
+    private bool _smartAiEnabled = true;
+    private string _smartAiEndpoint = "https://freebuff.com/api/v1/paid";
+    private string _smartAiModel = "gpt-4.1-mini";
+    private string _smartAiKey = "";
     private bool _showWidgets = true;
     private bool _showQuickControls = true;
     private bool _quickControlsCompact;
@@ -327,6 +331,33 @@ public sealed class AppSettings : ObservableObject
     {
         get => _searchCardWidth;
         set => SetProperty(ref _searchCardWidth, value);
+    }
+
+    /// <summary>Enables the optional AI answers in the smart bar.</summary>
+    public bool SmartAiEnabled
+    {
+        get => _smartAiEnabled;
+        set => SetProperty(ref _smartAiEnabled, value);
+    }
+
+    /// <summary>OpenAI-compatible base URL (the client appends /chat/completions).</summary>
+    public string SmartAiEndpoint
+    {
+        get => _smartAiEndpoint;
+        set => SetProperty(ref _smartAiEndpoint, value);
+    }
+
+    public string SmartAiModel
+    {
+        get => _smartAiModel;
+        set => SetProperty(ref _smartAiModel, value);
+    }
+
+    /// <summary>User-owned key, stored only in the local profile and never logged.</summary>
+    public string SmartAiKey
+    {
+        get => _smartAiKey;
+        set => SetProperty(ref _smartAiKey, value);
     }
 
     public bool ShowSettingsButton

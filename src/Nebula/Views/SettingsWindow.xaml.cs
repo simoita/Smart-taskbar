@@ -601,6 +601,21 @@ public partial class SettingsWindow : Window
 
     private void OnOpenSearch(object sender, RoutedEventArgs e) => App.Instance?.ShowLauncher();
 
+    private void OnAiKeyLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is PasswordBox box)
+            box.Password = _vm.Settings.SmartAiKey ?? "";
+    }
+
+    private void OnAiKeyChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is PasswordBox box)
+        {
+            _vm.Settings.SmartAiKey = box.Password;
+            _store.MarkDirty();
+        }
+    }
+
     private void OnOpenControls(object sender, RoutedEventArgs e) => App.Instance?.ShowControls();
 
     private void OnPickDockIcon(object sender, RoutedEventArgs e)

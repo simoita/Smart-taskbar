@@ -47,7 +47,7 @@
                         <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
                             <TextBlock Text="Nebula" FontWeight="{DynamicResource S.TitleWeight}" FontSize="14"
                                        Foreground="{DynamicResource C.Text}" />
-                            <TextBlock x:Name="CaptionText" Text="Cerca app, file, impostazioni, finestre e azioni" FontSize="10.5"
+                            <TextBlock x:Name="CaptionText" Text="Cerca, calcola, comanda o chiedi — senza web" FontSize="10.5"
                                        Foreground="{DynamicResource C.TextMuted}" />
                         </StackPanel>
                     </StackPanel>
@@ -82,10 +82,46 @@
                                      BorderThickness="0" Padding="0,10" FontSize="17"
                                      AutomationProperties.Name="Ricerca"
                                      TextChanged="OnSearchTextChanged" />
-                            <TextBlock x:Name="Placeholder" Text="Cerca un'app, un file, un'impostazione o un'azione…"
+                            <TextBlock x:Name="Placeholder" Text="Cerca, calcola o chiedi qualcosa…"
                                        FontSize="17" Foreground="{DynamicResource C.TextFaint}"
                                        VerticalAlignment="Center" Margin="2,0,0,0" IsHitTestVisible="False" />
                         </Grid>
+                    </Grid>
+                </Border>
+
+                <Border x:Name="SmartCard" Visibility="Collapsed" Margin="0,10,0,0"
+                        CornerRadius="{DynamicResource S.InnerRadius}"
+                        Background="{DynamicResource S.InnerBg}"
+                        BorderBrush="{DynamicResource C.Accent}" BorderThickness="1"
+                        Padding="14,12" Cursor="Hand"
+                        MouseLeftButtonUp="OnSmartCardClick"
+                        ToolTip="Invio esegue un comando o copia una risposta">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="34" Height="34" CornerRadius="{DynamicResource S.InnerRadius}"
+                                Background="{DynamicResource C.AccentGrad}" VerticalAlignment="Top">
+                            <TextBlock x:Name="SmartGlyph" FontFamily="Segoe Fluent Icons" FontSize="15"
+                                       Foreground="{DynamicResource C.OnAccent}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,10,0">
+                            <TextBlock x:Name="SmartTitle" FontSize="14" TextWrapping="Wrap"
+                                       FontWeight="{DynamicResource S.TitleWeight}"
+                                       Foreground="{DynamicResource C.Text}" />
+                            <ScrollViewer MaxHeight="150" Margin="0,3,0,0"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <TextBlock x:Name="SmartDetail" FontSize="12" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource C.TextMuted}" />
+                            </ScrollViewer>
+                        </StackPanel>
+                        <TextBlock x:Name="SmartHint" Grid.Column="2" FontSize="9.5"
+                                   Foreground="{DynamicResource C.TextFaint}"
+                                   VerticalAlignment="Top" Margin="8,2,2,0" />
                     </Grid>
                 </Border>
 
@@ -130,12 +166,12 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
-                <TextBlock x:Name="EmptyText" Text="Nessun risultato. Prova con il nome di un'app, di un file o di un'impostazione."
+                <TextBlock x:Name="EmptyText" Text="Nessun risultato. Prova un'app, un calcolo come 15% di 240, un comando come «dock in alto» o una domanda."
                            Foreground="{DynamicResource C.TextMuted}" FontSize="12.5"
                            HorizontalAlignment="Center" Margin="0,26" Visibility="Collapsed" />
 
                 <Grid Margin="6,12,6,0">
-                    <TextBlock Text="↑ ↓  naviga      Invio  apri      Shift+Invio  cartella      Esc  chiudi" FontSize="10.5"
+                    <TextBlock Text="↑ ↓  naviga      Invio  apri o esegui      Shift+Invio  cartella      Esc  chiudi" FontSize="10.5"
                                Foreground="{DynamicResource C.TextFaint}" />
                     <TextBlock x:Name="CountText" FontSize="10.5" HorizontalAlignment="Right"
                                Foreground="{DynamicResource C.TextFaint}" />
