@@ -238,8 +238,31 @@ public sealed class DockViewModel : ObservableObject
 
     public CornerRadius ShellRadius => new(ShellRadiusValue);
 
+    /// <summary>
+    /// La barra che sostituisce la taskbar a tutta larghezza appoggia sul bordo
+    /// basso del monitor: parte dal bordo dello schermo senza cornice sotto e
+    /// conserva l'arrotondamento solo in alto. Con un margine dal bordo scelto
+    /// dall'utente la barra resta staccata e arrotondata anche sotto.
+    /// </summary>
+    public bool IsFlushTaskbar =>
+        Settings.ReplaceWindowsTaskbar &&
+        Settings.TaskbarFullWidth &&
+        !Settings.DockOnTop &&
+        Settings.EdgeMargin <= 0.5;
+
+    /// <summary>Angoli della barra: arrotondati in alto, squadrati sul bordo schermo.</summary>
+    public CornerRadius ShellCornerRadius => IsFlushTaskbar
+        ? new CornerRadius(ShellRadiusValue, ShellRadiusValue, 0, 0)
+        : new CornerRadius(ShellRadiusValue);
+
     /// <summary>Concentric radius for anything painted just inside the 1 px stroke.</summary>
-    public CornerRadius InnerRadius => new(Math.Max(0, ShellRadiusValue - 1));
+    public CornerRadius InnerRadius => IsFlushTaskbar
+        ? new CornerRadius(Math.Max(0, ShellRadiusValue - 1), Math.Max(0, ShellRadiusValue - 1), 0, 0)
+        : new CornerRadius(Math.Max(0, ShellRadiusValue - 1));
+
+    /// <summary>Il bisello inferiore disegnerebbe una riga sul bordo dello schermo.</summary>
+    public Visibility ChromeBottomLineVisibility =>
+        IsFlushTaskbar ? Visibility.Collapsed : Visibility.Visible;
 
     /// <summary>
     /// Gutter between the shell edge and the first control. It follows the
@@ -300,7 +323,10 @@ public sealed class DockViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(ShellRadiusValue));
         OnPropertyChanged(nameof(ShellRadius));
+        OnPropertyChanged(nameof(IsFlushTaskbar));
+        OnPropertyChanged(nameof(ShellCornerRadius));
         OnPropertyChanged(nameof(InnerRadius));
+        OnPropertyChanged(nameof(ChromeBottomLineVisibility));
         OnPropertyChanged(nameof(ShellInset));
         OnPropertyChanged(nameof(ZoneHostMargin));
         OnPropertyChanged(nameof(ItemSize));
@@ -739,6 +765,8 @@ public sealed class DockViewModel : ObservableObject
             case nameof(AppSettings.TaskbarFullWidth):
             case nameof(AppSettings.ReserveTaskbarSpace):
             case nameof(AppSettings.ReplaceWindowsTaskbar):
+            case nameof(AppSettings.DockOnTop):
+            case nameof(AppSettings.EdgeMargin):
                 RaiseBarMetrics();
                 OnPropertyChanged(nameof(IslandInBar));
                 OnPropertyChanged(nameof(IslandSlotVisibility));

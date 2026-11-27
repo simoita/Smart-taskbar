@@ -172,6 +172,30 @@ public partial class App
             Add(checks, "dock.bottom_edge", Math.Abs(shellTopLeft.Y - expectedShellTopPx) <= 3.0,
                 $"shellTop={shellTopLeft.Y:0.#}px expected={expectedShellTopPx:0.#}px; shellHeight={shellDip.Height:0.#}dip");
 
+            // 3b. Senza margine dal bordo la taskbar appoggia sul fondo dello
+            // schermo: niente riga né spazio sotto, angoli inferiori squadrati e
+            // bordo superiore ancora arrotondato.
+            settings.EdgeMargin = 0;
+            dock.Reposition();
+            await Task.Delay(450);
+            dock.UpdateLayout();
+            Rect flushShell = dock.ShellBoundsDip;
+            Point flushBottomRight = dock.PointToScreen(new Point(flushShell.Right, flushShell.Bottom));
+            CornerRadius flushCorners = dock.Shell.CornerRadius;
+            bool flushBottom =
+                Math.Abs(flushBottomRight.Y - screen.Bounds.Bottom) <= 3.0 &&
+                flushCorners.BottomLeft == 0 && flushCorners.BottomRight == 0 &&
+                flushCorners.TopLeft > 0 && flushCorners.TopRight > 0 &&
+                dock.Shell.BorderThickness.Bottom == 0 &&
+                dock.Shell.BorderThickness.Top > 0;
+            Add(checks, "dock.flush_bottom", flushBottom,
+                $"shellBottom={flushBottomRight.Y:0.#}px screenBottom={screen.Bounds.Bottom}px; " +
+                $"corners={flushCorners}; border={dock.Shell.BorderThickness}");
+            settings.EdgeMargin = 10;
+            dock.Reposition();
+            await Task.Delay(450);
+            dock.UpdateLayout();
+
             int afterBottom = WorkArea().Bottom;
             int reservedPx = hiddenWorkBottom - afterBottom;
             double expectedReservedPx = (shellDip.Height + settings.EdgeMargin) * scale;

@@ -12,7 +12,7 @@
             <TranslateTransform x:Name="DockSlide" Y="24" />
         </Grid.RenderTransform>
 
-        <Border x:Name="Shell" CornerRadius="{Binding ShellRadius}"
+        <Border x:Name="Shell" CornerRadius="{Binding ShellCornerRadius}"
                 Background="{DynamicResource C.DockShell}"
                 BorderBrush="{Binding StrokeBrush}" BorderThickness="1"
                 MinHeight="{Binding Settings.DockHeight}"
@@ -22,12 +22,12 @@
 
             <Grid ClipToBounds="False">
                 <Grid x:Name="ShellChrome">
-                <Border CornerRadius="{Binding ShellRadius}" Background="{Binding Backdrop}"
+                <Border CornerRadius="{Binding ShellCornerRadius}" Background="{Binding Backdrop}"
                         Visibility="{Binding BackdropVisibility}" Opacity="0.55" />
 
-                <Border CornerRadius="{Binding ShellRadius}" Background="{Binding TintBrush}" />
+                <Border CornerRadius="{Binding ShellCornerRadius}" Background="{Binding TintBrush}" />
 
-                <Border CornerRadius="{Binding ShellRadius}" IsHitTestVisible="False"
+                <Border CornerRadius="{Binding ShellCornerRadius}" IsHitTestVisible="False"
                         Visibility="{Binding ChromeGlowVisibility}">
                     <Border.Background>
                         <RadialGradientBrush Center="0.14,0.35" GradientOrigin="0.14,0.35"
@@ -39,7 +39,7 @@
                     <Border.Opacity>0.3</Border.Opacity>
                 </Border>
 
-                <Border CornerRadius="{Binding ShellRadius}" IsHitTestVisible="False"
+                <Border CornerRadius="{Binding ShellCornerRadius}" IsHitTestVisible="False"
                         Visibility="{Binding ChromeGlowVisibility}">
                     <Border.Background>
                         <RadialGradientBrush Center="0.88,0.5" GradientOrigin="0.88,0.5"
@@ -51,26 +51,30 @@
                     <Border.Opacity>0.22</Border.Opacity>
                 </Border>
 
-                <Border CornerRadius="{Binding ShellRadius}" Background="{StaticResource GrainBrush}"
+                <Border CornerRadius="{Binding ShellCornerRadius}" Background="{StaticResource GrainBrush}"
                         IsHitTestVisible="False"
                         Visibility="{Binding ChromeGrainVisibility}" />
 
                 <!-- Bevel: a light line just inside the top stroke and a dark one
                      just above the bottom stroke. Both are rounded, so no line
                      stops in mid-air over a corner, and both are theme-aware: on
-                     a light preset a white line used to disappear. -->
+                     a light preset a white line used to disappear.
+                     Sul bordo basso dello schermo le due linee inferiori
+                     sparirebbero nella cornice del monitor, quindi si spengono. -->
                 <Border CornerRadius="{Binding InnerRadius}" IsHitTestVisible="False"
                         BorderThickness="0,1,0,0" BorderBrush="{DynamicResource C.DockHighlight}" />
 
-                <Border CornerRadius="{Binding InnerRadius}" IsHitTestVisible="False"
-                        BorderThickness="0,0,0,1" BorderBrush="{DynamicResource C.DockShade}" />
+                <Grid Visibility="{Binding ChromeBottomLineVisibility}">
+                    <Border CornerRadius="{Binding InnerRadius}" IsHitTestVisible="False"
+                            BorderThickness="0,0,0,1" BorderBrush="{DynamicResource C.DockShade}" />
 
-                <Border CornerRadius="{Binding InnerRadius}" Margin="1" IsHitTestVisible="False"
-                        BorderThickness="0,0,0,1" BorderBrush="{DynamicResource C.AccentGrad}" Opacity="0.16"
-                        Visibility="{Binding ChromeShimmerVisibility}" />
+                    <Border CornerRadius="{Binding InnerRadius}" Margin="1" IsHitTestVisible="False"
+                            BorderThickness="0,0,0,1" BorderBrush="{DynamicResource C.AccentGrad}" Opacity="0.16"
+                            Visibility="{Binding ChromeShimmerVisibility}" />
+                </Grid>
 
                 <Border x:Name="LiquidSheen" Width="280" HorizontalAlignment="Left"
-                        CornerRadius="{Binding ShellRadius}"
+                        CornerRadius="{Binding ShellCornerRadius}"
                         IsHitTestVisible="False" Opacity="0.16"
                         Visibility="{Binding ChromeSheenVisibility}">
                     <Border.Background>
@@ -87,7 +91,7 @@
 
                 <!-- Finiture semplici: un unico colore pieno, senza bagliori,
                      grana, riflessi o ombre. -->
-                <Border x:Name="FlatFill" CornerRadius="{Binding ShellRadius}"
+                <Border x:Name="FlatFill" CornerRadius="{Binding ShellCornerRadius}"
                         Background="{Binding FlatFillBrush}" IsHitTestVisible="False"
                         Visibility="{Binding FlatFillVisibility}" />
                 </Grid>

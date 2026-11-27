@@ -21,6 +21,21 @@ public partial class DockWindow : Window
     private const double ShadowBottom = 26;
     private const int WmDisplayChange = 0x007E;
 
+    /// <summary>
+    /// La taskbar a tutta larghezza appoggia sul bordo basso del monitor: parte
+    /// dal bordo dello schermo, senza trasparenza sotto, e conserva solo gli
+    /// angoli superiori arrotondati. Se l'utente sceglie un margine dal bordo la
+    /// barra resta staccata e arrotondata anche sotto.
+    /// </summary>
+    private bool FlushTaskbar =>
+        _vm.Settings.ReplaceWindowsTaskbar &&
+        _vm.Settings.TaskbarFullWidth &&
+        !_vm.Settings.DockOnTop &&
+        _vm.Settings.EdgeMargin <= 0.5;
+
+    /// <summary>Trasparenza sotto la barra: zero quando tocca il bordo dello schermo.</summary>
+    private double BottomPad => FlushTaskbar ? 0 : ShadowBottom;
+
     private readonly DockViewModel _vm;
     private readonly SettingsStore _store;
     private readonly int? _forcedMonitor;
@@ -316,11 +331,12 @@ public partial class DockWindow : Window
             // Absorb it in the transparent side margin so the *shell* keeps the
             // exact requested width and edge distance on every DPI.
             double side = Math.Max(0, (ActualWidth - desiredShell) / 2);
-            Root.Margin = new Thickness(side, ShadowTop, side, ShadowBottom);
+            Root.Margin = new Thickness(side, ShadowTop, side, BottomPad);
         }
-        else if (Math.Abs(Root.Margin.Left - 26) > 0.5)
+        else if (Math.Abs(Root.Margin.Left - 26) > 0.5 ||
+                 Math.Abs(Root.Margin.Bottom - BottomPad) > 0.5)
         {
-            Root.Margin = new Thickness(26, ShadowTop, 26, ShadowBottom);
+            Root.Margin = new Thickness(26, ShadowTop, 26, BottomPad);
         }
 
         Left = work.Left + (work.Width - ActualWidth) / 2;
@@ -330,6 +346,7 @@ public partial class DockWindow : Window
             Top = VisibleTop();
         }
 
+        UpdateShellBottomEdge();
         UpdateAppBar();
         UpdateIslandSlot();
 
@@ -394,7 +411,7 @@ public partial class DockWindow : Window
             return;
         }
 
-        double height = Math.Max(28, ActualHeight - ShadowTop - ShadowBottom + _vm.Settings.EdgeMargin);
+        double height = Math.Max(28, ActualHeight - ShadowTop - BottomPad + _vm.Settings.EdgeMargin);
         AppBarApplySucceeded = _appBar.Apply(this, _vm.Settings.DockOnTop, height, MonitorIndex);
 
         // Windows can grant a strip that is not flush with the monitor edge
@@ -829,12 +846,30 @@ public partial class DockWindow : Window
         ShellChrome.Visibility = separate ? Visibility.Collapsed : Visibility.Visible;
 
         // The flat finish is a single full colour: no border, no glass shell.
-        bool borderless = separate || _vm.DockFinish == "flat";
-        Shell.BorderThickness = borderless ? new Thickness(0) : new Thickness(1);
+        UpdateShellBottomEdge();
         if (_vm.DockFinish == "glass" && !separate)
             Shell.SetResourceReference(BackgroundProperty, "C.DockShell");
         else
             Shell.Background = Brushes.Transparent;
+    }
+
+    /// <summary>
+    /// Il bordo della barra. Sulla taskbar a filo dello schermo il lato
+    /// inferiore non esiste: una linea da 1 px sul bordo del monitor si
+    /// vedrebbe come una cornice sotto la barra.
+    /// </summary>
+    private void UpdateShellBottomEdge()
+    {
+        if (Shell is null)
+            return;
+
+        bool borderless = _vm.Settings.DockZonesSeparate || _vm.DockFinish == "flat";
+        Thickness thickness = borderless
+            ? new Thickness(0)
+            : FlushTaskbar ? new Thickness(1, 1, 1, 0) : new Thickness(1);
+
+        if (Shell.BorderThickness != thickness)
+            Shell.BorderThickness = thickness;
     }
 
     private double VisibleTop()
@@ -851,7 +886,7 @@ public partial class DockWindow : Window
             double scale = Math.Max(0.5, ScreenGeometry.Scale(ScreenGeometry.Target(MonitorIndex)));
             double stripTop = strip.Top / scale;
             double stripBottom = strip.Bottom / scale;
-            double shellHeight = Math.Max(1, ActualHeight - ShadowTop - ShadowBottom);
+            double shellHeight = Math.Max(1, ActualHeight - ShadowTop - BottomPad);
 
             return _vm.Settings.DockOnTop
                 ? stripTop + margin - ShadowTop
@@ -861,7 +896,7 @@ public partial class DockWindow : Window
         Rect work = CurrentWorkArea();
         return _vm.Settings.DockOnTop
             ? work.Top - ShadowTop + margin
-            : work.Bottom + ShadowBottom - margin - ActualHeight;
+            : work.Bottom + BottomPad - margin - ActualHeight;
     }
 
     private double HiddenTop()
@@ -873,7 +908,7 @@ public partial class DockWindow : Window
     }
 
     private void UpdateBackdrop() =>
-        _vm.SetDockSize(Math.Max(1, ActualWidth - 52), Math.Max(1, ActualHeight - ShadowTop - ShadowBottom));
+        _vm.SetDockSize(Math.Max(1, ActualWidth - 52), Math.Max(1, ActualHeight - ShadowTop - BottomPad));
 
     private void OnWatchTick(object? sender, EventArgs e)
     {
