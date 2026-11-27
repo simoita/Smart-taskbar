@@ -162,6 +162,16 @@ public sealed class SettingsStore : IDisposable
             s.SettingsVersion = 2;
         }
 
+        if (s.SettingsVersion < 3)
+        {
+            // La barra è una superficie piena senza bordo, come la taskbar di
+            // Windows: chi aveva il vetro predefinito passa al monocolore
+            // piatto. Chi ha scelto "Contorno" lo mantiene.
+            if (s.DockFinish is not ("flat" or "outline"))
+                s.DockFinish = "flat";
+            s.SettingsVersion = 3;
+        }
+
         s.TaskbarWidgets ??= new List<string> { "stats", "battery", "clock" };
         var taskbarWidgets = new List<string>();
         foreach (string id in s.TaskbarWidgets)

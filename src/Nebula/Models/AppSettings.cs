@@ -59,7 +59,7 @@ public sealed class AppSettings : ObservableObject
     private int _monitorIndex;
     private bool _monitorFollowCursor;
     private bool _taskbarAllMonitors;
-    private string _dockFinish = "glass";
+    private string _dockFinish = "flat";
     private bool _panelsFollowDock = true;
     private bool _compactMode;
     private bool _enableTabs = true;
@@ -707,5 +707,5 @@ public sealed class AppSettings : ObservableObject
 
     public List<string> RecentApps { get; set; } = new();
 
-    public static AppSettings CreateDefault() => new() { SettingsVersion = 2 };
+    public static AppSettings CreateDefault() => new() { SettingsVersion = 3 };
 }

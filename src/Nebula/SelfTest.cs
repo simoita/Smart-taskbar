@@ -103,6 +103,18 @@ public partial class App
             Add(checks, "settings.dock_buttons", reloadedButtons == "lock,taskview",
                 $"reloaded={reloadedButtons} (atteso lock,taskview)");
 
+            // Un profilo della vecchia release (vetro, schema 2) deve passare
+            // una volta alla barra piena: niente bordo colorato.
+            settings.DockFinish = "glass";
+            settings.SettingsVersion = 2;
+            store.SaveNow();
+            store.Dispose();
+            store = new SettingsStore();
+            settings = store.Settings;
+            bool flatMigration = settings.DockFinish == "flat" && settings.SettingsVersion == 3;
+            Add(checks, "settings.flat_migration", flatMigration,
+                $"finish={settings.DockFinish}; version={settings.SettingsVersion}");
+
             Forms.Screen screen = ScreenGeometry.Target(settings.MonitorIndex);
             double scale = ScreenGeometry.Scale(screen);
             Write(report, $"Screen: {screen.Bounds.Width}x{screen.Bounds.Height} px; DPI scale={scale:0.##}");
@@ -204,15 +216,19 @@ public partial class App
             Rect flushShell = dock.ShellBoundsDip;
             Point flushBottomRight = dock.PointToScreen(new Point(flushShell.Right, flushShell.Bottom));
             CornerRadius flushCorners = dock.Shell.CornerRadius;
+            // La finitura piena non ha alcun bordo; il vetro mantiene la
+            // cornice superiore ma non quella sul bordo dello schermo.
+            bool borderAllowed = settings.DockFinish == "flat"
+                ? dock.Shell.BorderThickness == new Thickness(0)
+                : dock.Shell.BorderThickness.Bottom == 0 && dock.Shell.BorderThickness.Top > 0;
             bool flushBottom =
                 Math.Abs(flushBottomRight.Y - screen.Bounds.Bottom) <= 3.0 &&
                 flushCorners.BottomLeft == 0 && flushCorners.BottomRight == 0 &&
-                flushCorners.TopLeft > 0 && flushCorners.TopRight > 0 &&
-                dock.Shell.BorderThickness.Bottom == 0 &&
-                dock.Shell.BorderThickness.Top > 0;
+                flushCorners.TopLeft > 0 && flushCorners.TopRight > 0 && borderAllowed;
             Add(checks, "dock.flush_bottom", flushBottom,
-                $"shellBottom={flushBottomRight.Y:0.#}px screenBottom={screen.Bounds.Bottom}px; " +
-                $"corners={flushCorners}; border={dock.Shell.BorderThickness}");
+                $"finish={settings.DockFinish}; shellBottom={flushBottomRight.Y:0.#}px " +
+                $"screenBottom={screen.Bounds.Bottom}px; corners={flushCorners}; " +
+                $"border={dock.Shell.BorderThickness}");
             settings.EdgeMargin = 10;
             dock.Reposition();
             await Task.Delay(450);
@@ -396,6 +412,19 @@ public partial class App
                 dockVm.DockButtonsVisibility == Visibility.Visible,
                 $"model={dockButtonOrder}; visual={dockButtonHost}; " +
                 $"visibility={dockVm.DockButtonsVisibility}");
+
+            // La barra predefinita è un unico colore pieno senza cornice:
+            // si distingue dallo sfondo per il riempimento, non per un bordo.
+            string fillInfo = dock.FlatFill.Background is SolidColorBrush fill
+                ? $"#{fill.Color.R:X2}{fill.Color.G:X2}{fill.Color.B:X2}/A={fill.Color.A}"
+                : dock.FlatFill.Background?.GetType().Name ?? "null";
+            bool solidShell = settings.DockFinish == "flat" &&
+                              dock.Shell.BorderThickness == new Thickness(0) &&
+                              dock.FlatFill.Visibility == Visibility.Visible &&
+                              dock.FlatFill.Background is SolidColorBrush { Color.A: 255 };
+            Add(checks, "dock.solid_shell", solidShell,
+                $"finish={settings.DockFinish}; border={dock.Shell.BorderThickness}; " +
+                $"fill={dock.FlatFill.Visibility}/{fillInfo}");
             Capture(dock.ActionsZone, Path.Combine(outputDir, "dock-actions.png"));
 
             store.SaveNow();

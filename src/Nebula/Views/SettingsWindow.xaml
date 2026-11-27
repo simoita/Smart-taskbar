@@ -748,7 +748,7 @@
                                                         <StackPanel MaxWidth="500" HorizontalAlignment="Left">
                                                             <TextBlock Text="Finitura della barra" FontSize="13"
                                                                        Foreground="{DynamicResource C.Text}" />
-                                                            <TextBlock Text="Vetro con bagliori, oppure un monocolore piatto senza ombre, grana e riflessi."
+                                                            <TextBlock Text="Monocolore piatto (predefinito, come la taskbar di Windows) oppure vetro con bagliori e contorno."
                                                                        Style="{StaticResource T.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
                                                         </StackPanel>
                                                         <ComboBox Width="238" Height="32" HorizontalAlignment="Right"
