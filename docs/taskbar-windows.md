@@ -127,6 +127,10 @@ volta per migrare la configurazione esistente, poi la lista è l'unica fonte di
 verità. I widget sono indipendenti dall'ordine delle zone e possono stare anche
 in una dock non a tutta larghezza.
 
+## Superficie della barra
+
+La barra usa di default **Monocolore piatto**: un solo colore pieno e opaco, ricavato dal tema, senza bordo, linee d'accento, bagliori o grana. È il modo in cui la barra si stacca dallo sfondo senza cornici, come la taskbar di Windows. In **Studio → Stile → Finitura della barra** restano disponibili **Vetro** e **Contorno** per chi li preferisce. I profili creati prima della 1.11.0 con la finitura Vetro passano una volta a Monocolore piatto durante l'aggiornamento (schema impostazioni 3); la scelta si può cambiare in qualsiasi momento.
+
 ## Ingresso animato della dock
 
 La dock entra in scena come un unico blocco: parte oltre il bordo dello schermo
