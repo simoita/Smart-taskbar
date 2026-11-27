@@ -2,12 +2,20 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Nebula.Controls"
+        xmlns:views="clr-namespace:Nebula.Views"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Nebula Widgets" Width="440" SizeToContent="Height"
-        WindowStyle="SingleBorderWindow" AllowsTransparency="False"
+        WindowStyle="None" AllowsTransparency="False"
         Background="{DynamicResource C.Bg}"
         ShowInTaskbar="True" ResizeMode="NoResize"
         WindowStartupLocation="Manual" UseLayoutRounding="True" SnapsToDevicePixels="True"
         FontFamily="{DynamicResource S.FontFamily}">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="0"
+                            CornerRadius="0" GlassFrameThickness="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
 
     <Border x:Name="Card" Margin="10"
             CornerRadius="{DynamicResource S.CardRadius}"
@@ -40,11 +48,8 @@
                                        FontSize="9.5" Foreground="{DynamicResource C.TextMuted}" />
                         </StackPanel>
                     </StackPanel>
-                    <Button Style="{StaticResource IconButton}" Width="28" Height="28"
-                            HorizontalAlignment="Right" Click="OnCloseClick" ToolTip="Chiudi"
-                            AutomationProperties.Name="Chiudi pannello">
-                        <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="11" />
-                    </Button>
+                    <views:CaptionButtons ShowMaximize="False"
+                                          HorizontalAlignment="Right" VerticalAlignment="Center" />
                 </Grid>
 
                 <Border Background="{DynamicResource S.InnerBg}"

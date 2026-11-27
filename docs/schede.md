@@ -17,13 +17,19 @@ Nebula rifiuta le finestre che non può gestire in sicurezza: finestre di sistem
 
 La tab bar contiene una scheda per ogni finestra, con titolo e icona reali. Il titolo si aggiorna automaticamente quando la finestra lo cambia.
 
+Con **Posizione = Sopra la finestra** la barra è la barra superiore della finestra attiva: copre esattamente la vecchia barra del titolo di Windows (stessa larghezza, stessa altezza della fascia, stesso bordo) e al suo posto mostra le schede e i pulsanti **riduci**, **ingrandisci/ripristina** e **chiudi**. Il trascinamento della barra sposta la finestra con l'aggancio di Windows, il doppio clic la ingrandisce o ripristina, e dai bordi della barra si ridimensiona la finestra come dalla cornice. Le finestre che disegnano da sé la propria intestazione (nessuna fascia non client) non possono essere coperte senza tagliarne il contenuto: per loro, e per **Posizione = Sotto la finestra**, la barra resta staccata e usa l'altezza scelta nello studio.
+
 | Azione | Come |
 | --- | --- |
 | Selezionare | Clic sulla scheda |
 | Riordinare | Trascinare la scheda |
 | Chiudere la finestra | × sulla scheda, oppure menu destro → **Chiudi finestra** |
 | Staccare la finestra dal gruppo | Menu destro → **Stacca scheda** |
-| Chiudere il gruppo | × a destra della barra, oppure menu destro → **Chiudi gruppo e ripristina le finestre** |
+| Ridurre, ingrandire, chiudere | Pulsanti della finestra a destra nella barra |
+| Spostare la finestra | Trascinare la barra |
+| Ridimensionare la finestra | Trascinare il bordo della barra |
+| Menu di sistema | Menu destro sulla barra (ripristina, sposta, dimensiona, riduci, ingrandisci, chiudi) |
+| Chiudere il gruppo | Menu destro → **Chiudi gruppo e ripristina le finestre** |
 
 Selezionando una scheda, la finestra corrispondente torna in primo piano e le altre vengono nascoste. Le finestre nascoste conservano la loro `WINDOWPLACEMENT` originale: staccandole o chiudendo il gruppo vengono riportate esattamente alla posizione e dimensione di quando sono entrate nel gruppo. Se una finestra viene chiusa dall'utente o dall'app, la sua scheda sparisce entro il tick di controllo (300 ms).
 
@@ -35,8 +41,8 @@ Nello studio, pagina **Schede**:
 
 - **Attiva le schede**: abilita o disabilita la funzione. Disattivandola, tutti i gruppi vengono chiusi e le finestre ripristinate.
 - **Stile**: **Vetro**, **Minimal**, **Neon**, **Soft**, **Mono**, **Liquid**; cambia angoli, riempimento, bordo e accento della barra.
-- **Altezza della barra**: da 34 a 64 px.
-- **Posizione**: sopra o sotto la finestra attiva.
+- **Altezza della barra**: da 34 a 64 px, usata quando la barra resta staccata. Se prende il posto del titolo di Windows segue l'altezza della fascia della finestra.
+- **Posizione**: **Sopra** sostituisce la barra del titolo; **Sotto** lascia la barra staccata sotto la finestra.
 - **Animazioni**: apertura, cambio scheda e chiusura seguono **Animazioni fluide** e **Velocità** della pagina Animazioni. Con le animazioni disattivate la barra compare e scompare senza dissolvenza.
 
 Tutte le impostazioni vengono salvate in `%APPDATA%\Nebula\settings.json` e applicate dal vivo senza riavviare Nebula.
@@ -72,6 +78,7 @@ La tab bar compare in **16–29 ms** dal comando di raggruppamento (misurato dal
 - Creazione gruppo da dock, menu contestuale della dock e studio.
 - Cambio scheda con finestra in primo piano e altre nascoste.
 - Riordino con trascinamento.
+- Barra in alto su due finestre WinForms reali: rettangolo della barra uguale alla fascia visibile della finestra (267,200–1033,231), `clientTop=231`, nessun pixel del contenuto coperto; pulsanti riduci/ingrandisci/chiudi e cattura `tabbar-window-top.png` nel self-test.
 - Titolo aggiornato a runtime: la scheda ha seguito il nuovo titolo.
 - Chiusura di un membro: processo terminato, scheda rimossa senza fantasmi.
 - Stacco: geometria originale ripristinata esattamente (350,260,760×480).

@@ -1,0 +1,27 @@
+<UserControl x:Class="Nebula.Views.CaptionButtons"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+             Focusable="False">
+
+    <StackPanel Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+        <Button x:Name="MinButton" Style="{StaticResource CaptionButton}"
+                ToolTip="Riduci a icona" Click="OnMinimizeClick"
+                AutomationProperties.Name="Riduci a icona">
+            <TextBlock Text="&#xE921;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+        </Button>
+
+        <Button x:Name="MaxButton" Style="{StaticResource CaptionButton}"
+                ToolTip="Ingrandisci" Click="OnMaximizeClick"
+                AutomationProperties.Name="Ingrandisci">
+            <TextBlock x:Name="MaxGlyph" Text="&#xE922;"
+                       FontFamily="Segoe Fluent Icons" FontSize="10" />
+        </Button>
+
+        <Button x:Name="CloseButton" Style="{StaticResource CaptionCloseButton}"
+                ToolTip="Chiudi" Click="OnCloseClick"
+                AutomationProperties.Name="Chiudi">
+            <TextBlock Text="&#xE8BB;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+        </Button>
+    </StackPanel>
+</UserControl>

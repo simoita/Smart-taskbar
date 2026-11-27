@@ -54,7 +54,7 @@ Nessuna impostazione con editor compare su due pagine. Il file completo con righ
 ## Effetto di ogni gruppo di controlli
 
 ### Barra del titolo e navigazione
-- Riduci a icona: `WindowState = Minimized`; Chiudi: chiude lo Studio; trascinamento: `DragMove`.
+- La barra del titolo è disegnata da Nebula (`CaptionButtons`): riduci, ingrandisci/ripristina e chiudi agiscono sul `Window`; `WindowChrome` mantiene trascinamento, aggancio, doppio clic e ridimensionamento nativi.
 - Dieci voci di navigazione: `ShowPage` rende visibile una sola pagina e aggiorna titolo/sottotitolo.
 - `SizeChanged` del Chrome: aggiorna il clip arrotondato della finestra.
 

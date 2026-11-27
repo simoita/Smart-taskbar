@@ -215,5 +215,8 @@ public partial class IconPickerWindow : Window
         DialogResult = true;
     }
 
+    private void OnHeaderDrag(object sender, System.Windows.Input.MouseButtonEventArgs e) =>
+        PanelDrag.MoveWindow(this, e);
+
     private void OnCancelClick(object sender, RoutedEventArgs e) => DialogResult = false;
 }

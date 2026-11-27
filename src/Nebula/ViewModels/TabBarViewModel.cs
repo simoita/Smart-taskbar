@@ -47,11 +47,14 @@ public sealed class TabBarViewModel : ObservableObject
     private readonly TabGroupService _service;
     private readonly AppSettings _settings;
 
+    private double _barHeight;
+
     public TabBarViewModel(TabGroup group, TabGroupService service, AppSettings settings)
     {
         _group = group;
         _service = service;
         _settings = settings;
+        _barHeight = Math.Clamp(settings.TabsBarHeight, 34, 64);
         Sync();
     }
 
@@ -59,7 +62,28 @@ public sealed class TabBarViewModel : ObservableObject
     public ObservableCollection<TabChipViewModel> Tabs { get; } = new();
 
     public string StyleKey => _settings.TabsStyle;
-    public double BarHeight => Math.Clamp(_settings.TabsBarHeight, 34, 64);
+
+    /// <summary>Altezza corrente: quella della fascia della finestra o quella scelta per la barra staccata.</summary>
+    public double BarHeight => _barHeight;
+
+    public double ChipHeight => Math.Max(20, _barHeight - 8);
+    public double ChipIconSize => Math.Clamp(_barHeight - 13, 14, 22);
+    public double ChipCloseSize => Math.Clamp(_barHeight - 11, 16, 22);
+    public double ChipMarkHeight => Math.Clamp(_barHeight - 16, 10, 18);
+
+    public void SetBarHeight(double value)
+    {
+        value = Math.Clamp(value, 28, 72);
+        if (Math.Abs(_barHeight - value) < 0.1)
+            return;
+
+        _barHeight = value;
+        OnPropertyChanged(nameof(BarHeight));
+        OnPropertyChanged(nameof(ChipHeight));
+        OnPropertyChanged(nameof(ChipIconSize));
+        OnPropertyChanged(nameof(ChipCloseSize));
+        OnPropertyChanged(nameof(ChipMarkHeight));
+    }
     public string BarPosition => _settings.TabsBarPosition;
     public bool Animations => _settings.AnimationsEnabled;
     public double AnimationSpeed => Math.Clamp(_settings.AnimationSpeed, 0.5, 2);

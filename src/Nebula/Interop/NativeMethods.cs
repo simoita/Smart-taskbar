@@ -22,6 +22,24 @@ public static class NativeMethods
     public const uint SW_SHOWMAXIMIZED = 3;
 
     public const int WM_CLOSE = 0x0010;
+    public const uint WM_NCLBUTTONDOWN = 0x00A1;
+    public const uint WM_SYSCOMMAND = 0x0112;
+    public const uint SW_SHOWNOACTIVATE = 4;
+    public const int HTCAPTION = 2;
+    public const int HTLEFT = 10;
+    public const int HTRIGHT = 11;
+    public const int HTTOP = 12;
+    public const int HTTOPLEFT = 13;
+    public const int HTTOPRIGHT = 14;
+    public const int HTBOTTOM = 15;
+    public const int HTBOTTOMLEFT = 16;
+    public const int HTBOTTOMRIGHT = 17;
+    public const int SC_SIZE = 0xF000;
+    public const int SC_MOVE = 0xF010;
+    public const int SC_MINIMIZE = 0xF020;
+    public const int SC_MAXIMIZE = 0xF030;
+    public const int SC_RESTORE = 0xF120;
+    public const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
     public const int GA_ROOT = 2;
     public const int HWND_TOPMOST = -1;
     public const int GW_HWNDNEXT = 2;
@@ -252,6 +270,24 @@ public static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
+
+    [DllImport("user32.dll")]
+    public static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool ReleaseCapture();
+
+    [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")]
+    public static extern int DwmGetWindowAttributeRect(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetTopWindow(IntPtr hWnd);

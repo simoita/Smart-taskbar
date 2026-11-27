@@ -594,6 +594,116 @@ public partial class App
             island.Close();
             island = null;
 
+            // 8c. La tab bar prende il posto della barra del titolo di Windows:
+            // due finestre classiche esterne vengono raggruppate davvero e la
+            // barra deve coprire esattamente la fascia del titolo, senza
+            // coprire il contenuto e senza lasciare scoperto il bordo vecchio.
+            string probeScript = Path.Combine(dataDir, "tab-probe.ps1");
+            File.WriteAllText(probeScript,
+                "param([string]$Title)\r\n" +
+                "Add-Type -AssemblyName System.Windows.Forms\r\n" +
+                "$f = New-Object System.Windows.Forms.Form\r\n" +
+                "$f.Text = $Title\r\n" +
+                "$f.Width = 780\r\n" +
+                "$f.Height = 520\r\n" +
+                "$f.StartPosition = 'Manual'\r\n" +
+                "$f.Left = 260\r\n" +
+                "$f.Top = 200\r\n" +
+                "[void]$f.ShowDialog()\r\n");
+
+            var probeProcesses = new List<System.Diagnostics.Process>();
+            var probeService = new TabGroupService(settings);
+            TabBarWindow? probeBar = null;
+            bool previousEnableTabs = settings.EnableTabs;
+            try
+            {
+                settings.EnableTabs = true;
+                for (int i = 0; i < 2; i++)
+                {
+                    probeProcesses.Add(System.Diagnostics.Process.Start(
+                        new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = "powershell.exe",
+                            Arguments = "-NoProfile -ExecutionPolicy Bypass -File \"" + probeScript +
+                                        "\" -Title \"Nebula tab probe " + (char)('A' + i) + "\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        })!);
+                }
+
+                IntPtr probeA = IntPtr.Zero;
+                IntPtr probeB = IntPtr.Zero;
+                await WaitUntilAsync(() =>
+                {
+                    probeA = NativeMethods.FindWindow(null, "Nebula tab probe A");
+                    probeB = NativeMethods.FindWindow(null, "Nebula tab probe B");
+                    return probeA != IntPtr.Zero && probeB != IntPtr.Zero;
+                }, 12000);
+
+                string tabDetail = $"A={probeA}; B={probeB}";
+                bool tabCovered = false;
+                if (probeA != IntPtr.Zero && probeB != IntPtr.Zero &&
+                    probeService.CreateGroup(new[] { probeA, probeB }, out string? tabError))
+                {
+                    TabGroup group = probeService.Groups[0];
+                    probeBar = new TabBarWindow(group, probeService, settings, theme)
+                    {
+                        ShowActivated = false
+                    };
+                    probeBar.Show();
+                    await Task.Delay(900);
+                    probeBar.UpdateLayout();
+
+                    IntPtr active = group.ActiveMember?.Handle ?? IntPtr.Zero;
+                    IntPtr barHandle = new WindowInteropHelper(probeBar).Handle;
+                    NativeMethods.GetWindowRect(barHandle, out NativeMethods.RECT probeBarRect);
+                    NativeMethods.GetWindowRect(active, out NativeMethods.RECT probeWindowRect);
+                    NativeMethods.GetClientRect(active, out _);
+                    var clientOrigin = new NativeMethods.POINT();
+                    NativeMethods.ClientToScreen(active, ref clientOrigin);
+
+                    NativeMethods.DwmGetWindowAttributeRect(
+                        active, NativeMethods.DWMWA_EXTENDED_FRAME_BOUNDS,
+                        out NativeMethods.RECT probeVisible, Marshal.SizeOf<NativeMethods.RECT>());
+
+                    int band = clientOrigin.Y - probeVisible.Top;
+                    tabCovered = band >= 26 &&
+                                 Math.Abs(probeBarRect.Left - probeVisible.Left) <= 2 &&
+                                 Math.Abs(probeBarRect.Top - probeVisible.Top) <= 2 &&
+                                 Math.Abs((probeBarRect.Right - probeBarRect.Left) - (probeVisible.Right - probeVisible.Left)) <= 2 &&
+                                 Math.Abs((probeBarRect.Bottom - probeBarRect.Top) - band) <= 2;
+                    tabDetail = $"bar={probeBarRect.Left},{probeBarRect.Top},{probeBarRect.Right},{probeBarRect.Bottom}; " +
+                                $"visible={probeVisible.Left},{probeVisible.Top},{probeVisible.Right},{probeVisible.Bottom}; " +
+                                $"window={probeWindowRect.Left},{probeWindowRect.Top},{probeWindowRect.Right},{probeWindowRect.Bottom}; " +
+                                $"clientTop={clientOrigin.Y} band={band}";
+                }
+                else
+                {
+                    tabDetail += "; gruppo non creato";
+                }
+
+                Add(checks, "tabs.custom_title_bar", tabCovered, tabDetail);
+                if (probeBar is not null)
+                    Capture(probeBar.Bar, Path.Combine(outputDir, "tabbar-window-top.png"));
+            }
+            finally
+            {
+                try { probeBar?.Close(); } catch { }
+                try { probeService.CloseAll(); } catch { }
+                probeService.Dispose();
+                settings.EnableTabs = previousEnableTabs;
+                foreach (System.Diagnostics.Process process in probeProcesses)
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                            process.Kill();
+                    }
+                    catch { }
+                    process.Dispose();
+                }
+            }
+
             // 9. Studio layout at common sizes, plus screenshots of every page.
             var tabs = new TabGroupService(settings);
             var icons = new SystemIconService();
@@ -604,17 +714,22 @@ public partial class App
             await WaitUntilAsync(() => studio.IsLoaded, 4000);
             await Task.Delay(500);
 
-            // 9a. Le pagine dell'app sono finestre classiche di Windows:
-            // cornice e barra del titolo native, nessuna finestra trasparente
-            // senza bordo che non si può spostare.
-            Add(checks, "studio.classic_window",
-                studio.WindowStyle == WindowStyle.SingleBorderWindow && !studio.AllowsTransparency,
+            // 9a. Le pagine dell'app non usano più la barra del titolo di
+            // Windows: cornice disegnata da Nebula, con trascinamento, aggancio,
+            // ridimensionamento e pulsanti della finestra ancora disponibili.
+            bool studioChrome = studio.WindowStyle == WindowStyle.None &&
+                                !studio.AllowsTransparency &&
+                                System.Windows.Shell.WindowChrome.GetWindowChrome(studio) is not null &&
+                                studio.FindName("StudioCaption") is CaptionButtons &&
+                                studio.ResizeMode == ResizeMode.CanResize;
+            Add(checks, "studio.custom_chrome", studioChrome,
                 $"style={studio.WindowStyle}; transparent={studio.AllowsTransparency}; " +
-                $"resize={studio.ResizeMode}; taskbar={studio.ShowInTaskbar}");
+                $"resize={studio.ResizeMode}; taskbar={studio.ShowInTaskbar}; " +
+                $"caption={studio.FindName("StudioCaption")?.GetType().Name ?? "no"}");
 
-            // 9b. Anche le altre pagine che si aprono dall'app sono finestre
-            // classiche: crearle qui verifica che la cornice nativa non rompa
-            // il caricamento di nessuna di esse.
+            // 9b. Anche le altre pagine che si aprono dall'app usano la cornice
+            // disegnata da Nebula: crearle qui verifica che il nuovo chrome non
+            // rompa il caricamento di nessuna di esse.
             var pages = new List<(string Name, Window Window)>();
             try
             {
@@ -631,10 +746,11 @@ public partial class App
                         pages.Add(("start", new StartPanelWindow()));
                 }
 
-                bool classicPages = pages.Count >= 2 && pages.All(page =>
-                    page.Window.WindowStyle == WindowStyle.SingleBorderWindow &&
-                    !page.Window.AllowsTransparency);
-                Add(checks, "pages.classic_windows", classicPages,
+                bool chromePages = pages.Count >= 2 && pages.All(page =>
+                    page.Window.WindowStyle == WindowStyle.None &&
+                    !page.Window.AllowsTransparency &&
+                    System.Windows.Shell.WindowChrome.GetWindowChrome(page.Window) is not null);
+                Add(checks, "pages.custom_chrome", chromePages,
                     pages.Count == 0
                         ? "App.Instance non disponibile"
                         : string.Join(", ", pages.Select(page =>
