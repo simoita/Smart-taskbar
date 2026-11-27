@@ -725,6 +725,24 @@ public partial class App
                     await Task.Delay(900);
                     probeBar.UpdateLayout();
 
+                    // Ogni scheda è ritagliata sulla propria pillola: accento e
+                    // sottolineatura non possono sbordare dagli angoli.
+                    var tabRoots = FindVisualChildren<Border>(probeBar.TabItems)
+                        .Where(border => border.Name == "TabRoot")
+                        .ToList();
+                    bool chipClip = tabRoots.Count == 2 && tabRoots.All(root =>
+                        root.Clip is RectangleGeometry geometry &&
+                        Math.Abs(geometry.Rect.Width - root.ActualWidth) <= 1 &&
+                        Math.Abs(geometry.Rect.Height - root.ActualHeight) <= 1 &&
+                        Math.Abs(geometry.RadiusX - root.CornerRadius.TopLeft) <= 0.1 &&
+                        geometry.RadiusX > 0);
+                    Add(checks, "tabs.chip_clip", chipClip,
+                        tabRoots.Count == 0
+                            ? "nessuna scheda trovata"
+                            : string.Join(", ", tabRoots.Select(root =>
+                                $"{root.ActualWidth:0.#}x{root.ActualHeight:0.#}/" +
+                                $"{(root.Clip is RectangleGeometry g ? $"r={g.RadiusX:0.#}" : "no-clip")}")));
+
                     IntPtr active = group.ActiveMember?.Handle ?? IntPtr.Zero;
                     IntPtr barHandle = new WindowInteropHelper(probeBar).Handle;
                     NativeMethods.GetWindowRect(barHandle, out NativeMethods.RECT probeBarRect);

@@ -52,9 +52,13 @@
                                 <Border x:Name="TabRoot"
                                         Height="{Binding DataContext.ChipHeight, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                         MinWidth="120" MaxWidth="248"
-                                        Margin="1,0" Padding="7,0,4,0"
+                                        Margin="1,0"
                                         CornerRadius="7"
                                         Background="Transparent"
+                                        ClipToBounds="True"
+                                        Loaded="OnTabRootLoaded"
+                                        SizeChanged="OnTabRootSizeChanged"
+                                        LayoutUpdated="OnTabRootLayoutUpdated"
                                         Cursor="Hand"
                                         AutomationProperties.Name="{Binding Title}"
                                         PreviewMouseLeftButtonDown="OnTabMouseDown"
@@ -63,20 +67,24 @@
                                         MouseRightButtonUp="OnTabRightClick"
                                         AllowDrop="True"
                                         Drop="OnTabDrop" DragOver="OnTabDragOver">
-                                    <Grid ClipToBounds="True">
+                                    <Grid>
                                         <Border x:Name="HoverBg" CornerRadius="7"
                                                 Background="{DynamicResource C.Hover}" Opacity="0" />
                                         <Border x:Name="SelectionBg" CornerRadius="7"
                                                 Background="{DynamicResource C.Selected}" Opacity="0" />
-                                        <Border x:Name="AccentMark" Width="3"
-                                                Height="{Binding DataContext.ChipMarkHeight, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        <!-- L'accento sta dentro la pillola: il ritaglio
+                                             arrotondato della scheda lo tiene lontano dai
+                                             bordi, anche negli angoli. -->
+                                        <Border x:Name="AccentMark" Width="3" Height="10"
+                                                Margin="4,0,0,0" VerticalAlignment="Center"
                                                 CornerRadius="2" HorizontalAlignment="Left"
                                                 Background="{DynamicResource C.AccentGrad}" Opacity="0" />
                                         <Border x:Name="Underline" Height="2" Width="24"
+                                                Margin="0,0,0,2"
                                                 CornerRadius="1" VerticalAlignment="Bottom"
                                                 Background="{DynamicResource C.AccentGrad}" Opacity="0" />
 
-                                        <Grid Margin="1,0,0,0">
+                                        <Grid Margin="8,0,4,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />

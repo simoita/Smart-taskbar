@@ -677,6 +677,36 @@ public partial class TabBarWindow : Window
         }
     }
 
+    /// <summary>
+    /// La scheda è una pillola arrotondata: il ritaglio reale impedisce che
+    /// l'accento, la sottolineatura o l'hover escano dalla sua sagoma. Il
+    /// raggio arriva dallo stile della tab bar (4, 7 o 10 px), quindi va
+    /// riallineato quando il tema o la dimensione cambiano.
+    /// </summary>
+    private void OnTabRootLoaded(object sender, RoutedEventArgs e) => ApplyTabClip(sender as Border);
+
+    private void OnTabRootSizeChanged(object sender, SizeChangedEventArgs e) => ApplyTabClip(sender as Border);
+
+    private void OnTabRootLayoutUpdated(object? sender, EventArgs e) => ApplyTabClip(sender as Border);
+
+    private static void ApplyTabClip(Border? root)
+    {
+        if (root is null)
+            return;
+
+        var rect = new Rect(0, 0, root.ActualWidth, root.ActualHeight);
+        double radius = root.CornerRadius.TopLeft;
+        if (rect.Width < 1 || rect.Height < 1)
+            return;
+
+        if (root.Clip is RectangleGeometry current &&
+            current.Rect == rect &&
+            Math.Abs(current.RadiusX - radius) < 0.1)
+            return;
+
+        root.Clip = new RectangleGeometry(rect, radius, radius);
+    }
+
     private void OnCloseTabClick(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
