@@ -45,6 +45,8 @@ Nello studio, pagina **Schede**:
 - **Posizione**: **Sopra** sostituisce la barra del titolo; **Sotto** lascia la barra staccata sotto la finestra.
 - **Animazioni**: apertura, cambio scheda e chiusura seguono **Animazioni fluide** e **Velocità** della pagina Animazioni. Con le animazioni disattivate la barra compare e scompare senza dissolvenza.
 
+Ogni scheda ritaglia i propri elementi interni (accento e sottolineatura) con il raggio della sua pillola: nessuna parte esce dalla sagoma, in nessuno stile.
+
 Tutte le impostazioni vengono salvate in `%APPDATA%\Nebula\settings.json` e applicate dal vivo senza riavviare Nebula.
 
 ## Crash e terminazione forzata
