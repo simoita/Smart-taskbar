@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -802,6 +803,43 @@ public partial class App
                 foreach ((string _, Window page) in pages)
                 {
                     try { page.Close(); } catch { }
+                }
+            }
+
+            // 9c. Il pannello Start è riusato: la seconda apertura non
+            // ricostruisce la finestra, azzera la ricerca e mette subito il
+            // fuoco nel campo, così il testo digitato non va perso.
+            if (App.Instance is not null)
+            {
+                var startProbe = new StartPanelWindow();
+                try
+                {
+                    startProbe.PrepareForOpen();
+                    startProbe.Show();
+                    startProbe.Activate();
+                    startProbe.FocusSearch();
+                    await Task.Delay(240);
+                    bool startFocused = startProbe.SearchBox.IsKeyboardFocusWithin ||
+                                        Keyboard.FocusedElement == startProbe.SearchBox;
+
+                    startProbe.SearchBox.Text = "prova";
+                    startProbe.Dismiss();
+                    bool startHidden = !startProbe.IsVisible && startProbe.IsLoaded;
+
+                    startProbe.PrepareForOpen();
+                    bool startCleared = startProbe.SearchBox.Text.Length == 0;
+                    startProbe.Show();
+                    await Task.Delay(140);
+                    bool startReopened = startProbe.IsVisible && startProbe.IsLoaded;
+
+                    Add(checks, "start.instant_search",
+                        startFocused && startHidden && startCleared && startReopened,
+                        $"focused={startFocused}; hiddenReusable={startHidden}; " +
+                        $"cleared={startCleared}; reopened={startReopened}");
+                }
+                finally
+                {
+                    try { startProbe.Close(); } catch { }
                 }
             }
 

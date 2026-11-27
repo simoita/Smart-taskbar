@@ -51,6 +51,7 @@ public partial class StartPanelWindow : Window
     private string _quickQuery = "\u0000";
     private int _searchVersion;
     private bool _closing;
+    private bool _introPending = true;
 
     public StartPanelWindow()
     {
@@ -82,8 +83,12 @@ public partial class StartPanelWindow : Window
 
         if (App.Instance is { } app)
         {
-            app.Catalog.Loaded += OnCatalogLoaded;
-            app.Files.IndexReady += OnFilesReady;
+            // Il self-test costruisce il pannello prima che il catalogo sia
+            // pronto: senza queste guardie la finestra non si potrebbe provare.
+            if (app.Catalog is not null)
+                app.Catalog.Loaded += OnCatalogLoaded;
+            if (app.Files is not null)
+                app.Files.IndexReady += OnFilesReady;
         }
 
         PanelDrag.AttachCard(HeaderDragArea, Panel, PanelDragShift);
@@ -94,8 +99,10 @@ public partial class StartPanelWindow : Window
         _searchTimer.Stop();
         if (App.Instance is { } app)
         {
-            app.Catalog.Loaded -= OnCatalogLoaded;
-            app.Files.IndexReady -= OnFilesReady;
+            if (app.Catalog is not null)
+                app.Catalog.Loaded -= OnCatalogLoaded;
+            if (app.Files is not null)
+                app.Files.IndexReady -= OnFilesReady;
         }
 
         DataContext = null;
@@ -278,12 +285,60 @@ public partial class StartPanelWindow : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         // Un programma installato durante la sessione compare senza riavvio.
-        App.Instance?.Catalog.LoadAsync();
+        if (App.Instance?.Catalog is { } catalog)
+            catalog.LoadAsync();
+        FocusSearch();
+    }
 
-        SearchBox.Focus();
-        Keyboard.Focus(SearchBox);
+    protected override void OnActivated(EventArgs e)
+    {
+        base.OnActivated(e);
+
+        // Il pannello è riusato: a ogni apertura torna subito in mano alla
+        // ricerca, prima che parta qualsiasi animazione.
+        FocusSearch();
+
+        if (!_introPending)
+            return;
+
+        _introPending = false;
         AnimateIn();
         Dispatcher.InvokeAsync(AnimateTiles, DispatcherPriority.Loaded);
+    }
+
+    /// <summary>Porta il cursore nella ricerca, con il caret in fondo al testo.</summary>
+    public void FocusSearch()
+    {
+        SearchBox.Focus();
+        Keyboard.Focus(SearchBox);
+        SearchBox.CaretIndex = SearchBox.Text.Length;
+    }
+
+    /// <summary>
+    /// Prepara la finestra riusata alla prossima apertura: ricerca vuota,
+    /// pagina iniziale e stato dell'animazione di ingresso. Non ricostruisce la
+    /// finestra, così il tasto Windows apre il pannello senza il costo del
+    /// primo layout e il testo digitato subito non si perde.
+    /// </summary>
+    public void PrepareForOpen()
+    {
+        _closing = false;
+        _searchTimer.Stop();
+        _searchVersion++;
+        _quickQuery = "\u0000";
+        _results.Clear();
+        ResultList.SelectedIndex = -1;
+
+        if (SearchBox.Text.Length > 0)
+            SearchBox.Text = string.Empty;
+
+        HomeView.Visibility = Visibility.Visible;
+        ResultsView.Visibility = Visibility.Collapsed;
+        SearchPlaceholder.Visibility = Visibility.Visible;
+
+        Panel.Opacity = 0;
+        PanelShift.Y = 34;
+        _introPending = true;
     }
 
     private void AnimateIn()
@@ -578,6 +633,11 @@ public partial class StartPanelWindow : Window
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Se il pannello è appena comparso e il fuoco non è ancora nella
+        // ricerca, il primo tasto premuto la raggiunge invece di perdersi.
+        if (!SearchBox.IsKeyboardFocusWithin && IsTypingKey(e.Key))
+            FocusSearch();
+
         switch (e.Key)
         {
             case Key.Escape:
@@ -740,12 +800,26 @@ public partial class StartPanelWindow : Window
         App.Instance?.ShowGroupPicker();
     }
 
-    private void Dismiss()
+    /// <summary>Chiude il pannello nascondendolo, pronto per la prossima apertura.</summary>
+    public void Dismiss()
     {
         if (_closing)
             return;
 
         _closing = true;
-        Close();
+        Hide();
     }
+
+    /// <summary>
+    /// Tasti che producono testo (o cancellano): meritano il fuoco nella
+    /// ricerca anche quando il pannello è appena stato attivato.
+    /// </summary>
+    private static bool IsTypingKey(Key key) =>
+        key is not (Key.None or Key.Escape or Key.Tab or Key.Enter
+            or Key.Up or Key.Down or Key.Left or Key.Right or Key.Home or Key.End
+            or Key.PageUp or Key.PageDown or Key.Insert or Key.Delete
+            or Key.LeftShift or Key.RightShift or Key.LeftCtrl or Key.RightCtrl
+            or Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin or Key.Apps
+            or Key.F1 or Key.F2 or Key.F3 or Key.F4 or Key.F5 or Key.F6
+            or Key.F7 or Key.F8 or Key.F9 or Key.F10 or Key.F11 or Key.F12);
 }

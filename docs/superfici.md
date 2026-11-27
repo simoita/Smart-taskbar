@@ -4,6 +4,7 @@ Nebula usa le superfici già presenti nella dock, non processi o finestre WPF ag
 
 - **Widget**, **Controlli rapidi** e **Rete** condividono la stessa `WidgetsWindow` con tre schede. Aprendo una scheda si riusa la finestra già creata; chiudendola si fermano timer e risorse della scheda.
 - **Ricerca** usa la `LauncherWindow` esistente. Cerca app del menu Start e, se attivo, finestre aperte tramite `WindowTracker`.
+- **Start** (tasto Windows) usa un solo `StartPanelWindow`, creato in anticipo con `DispatcherPriority.ApplicationIdle` e poi riusato: alla chiusura viene nascosto, non distrutto. A ogni apertura torna con la ricerca vuota e il fuoco già nel campo, prima che parta l'animazione; se il fuoco non fosse ancora arrivato, il primo tasto premuto lo porta nella ricerca invece di perdersi.
 - Tutte le superfici leggono lo stesso `settings.json` in `%APPDATA%\Nebula` e reagiscono dal vivo alle modifiche dello studio.
 
 ## Aprire le superfici

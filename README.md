@@ -4,6 +4,8 @@ Dock e pannello di personalizzazione per Windows, scritto in WPF su .NET 8. Nebu
 
 L'obiettivo di questa revisione è la sicurezza d'uso quotidiano: anche terminando Nebula forzatamente, le finestre raggruppate e la taskbar di Windows devono tornare disponibili senza rilanciare nulla.
 
+**Novità 1.9.1:** il pannello Start risponde subito: la finestra viene preparata in anticipo e riusata, e il cursore è già nella ricerca quando il pannello compare, così i primi caratteri digitati dopo il tasto Windows non vanno più persi.
+
 **Novità 1.9.0:** la dockbar entra in scena tutta insieme, salendo dal bordo dello schermo, e le icone che arrivano dopo non compaiono più di colpo. In più la zona azioni diventa configurabile: in **Studio → Dock** puoi aggiungere pulsanti per pannelli, funzioni di Windows e widget (cattura schermo, blocco, terminale, cestino, rete e altri), con l'ordine che preferisci.
 
 **Novità 1.8.0:** addio alla barra del titolo di Windows: le **schede delle finestre raggruppate** ora sono la barra superiore della finestra attiva, con **riduci, ingrandisci/ripristina e chiudi**, trascinamento con aggancio e ridimensionamento dai bordi; anche **Studio, ricerca, widget, Start e i selettori** usano una barra disegnata da Nebula con gli stessi pulsanti e le stesse funzioni della finestra.

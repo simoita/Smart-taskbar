@@ -299,11 +299,18 @@ public partial class App : Application
         _hotkeys.WidgetsRequested += () => Dispatcher.InvokeAsync(ShowWidgets);
 
         _winKeyHook = new WinKeyHook();
-        _winKeyHook.WinPressed += () => Dispatcher.InvokeAsync(ToggleStartPanel);
+        // The hook already raises the event on this dispatcher: another queue
+        // hop only delays the panel.
+        _winKeyHook.WinPressed += ToggleStartPanel;
         ApplyWinKeyHook();
 
         _tray = new TrayService(ShowSettings, ShowLauncher, ShowWidgets,
             ToggleDockVisibility, RestoreWindowsTaskbar, ExitApp);
+
+        // Il pannello Start si costruisce una volta sola, mentre l'utente non
+        // sta aspettando: al tasto Windows deve comparire e accettare testo
+        // senza il costo del primo layout.
+        Dispatcher.InvokeAsync(GetStartPanel, DispatcherPriority.ApplicationIdle);
 
         // A swap that could not complete restarts this (old) build. Tell the user
         // why the version did not change instead of leaving the failure only in
@@ -879,27 +886,42 @@ public partial class App : Application
         _launcher.Activate();
     }
 
+    private StartPanelWindow GetStartPanel()
+    {
+        if (_startPanel is null)
+        {
+            _startPanel = new StartPanelWindow();
+            _startPanel.Closed += (_, _) => _startPanel = null;
+        }
+
+        return _startPanel;
+    }
+
     public void ShowStartPanel()
     {
-        if (_startPanel is { IsVisible: true })
+        StartPanelWindow panel = GetStartPanel();
+        if (panel.IsVisible)
         {
-            _startPanel.Activate();
+            panel.Activate();
+            panel.FocusSearch();
             return;
         }
 
-        _startPanel = new StartPanelWindow();
-        _startPanel.Closed += (_, _) => _startPanel = null;
-        _startPanel.RefreshContent();
-        _startPanel.Show();
-        _startPanel.Activate();
+        // Prima si mostra e si porta il fuoco nella ricerca, poi si aggiorna il
+        // contenuto: chi inizia a scrivere subito dopo il tasto Windows non
+        // perde la prima lettera.
+        panel.PrepareForOpen();
+        panel.Show();
+        panel.Activate();
+        panel.FocusSearch();
+        panel.RefreshContent();
     }
 
     public void ToggleStartPanel()
     {
         if (_startPanel is { IsVisible: true })
         {
-            _startPanel.Close();
-            _startPanel = null;
+            _startPanel.Dismiss();
             return;
         }
 
@@ -908,8 +930,7 @@ public partial class App : Application
 
     public void CloseStartPanel()
     {
-        _startPanel?.Close();
-        _startPanel = null;
+        _startPanel?.Dismiss();
     }
 
     public void RecordRecent(string? path)
@@ -1382,8 +1403,9 @@ public partial class App : Application
     private void HideDockAndPanels()
     {
         _launcher?.Close();
-        _startPanel?.Close();
-        _startPanel = null;
+        // Il pannello Start è riusato: nasconderlo evita di ricostruirlo alla
+        // prossima apertura (e di perdere il primo carattere digitato).
+        _startPanel?.Dismiss();
         _widgets?.Close();
         foreach (DockWindow dock in AllDocks)
             dock.HideForTaskbarRestore();
