@@ -71,6 +71,7 @@ public sealed class AppSettings : ObservableObject
     private double _dockAppsScale = 1;
     private double _dockSystemScale = 1;
     private double _dockActionsScale = 1;
+    private List<string> _dockButtons = new(DockButtonCatalog.Defaults);
     private bool _dockZoneDividers = true;
     private bool _dockZonesSeparate;
     private bool _showOpenIndicator = true;
@@ -522,6 +523,16 @@ public sealed class AppSettings : ObservableObject
     {
         get => _dockActionsScale;
         set => SetProperty(ref _dockActionsScale, value);
+    }
+
+    /// <summary>
+    /// Pulsanti scelti per la zona azioni della dockbar: pannelli, funzioni di
+    /// Windows e widget, nell'ordine in cui compaiono.
+    /// </summary>
+    public List<string> DockButtons
+    {
+        get => _dockButtons;
+        set => SetProperty(ref _dockButtons, value);
     }
 
     public bool DockZoneDividers

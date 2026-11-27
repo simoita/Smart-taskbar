@@ -166,6 +166,21 @@ public sealed class SettingsStore : IDisposable
         }
         s.TaskbarWidgets = taskbarWidgets;
 
+        // Pulsanti extra della dockbar: solo voci del catalogo, senza doppioni,
+        // entro il tetto che tiene leggibile la zona azioni.
+        s.DockButtons ??= new List<string>(DockButtonCatalog.Defaults);
+        var dockButtons = new List<string>();
+        foreach (string id in s.DockButtons)
+        {
+            string? known = DockButtonCatalog.Find(id)?.Id;
+            if (known is null || dockButtons.Contains(known, StringComparer.OrdinalIgnoreCase))
+                continue;
+            dockButtons.Add(known);
+            if (dockButtons.Count >= DockButtonCatalog.MaxButtons)
+                break;
+        }
+        s.DockButtons = dockButtons;
+
         var widgetModes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (KeyValuePair<string, string> pair in s.TaskbarWidgetModes ??
                  new Dictionary<string, string>())

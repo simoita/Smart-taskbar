@@ -86,6 +86,7 @@ public partial class App
             settings.AnimationsEnabled = false;
             settings.EdgeMargin = 10;
             settings.TaskbarWidgets = new List<string> { "clock", "cpu", "separator", "battery" };
+            settings.DockButtons = new List<string> { "lock", "bogus", "lock", "taskview" };
             store.SaveNow();
             string firstOrder = string.Join(",", settings.TaskbarWidgets);
             store.Dispose();
@@ -95,6 +96,9 @@ public partial class App
             Add(checks, "settings.widgets.roundtrip",
                 firstOrder == "clock,cpu,separator,battery" && reloadedOrder == firstOrder,
                 $"written={firstOrder}; reloaded={reloadedOrder}; file={store.FilePath}");
+            string reloadedButtons = string.Join(",", settings.DockButtons);
+            Add(checks, "settings.dock_buttons", reloadedButtons == "lock,taskview",
+                $"reloaded={reloadedButtons} (atteso lock,taskview)");
 
             Forms.Screen screen = ScreenGeometry.Target(settings.MonitorIndex);
             double scale = ScreenGeometry.Scale(screen);
@@ -142,13 +146,28 @@ public partial class App
             Add(checks, "taskbar.native.hidden_all_monitors", hidden,
                 $"AnyTrayVisible={NativeTaskbarController.AnyTrayVisible()}");
 
+            // L'ingresso della barra è animato: parte oltre il bordo e sale al
+            // suo posto. Va osservato con le animazioni attive, non con la
+            // scorciatoia che il resto del test usa per essere deterministico.
+            bool animationsDuringReveal = settings.AnimationsEnabled;
+            settings.AnimationsEnabled = true;
             dock = new DockWindow(dockVm, store);
             dock.ShowActivated = false;
             dock.Show();
+            await Task.Delay(70);
+            double revealStartTop = dock.Top;
             dock.ApplySettings();
             await WaitUntilAsync(() => dock.IsAppBarRegistered && dock.AppBarApplySucceeded, 4000);
             await Task.Delay(650);
             dock.UpdateLayout();
+
+            double revealSettledTop = dock.Top;
+            bool revealRose = revealStartTop > revealSettledTop + 20 &&
+                              dock.Root.Opacity >= 0.99;
+            Add(checks, "dock.reveal", revealRose,
+                $"startTop={revealStartTop:0.#} settledTop={revealSettledTop:0.#}; " +
+                $"opacity={dock.Root.Opacity:0.00}");
+            settings.AnimationsEnabled = animationsDuringReveal;
 
             Add(checks, "appbar.registered", dock.IsAppBarRegistered,
                 $"IsRegistered={dock.IsAppBarRegistered}");
@@ -361,6 +380,20 @@ public partial class App
             string draggedOrder = string.Join(",", dockVm.TaskbarWidgetItems.Select(w => w.Id));
             Add(checks, "widgets.drag_reorder", draggedOrder == "cpu,clock,search,separator",
                 $"order={draggedOrder}");
+
+            // 7c. Pulsanti extra della dockbar: solo azioni del catalogo, senza
+            // doppioni, nell'ordine scelto e davvero resi nella zona azioni.
+            settings.DockButtons = new List<string> { "lock", "bogus", "search", "lock", "taskview" };
+            dockVm.RefreshDockButtons();
+            await Task.Delay(300);
+            string dockButtonOrder = string.Join(",", dockVm.DockButtons.Select(b => b.Id));
+            int dockButtonHost = dock.DockButtonsList?.Items.Count ?? -1;
+            Add(checks, "dock.custom_buttons",
+                dockButtonOrder == "lock,search,taskview" && dockButtonHost == 3 &&
+                dockVm.DockButtonsVisibility == Visibility.Visible,
+                $"model={dockButtonOrder}; visual={dockButtonHost}; " +
+                $"visibility={dockVm.DockButtonsVisibility}");
+            Capture(dock.ActionsZone, Path.Combine(outputDir, "dock-actions.png"));
 
             store.SaveNow();
             using (var modeStore = new SettingsStore())
@@ -642,8 +675,14 @@ public partial class App
 
                 string tabDetail = $"A={probeA}; B={probeB}";
                 bool tabCovered = false;
+                // La finestra esiste prima che WinForms abbia finito di mostrarla:
+                // il raggruppamento la scarterebbe come non visibile.
+                if (probeA != IntPtr.Zero && probeB != IntPtr.Zero)
+                    await Task.Delay(600);
+
+                string? tabError = null;
                 if (probeA != IntPtr.Zero && probeB != IntPtr.Zero &&
-                    probeService.CreateGroup(new[] { probeA, probeB }, out string? tabError))
+                    probeService.CreateGroup(new[] { probeA, probeB }, out tabError))
                 {
                     TabGroup group = probeService.Groups[0];
                     probeBar = new TabBarWindow(group, probeService, settings, theme)
@@ -679,7 +718,9 @@ public partial class App
                 }
                 else
                 {
-                    tabDetail += "; gruppo non creato";
+                    tabDetail += tabError is null
+                        ? "; gruppo non creato"
+                        : "; " + tabError;
                 }
 
                 Add(checks, "tabs.custom_title_bar", tabCovered, tabDetail);
@@ -891,6 +932,32 @@ public partial class App
 
             Capture((FrameworkElement)studio.FindName("Chrome"),
                 Path.Combine(outputDir, $"studio-{label}-{key}.png"));
+
+            // La pagina Dock è lunga: la parte bassa (pulsanti extra della
+            // dockbar) merita una cattura propria, altrimenti resta invisibile
+            // ai controlli visivi che guardano solo l'inizio della pagina.
+            if (key == "dock")
+            {
+                // Un VisualBrush di un elemento fuori dall'area visibile esce
+                // slavato: si porta prima la scheda sotto la finestra e si
+                // cattura lo Studio, come lo vede l'utente.
+                var buttonsCard = (FrameworkElement)studio.FindName("DockButtonsCard");
+                var pageHost = (FrameworkElement)studio.FindName("PageHost");
+                Point cardOrigin = buttonsCard.TransformToAncestor(pageHost).Transform(new Point(0, 0));
+                scroll.ScrollToVerticalOffset(Math.Max(0, cardOrigin.Y - 12));
+                studio.UpdateLayout();
+                await Task.Delay(140);
+                Capture((FrameworkElement)studio.FindName("Chrome"),
+                    Path.Combine(outputDir, $"studio-{label}-{key}-buttons.png"));
+                scroll.ScrollToBottom();
+                studio.UpdateLayout();
+                await Task.Delay(80);
+                Capture((FrameworkElement)studio.FindName("Chrome"),
+                    Path.Combine(outputDir, $"studio-{label}-{key}-bottom.png"));
+                scroll.ScrollToTop();
+                studio.UpdateLayout();
+                await Task.Delay(40);
+            }
         }
     }
 

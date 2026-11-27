@@ -49,6 +49,8 @@ public partial class DockWindow : Window
     private bool _userHidden;
     private bool _hiddenForTaskbarRestore;
     private int _tick;
+    private bool _revealing;
+    private readonly HashSet<string> _shownItemKeys = new(StringComparer.OrdinalIgnoreCase);
     private int _followMonitor = -1;
     private int _followTicks;
     private Rect _workAreaDip;
@@ -116,8 +118,10 @@ public partial class DockWindow : Window
             _hwndSource = null;
             _appBar.Dispose();
             _vm.Settings.PropertyChanged -= OnSettingsChanged;
+            _vm.ItemsChanged -= OnDockItemsChanged;
         };
         _vm.Settings.PropertyChanged += OnSettingsChanged;
+        _vm.ItemsChanged += OnDockItemsChanged;
 
         _backdropTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(260) };
         _backdropTimer.Tick += (_, _) =>
@@ -232,23 +236,56 @@ public partial class DockWindow : Window
         UpdateBackdrop();
         CenterLiquidSheen(false);
         Dispatcher.InvokeAsync(UpdateAppBar, DispatcherPriority.Loaded);
-        Dispatcher.InvokeAsync(AnimateDockItemsIn, DispatcherPriority.Loaded);
+        RevealDock();
+    }
+
+    /// <summary>
+    /// La barra entra in scena tutta insieme: parte oltre il bordo dello schermo
+    /// e sale al suo posto mentre l'opacità la accompagna. Prima il contenuto
+    /// faceva una seconda animazione dentro una finestra già ferma, e le icone
+    /// che arrivavano dopo comparivano di colpo "dal nulla".
+    /// </summary>
+    private void RevealDock()
+    {
+        double target = VisibleTop();
+
+        _shownItemKeys.Clear();
+        foreach (DockItemViewModel item in _vm.Items)
+            _shownItemKeys.Add(item.Key);
 
         if (!_vm.Settings.AnimationsEnabled)
         {
+            _revealing = false;
+            BeginAnimation(TopProperty, null);
+            Top = target;
             Root.Opacity = 1;
-            DockSlide.Y = 0;
             return;
         }
 
-        double seconds = 0.45 / Math.Clamp(_vm.Settings.AnimationSpeed, 0.5, 2);
+        _revealing = true;
+        double speed = Math.Clamp(_vm.Settings.AnimationSpeed, 0.5, 2);
 
-        Root.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromSeconds(seconds))
+        BeginAnimation(TopProperty, null);
+        Top = HiddenTop();
+        Root.Opacity = 0;
+        UpdateLayout();
+
+        var rise = new DoubleAnimation(Top, target,
+            TimeSpan.FromMilliseconds(380 / speed))
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        });
-        DockSlide.BeginAnimation(TranslateTransform.YProperty,
-            new DoubleAnimation(24, 0, TimeSpan.FromSeconds(seconds))
+            EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseOut }
+        };
+        rise.Completed += (_, _) =>
+        {
+            _revealing = false;
+            BeginAnimation(TopProperty, null);
+            Top = target;
+            Reposition();
+        };
+        BeginAnimation(TopProperty, rise);
+
+        Root.BeginAnimation(OpacityProperty,
+            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(210 / speed))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
             });
@@ -256,7 +293,7 @@ public partial class DockWindow : Window
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (!_hidden && !_animating)
+        if (!_hidden && !_animating && !_revealing)
             Reposition();
 
         _backdropTimer.Stop();
@@ -340,7 +377,7 @@ public partial class DockWindow : Window
         }
 
         Left = work.Left + (work.Width - ActualWidth) / 2;
-        if (!_hidden)
+        if (!_hidden && !_revealing)
         {
             BeginAnimation(TopProperty, null);
             Top = VisibleTop();
@@ -417,7 +454,7 @@ public partial class DockWindow : Window
         // Windows can grant a strip that is not flush with the monitor edge
         // (the bottom edge is shared with the native bar). Follow the granted
         // rectangle instead of the edge the user asked for.
-        if (AppBarApplySucceeded && !_hidden && IsLoaded)
+        if (AppBarApplySucceeded && !_hidden && IsLoaded && !_revealing)
         {
             BeginAnimation(TopProperty, null);
             Top = VisibleTop();
@@ -1041,10 +1078,10 @@ public partial class DockWindow : Window
         }
 
         _animating = true;
-        double seconds = 0.26 / Math.Clamp(_vm.Settings.AnimationSpeed, 0.5, 2);
+        double seconds = 0.32 / Math.Clamp(_vm.Settings.AnimationSpeed, 0.5, 2);
         var animation = new DoubleAnimation(Top, target, TimeSpan.FromSeconds(seconds))
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            EasingFunction = new QuinticEase { EasingMode = EasingMode.EaseOut }
         };
         animation.Completed += (_, _) =>
         {
@@ -1146,91 +1183,116 @@ public partial class DockWindow : Window
 
         try
         {
-            switch (widget.Id)
-            {
-                case "search":
-                    App.Instance?.ShowLauncher();
-                    break;
-                case "clock":
-                case "date":
-                case "widgets":
-                case "cpu":
-                case "ram":
-                case "stats":
-                case "ramdetail":
-                case "disk":
-                case "uptime":
-                case "battery":
-                    // Every read-only system widget opens the panel with the
-                    // full detail instead of doing nothing.
-                    App.Instance?.ShowWidgets();
-                    break;
-                case "network":
-                case "wifi":
-                case "bluetooth":
-                    App.Instance?.ShowNetworkPanel();
-                    break;
-                case "controls":
-                case "brightness":
-                    App.Instance?.ShowControls();
-                    break;
-                case "volume":
-                    _vm.Controls.ToggleMute(out _, out _);
-                    _vm.Controls.RefreshVolumeOnly();
-                    _vm.UpdateTaskbarWidgetValues();
-                    break;
-                case "tabs":
-                    App.Instance?.ShowGroupPicker();
-                    break;
-                case "settings":
-                    App.Instance?.ShowSettings();
-                    break;
-                case "media":
-                    App.Instance?.ToggleMediaPlayback();
-                    break;
-                case "notifications":
-                    _vm.Controls.SendWinShortcut(0x4E); // Win+N
-                    break;
-                case "quicksettings":
-                    _vm.Controls.SendWinShortcut(0x41); // Win+A
-                    break;
-                case "taskview":
-                    _vm.Controls.SendWinShortcut(0x09); // Win+Tab
-                    break;
-                case "showdesktop":
-                    _vm.Controls.SendWinShortcut(0x44); // Win+D
-                    break;
-                case "screenshot":
-                    _vm.Controls.SendWinShortcut(0x53, shift: true); // Win+Shift+S
-                    break;
-                case "clipboard":
-                    _vm.Controls.SendWinShortcut(0x56); // Win+V
-                    break;
-                case "emoji":
-                    _vm.Controls.SendWinShortcut(0xBE); // Win+.
-                    break;
-                case "lock":
-                    _vm.Controls.SendWinShortcut(0x4C); // Win+L
-                    break;
-                case "explorer":
-                    OpenShellTarget("explorer.exe");
-                    break;
-                case "terminal":
-                    OpenTerminal();
-                    break;
-                case "taskmgr":
-                    OpenShellTarget("taskmgr.exe");
-                    break;
-                case "recycle":
-                    OpenShellTarget("shell:RecycleBinFolder");
-                    break;
-            }
+            RunQuickAction(widget.Id);
         }
         catch (Exception ex)
         {
             // A missing optional app (Windows Terminal, Settings URI) must not
             // take the bar down; the next click simply tries again.
             Log.Write($"Taskbar widget action '{widget.Id}' failed: {ex.Message}");
+        }
+    }
+
+    private void OnDockButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: DockButtonViewModel button })
+            return;
+
+        try
+        {
+            RunQuickAction(button.Id);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Dock button '{button.Id}' failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Esegue una voce del catalogo. Widget della barra e pulsanti della dock
+    /// passano entrambi di qui: una sola implementazione per ogni funzione, così
+    /// le due superfici non possono divergere.
+    /// </summary>
+    private void RunQuickAction(string id)
+    {
+        switch (id)
+        {
+            case "search":
+                App.Instance?.ShowLauncher();
+                break;
+            case "clock":
+            case "date":
+            case "widgets":
+            case "cpu":
+            case "ram":
+            case "stats":
+            case "ramdetail":
+            case "disk":
+            case "uptime":
+            case "battery":
+                // Every read-only system widget opens the panel with the
+                // full detail instead of doing nothing.
+                App.Instance?.ShowWidgets();
+                break;
+            case "network":
+            case "wifi":
+            case "bluetooth":
+                App.Instance?.ShowNetworkPanel();
+                break;
+            case "controls":
+            case "brightness":
+                App.Instance?.ShowControls();
+                break;
+            case "volume":
+                _vm.Controls.ToggleMute(out _, out _);
+                _vm.Controls.RefreshVolumeOnly();
+                _vm.UpdateTaskbarWidgetValues();
+                break;
+            case "tabs":
+                App.Instance?.ShowGroupPicker();
+                break;
+            case "settings":
+                App.Instance?.ShowSettings();
+                break;
+            case "media":
+                App.Instance?.ToggleMediaPlayback();
+                break;
+            case "notifications":
+                _vm.Controls.SendWinShortcut(0x4E); // Win+N
+                break;
+            case "quicksettings":
+                _vm.Controls.SendWinShortcut(0x41); // Win+A
+                break;
+            case "taskview":
+                _vm.Controls.SendWinShortcut(0x09); // Win+Tab
+                break;
+            case "showdesktop":
+                _vm.Controls.SendWinShortcut(0x44); // Win+D
+                break;
+            case "screenshot":
+                _vm.Controls.SendWinShortcut(0x53, shift: true); // Win+Shift+S
+                break;
+            case "clipboard":
+                _vm.Controls.SendWinShortcut(0x56); // Win+V
+                break;
+            case "emoji":
+                _vm.Controls.SendWinShortcut(0xBE); // Win+.
+                break;
+            case "lock":
+                _vm.Controls.SendWinShortcut(0x4C); // Win+L
+                break;
+            case "explorer":
+                OpenShellTarget("explorer.exe");
+                break;
+            case "terminal":
+                OpenTerminal();
+                break;
+            case "taskmgr":
+                OpenShellTarget("taskmgr.exe");
+                break;
+            case "recycle":
+                OpenShellTarget("shell:RecycleBinFolder");
+                break;
         }
     }
 
@@ -1687,30 +1749,46 @@ public partial class DockWindow : Window
     }
 
     /// <summary>Staggered entrance for the dock icons; skipped when motion is off.</summary>
-    private void AnimateDockItemsIn()
+    /// <summary>
+    /// Le icone che arrivano dopo (un'app appena aperta, un pin aggiunto) entrano
+    /// con la stessa dissolvenza invece di apparire di colpo accanto alle altre.
+    /// </summary>
+    private void OnDockItemsChanged()
     {
-        if (!_vm.Settings.AnimationsEnabled || DockItems is null)
+        Dispatcher.InvokeAsync(AnimateNewDockItems, DispatcherPriority.Loaded);
+    }
+
+    private void AnimateNewDockItems()
+    {
+        if (DockItems is null || !IsVisible)
             return;
 
+        DockItems.UpdateLayout();
         double speed = Math.Clamp(_vm.Settings.AnimationSpeed, 0.5, 2);
-        for (int index = 0; index < _vm.Items.Count; index++)
+
+        foreach (DockItemViewModel item in _vm.Items)
         {
-            if (DockItems.ItemContainerGenerator.ContainerFromIndex(index) is not FrameworkElement item)
+            if (_shownItemKeys.Contains(item.Key))
                 continue;
 
-            item.Opacity = 0;
-            var shift = new TranslateTransform(0, 12);
-            item.RenderTransform = shift;
-            item.BeginAnimation(OpacityProperty,
-                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(210 / speed))
+            if (DockItems.ItemContainerGenerator.ContainerFromItem(item) is not FrameworkElement container)
+                continue;
+
+            _shownItemKeys.Add(item.Key);
+            if (!_vm.Settings.AnimationsEnabled)
+                continue;
+
+            container.Opacity = 0;
+            var shift = new TranslateTransform(0, 6);
+            container.RenderTransform = shift;
+            container.BeginAnimation(OpacityProperty,
+                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150 / speed))
                 {
-                    BeginTime = TimeSpan.FromMilliseconds(24 * index / speed),
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 });
             shift.BeginAnimation(TranslateTransform.YProperty,
-                new DoubleAnimation(12, 0, TimeSpan.FromMilliseconds(260 / speed))
+                new DoubleAnimation(6, 0, TimeSpan.FromMilliseconds(190 / speed))
                 {
-                    BeginTime = TimeSpan.FromMilliseconds(24 * index / speed),
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                 });
         }

@@ -474,6 +474,42 @@ public partial class SettingsWindow : Window
         _store.MarkDirty();
     }
 
+    private void OnAddDockButton(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: DockButtonOptionViewModel option })
+            return;
+
+        _vm.AddDockButton(option);
+        _store.MarkDirty();
+    }
+
+    private void OnRemoveDockButton(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: DockButtonOptionViewModel option })
+            return;
+
+        _vm.RemoveDockButton(option);
+        _store.MarkDirty();
+    }
+
+    private void OnMoveDockButtonUp(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: DockButtonOptionViewModel option })
+            return;
+
+        _vm.MoveDockButton(option, -1);
+        _store.MarkDirty();
+    }
+
+    private void OnMoveDockButtonDown(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: DockButtonOptionViewModel option })
+            return;
+
+        _vm.MoveDockButton(option, 1);
+        _store.MarkDirty();
+    }
+
     /// <summary>
     /// Reorders the bar by dragging a row of the Studio list: the row under the
     /// pointer receives the dragged widget just before itself.

@@ -1231,6 +1231,92 @@
                                             </StackPanel>
                                         </Border>
 
+                                        <Border x:Name="DockButtonsCard" Style="{StaticResource Card}" Margin="0,0,0,20">
+                                            <StackPanel>
+                                                <TextBlock Text="PULSANTI DELLA DOCKBAR" Style="{StaticResource T.Section}" />
+                                                <TextBlock Text="Oltre ai pulsanti fissi, la zona azioni può ospitare qualunque voce del catalogo: pannelli Nebula, funzioni di Windows e widget. Scegli quali vuoi e in che ordine; le frecce spostano il pulsante, la × lo toglie."
+                                                           Style="{StaticResource T.Caption}" Margin="0,0,0,10" TextWrapping="Wrap" />
+
+                                                <ItemsControl ItemsSource="{Binding ActiveDockButtons}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Style="{StaticResource Row}" Padding="0,7">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="28" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                        <ColumnDefinition Width="Auto" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons"
+                                                                               FontSize="14" Foreground="{DynamicResource C.AccentText}"
+                                                                               VerticalAlignment="Center" />
+                                                                    <StackPanel Grid.Column="1" Margin="6,0,12,0"
+                                                                                VerticalAlignment="Center">
+                                                                        <TextBlock Text="{Binding Name}" FontSize="12.5"
+                                                                                   Foreground="{DynamicResource C.Text}" />
+                                                                        <TextBlock Text="{Binding Description}" FontSize="9.5"
+                                                                                   Foreground="{DynamicResource C.TextMuted}"
+                                                                                   TextTrimming="CharacterEllipsis" />
+                                                                    </StackPanel>
+                                                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                                                        <Button Style="{StaticResource IconButton}" Width="26" Height="26"
+                                                                                ToolTip="Sposta a sinistra" Tag="{Binding}"
+                                                                                Click="OnMoveDockButtonUp">
+                                                                            <TextBlock Text="&#xE76B;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+                                                                        </Button>
+                                                                        <Button Style="{StaticResource IconButton}" Width="26" Height="26"
+                                                                                ToolTip="Sposta a destra" Tag="{Binding}"
+                                                                                Click="OnMoveDockButtonDown">
+                                                                            <TextBlock Text="&#xE76C;" FontFamily="Segoe Fluent Icons" FontSize="10" />
+                                                                        </Button>
+                                                                        <Button Style="{StaticResource IconButton}" Width="26" Height="26"
+                                                                                ToolTip="Rimuovi dalla dockbar" Tag="{Binding}"
+                                                                                Click="OnRemoveDockButton">
+                                                                            <TextBlock Text="&#xE711;" FontFamily="Segoe Fluent Icons" FontSize="9" />
+                                                                        </Button>
+                                                                    </StackPanel>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+
+                                                <TextBlock Text="Nessun pulsante extra: la dock mostra solo i controlli di sempre."
+                                                           Style="{StaticResource T.Caption}" Margin="0,4,0,0"
+                                                           Visibility="{Binding NoDockButtonsVisibility}" />
+                                                <TextBlock Text="{Binding DockButtonCountText}"
+                                                           Style="{StaticResource T.Caption}" Margin="0,4,0,10" />
+
+                                                <TextBlock Text="AGGIUNGI UN PULSANTE" Style="{StaticResource T.Section}"
+                                                           Margin="0,4,0,6" />
+                                                <ItemsControl ItemsSource="{Binding AvailableDockButtons}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Button Style="{StaticResource GhostButton}" Padding="10,6"
+                                                                    Margin="0,0,8,8" Tag="{Binding}"
+                                                                    ToolTip="{Binding Description}"
+                                                                    Click="OnAddDockButton">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons"
+                                                                               FontSize="12" VerticalAlignment="Center" />
+                                                                    <TextBlock Text="{Binding Name}" FontSize="11.5"
+                                                                               Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                                    <TextBlock Text="+" FontSize="13" Margin="7,0,0,0"
+                                                                               VerticalAlignment="Center"
+                                                                               Foreground="{DynamicResource C.AccentText}" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+
                                         <Border Style="{StaticResource Card}" Margin="0,0,0,20">
                                             <StackPanel>
                                                 <TextBlock Text="STATO DELLE ICONE" Style="{StaticResource T.Section}" />

@@ -63,6 +63,7 @@ public sealed class DockViewModel : ObservableObject
         RefreshTheme();
         UpdateClock();
         RefreshTaskbarWidgets();
+        RefreshDockButtons();
         Media.Changed += UpdateTaskbarWidgetValues;
         Media.Start();
         _clockTimer.Start();
@@ -80,6 +81,12 @@ public sealed class DockViewModel : ObservableObject
 
     /// <summary>Widgets rendered directly in the taskbar, in user order.</summary>
     public ObservableCollection<TaskbarWidgetViewModel> TaskbarWidgetItems { get; } = new();
+
+    /// <summary>Pulsanti extra della zona azioni, nell'ordine scelto.</summary>
+    public ObservableCollection<DockButtonViewModel> DockButtons { get; } = new();
+
+    public Visibility DockButtonsVisibility =>
+        DockButtons.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     public string TimeText
     {
@@ -400,6 +407,28 @@ public sealed class DockViewModel : ObservableObject
 
         UpdateTaskbarWidgetValues();
         RefreshWidgetSensors(force: true);
+    }
+
+    /// <summary>
+    /// Rebuilds the extra dock buttons in the configured order. Unknown ids and
+    /// duplicates (a hand-edited settings file) are ignored here too, so the dock
+    /// never shows a button that does nothing.
+    /// </summary>
+    public void RefreshDockButtons()
+    {
+        DockButtons.Clear();
+
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string id in Settings.DockButtons ?? new List<string>())
+        {
+            TaskbarWidgetDefinition? definition = DockButtonCatalog.Find(id);
+            if (definition is null || !used.Add(definition.Id))
+                continue;
+
+            DockButtons.Add(new DockButtonViewModel(definition));
+        }
+
+        OnPropertyChanged(nameof(DockButtonsVisibility));
     }
 
     /// <summary>
@@ -808,6 +837,9 @@ public sealed class DockViewModel : ObservableObject
                 break;
             case nameof(AppSettings.ShowDate):
                 UpdateTaskbarWidgetValues();
+                break;
+            case nameof(AppSettings.DockButtons):
+                RefreshDockButtons();
                 break;
             case nameof(AppSettings.TaskbarWidgets):
             case nameof(AppSettings.TaskbarWidgetModes):

@@ -160,6 +160,7 @@ public sealed class SettingsViewModel : ObservableObject
             WidgetOptions.Add(new WidgetOptionViewModel(settings, widget));
         SyncWidgetOptions();
         SyncTaskbarWidgets();
+        SyncDockButtons();
 
         AccentInput = settings.AccentHex;
 
@@ -203,6 +204,10 @@ public sealed class SettingsViewModel : ObservableObject
         {
             SyncTaskbarWidgets();
         }
+        else if (e.PropertyName == nameof(AppSettings.DockButtons))
+        {
+            SyncDockButtons();
+        }
         else if (e.PropertyName == nameof(AppSettings.IconSize))
         {
             OnPropertyChanged(nameof(IconSizePreset));
@@ -220,6 +225,8 @@ public sealed class SettingsViewModel : ObservableObject
     public ObservableCollection<WidgetOptionViewModel> WidgetOptions { get; } = new();
     public ObservableCollection<TaskbarWidgetOptionViewModel> ActiveTaskbarWidgets { get; } = new();
     public ObservableCollection<TaskbarWidgetOptionViewModel> AvailableTaskbarWidgets { get; } = new();
+    public ObservableCollection<DockButtonOptionViewModel> ActiveDockButtons { get; } = new();
+    public ObservableCollection<DockButtonOptionViewModel> AvailableDockButtons { get; } = new();
     public ObservableCollection<ShortcutInfoViewModel> DesktopShortcuts { get; } = new();
     public IReadOnlyList<TabStyleOptionViewModel> TabStyleOptions { get; } = new List<TabStyleOptionViewModel>
     {
@@ -561,6 +568,13 @@ public sealed class SettingsViewModel : ObservableObject
     public Visibility NoTaskbarWidgetsVisibility =>
         Settings.TaskbarWidgets is { Count: > 0 } ? Visibility.Collapsed : Visibility.Visible;
 
+    public string DockButtonCountText =>
+        $"{ActiveDockButtons.Count} di {DockButtonCatalog.MaxButtons} pulsanti extra · " +
+        "frecce per l'ordine";
+
+    public Visibility NoDockButtonsVisibility =>
+        Settings.DockButtons is { Count: > 0 } ? Visibility.Collapsed : Visibility.Visible;
+
     private void SyncTaskbarWidgets()
     {
         ActiveTaskbarWidgets.Clear();
@@ -584,6 +598,30 @@ public sealed class SettingsViewModel : ObservableObject
 
         OnPropertyChanged(nameof(TaskbarWidgetCountText));
         OnPropertyChanged(nameof(NoTaskbarWidgetsVisibility));
+    }
+
+    private void SyncDockButtons()
+    {
+        ActiveDockButtons.Clear();
+        AvailableDockButtons.Clear();
+
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string id in Settings.DockButtons ?? new List<string>())
+        {
+            TaskbarWidgetDefinition? definition = DockButtonCatalog.Find(id);
+            if (definition is null || !used.Add(definition.Id))
+                continue;
+            ActiveDockButtons.Add(new DockButtonOptionViewModel(definition));
+        }
+
+        foreach (TaskbarWidgetDefinition definition in DockButtonCatalog.All)
+        {
+            if (!used.Contains(definition.Id))
+                AvailableDockButtons.Add(new DockButtonOptionViewModel(definition));
+        }
+
+        OnPropertyChanged(nameof(DockButtonCountText));
+        OnPropertyChanged(nameof(NoDockButtonsVisibility));
     }
 
     private string TaskbarWidgetMode(string id) =>
@@ -681,6 +719,39 @@ public sealed class SettingsViewModel : ObservableObject
         SyncTaskbarWidgets();
     }
 
+    public void AddDockButton(DockButtonOptionViewModel option)
+    {
+        var buttons = new List<string>(Settings.DockButtons ?? new List<string>());
+        if (buttons.Contains(option.Id, StringComparer.OrdinalIgnoreCase) ||
+            buttons.Count >= DockButtonCatalog.MaxButtons)
+            return;
+
+        buttons.Add(option.Id);
+        Settings.DockButtons = buttons;
+        SyncDockButtons();
+    }
+
+    public void RemoveDockButton(DockButtonOptionViewModel option)
+    {
+        var buttons = new List<string>(Settings.DockButtons ?? new List<string>());
+        buttons.RemoveAll(id => string.Equals(id, option.Id, StringComparison.OrdinalIgnoreCase));
+        Settings.DockButtons = buttons;
+        SyncDockButtons();
+    }
+
+    public void MoveDockButton(DockButtonOptionViewModel option, int delta)
+    {
+        var buttons = new List<string>(Settings.DockButtons ?? new List<string>());
+        int index = buttons.FindIndex(id => string.Equals(id, option.Id, StringComparison.OrdinalIgnoreCase));
+        int target = index + delta;
+        if (index < 0 || target < 0 || target >= buttons.Count)
+            return;
+
+        (buttons[index], buttons[target]) = (buttons[target], buttons[index]);
+        Settings.DockButtons = buttons;
+        SyncDockButtons();
+    }
+
     public void AddPin(string path)
     {
         if (string.IsNullOrWhiteSpace(path) ||
@@ -717,6 +788,15 @@ public sealed record TabPositionOptionViewModel(string Id, string Name);
 public sealed record ZoneOrderOptionViewModel(string Id, string Name);
 public sealed record IconSizeOptionViewModel(string Id, string Name);
 public sealed record ShortcutInfoViewModel(string Name, string Path);
+
+/// <summary>Voce del catalogo mostrata nell'editor dei pulsanti della dock.</summary>
+public sealed record DockButtonOptionViewModel(TaskbarWidgetDefinition Definition)
+{
+    public string Id => Definition.Id;
+    public string Name => Definition.Name;
+    public string Description => Definition.Description;
+    public string Glyph => Definition.Glyph;
+}
 
 public sealed class TaskbarWidgetOptionViewModel
 {

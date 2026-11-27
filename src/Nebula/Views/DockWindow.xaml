@@ -8,10 +8,6 @@
         FontFamily="Segoe UI Variable Text, Segoe UI">
 
     <Grid x:Name="Root" Margin="26,22,26,26" Opacity="0">
-        <Grid.RenderTransform>
-            <TranslateTransform x:Name="DockSlide" Y="24" />
-        </Grid.RenderTransform>
-
         <Border x:Name="Shell" CornerRadius="{Binding ShellCornerRadius}"
                 Background="{DynamicResource C.DockShell}"
                 BorderBrush="{Binding StrokeBrush}" BorderThickness="1"
@@ -416,6 +412,32 @@
                     </StackPanel>
 
                     <StackPanel x:Name="ActionsZone" Orientation="Horizontal" VerticalAlignment="Center">
+
+                        <!-- Pulsanti scelti in Studio: ogni voce del catalogo
+                             apre un pannello Nebula, una funzione di Windows o
+                             un widget, senza aggiungere altre zone alla barra. -->
+                        <ItemsControl x:Name="DockButtonsList" ItemsSource="{Binding DockButtons}"
+                                      VerticalAlignment="Center"
+                                      Visibility="{Binding DockButtonsVisibility}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource DockIconButton}"
+                                            Width="{Binding DataContext.ActionButtonSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            Height="{Binding DataContext.ActionButtonSize, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            Click="OnDockButtonClick"
+                                            ToolTip="{Binding Description}"
+                                            AutomationProperties.Name="{Binding Name}">
+                                        <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons"
+                                                   FontSize="14" />
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
                         <Button Style="{StaticResource DockIconButton}" Click="OnTabsClick"
                                 Width="{Binding ActionButtonSize}" Height="{Binding ActionButtonSize}"

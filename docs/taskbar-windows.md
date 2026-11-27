@@ -127,6 +127,34 @@ volta per migrare la configurazione esistente, poi la lista è l'unica fonte di
 verità. I widget sono indipendenti dall'ordine delle zone e possono stare anche
 in una dock non a tutta larghezza.
 
+## Ingresso animato della dock
+
+La dock entra in scena come un unico blocco: parte oltre il bordo dello schermo
+e sale al suo posto in circa 380 ms (divisi per **Velocità** in **Studio →
+Animazioni**), mentre l'opacità la accompagna. Prima il contenuto faceva una
+seconda animazione dentro una finestra già ferma, e le icone che arrivavano
+dopo comparivano di colpo: ora ogni icona nuova (un'app appena aperta, un pin
+aggiunto) entra con una dissolvenza breve, senza spostare le altre.
+
+Con **Animazioni fluide** disattivato la barra compare e scompare senza
+transizioni. L'auto-hide alla ricomparsa usa la stessa salita con un'easing più
+morbido; in chiusura la barra scende oltre il bordo.
+
+## Pulsanti della dockbar
+
+**Studio → Dock → Pulsanti della dockbar** aggiunge alla zona azioni qualunque
+voce del catalogo, oltre ai pulsanti fissi (Schede, Cerca, Widget, Controlli,
+Impostazioni). Ogni voce è un pulsante che apre un pannello Nebula, esegue una
+funzione di Windows o comanda un widget; l'ordine è quello della lista e si
+cambia con le frecce.
+
+La lista è salvata in `settings.json` come `DockButtons`. Alla prima apertura
+contiene Mostra desktop, Panoramica, Cattura schermo, Appunti, Blocca e Cestino.
+Il caricamento scarta le voci sconosciute e i doppioni e si ferma a 12 pulsanti,
+così la zona azioni resta leggibile anche con un file di impostazioni modificato
+a mano. I pulsanti usano lo stesso esecutore dei widget della barra
+(`RunQuickAction`): una sola implementazione per ogni funzione.
+
 ## Come fanno le app che sostituiscono la taskbar
 
 Esistono due famiglie di soluzioni.
